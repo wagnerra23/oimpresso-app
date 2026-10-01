@@ -51,10 +51,10 @@ export function App() {
   return (
     <div className="oi oi-app" data-theme="light">
       {DEMO && <div className="app-banner demo">Modo demonstração — dados simulados</div>}
-      {!online && <div className="app-banner off" role="status">Sem conexão. Para bater o ponto o aparelho precisa estar on-line.</div>}
+      {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
         {aba === 'inicio' && <Inicio irParaPonto={() => setAba('ponto')} />}
-        {aba === 'ponto' && <Ponto avisar={avisar} />}
+        {aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
         {aba === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} />}
       </div>
       <nav className="oi-tabbar" aria-label="Navegação">

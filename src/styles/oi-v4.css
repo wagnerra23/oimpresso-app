@@ -1,0 +1,61 @@
+/* GERADO por scripts/tokens-v4.mjs a partir de design/oi-theme.v4.ts — não editar à mão.
+   design-v4: neutros e destaque vêm do DS do oimpresso (roxo 295), ação em verde. */
+.oi {
+  --bg: #fbfaf8;
+  --bg-2: #f4f3f0;
+  --surface: #ffffff;
+  --surface-2: #f7f7f4;
+  --border: #dfdedb;
+  --border-2: #e9e8e5;
+  --text: #1d1a15;
+  --text-dim: #66635d;
+  --text-mute: #928f88;
+  --accent: #795bbf;
+  --accent-2: #8e71d6;
+  --accent-soft: #f0eaff;
+  --accent-fg: #ffffff;
+  --accent-text: #795bbf;
+  --action: #2c894e;
+  --action-2: #12773d;
+  --action-soft: #d3f5db;
+  --action-fg: #ffffff;
+  --info: #2ea7ff;
+  --danger: #c53637;
+  --warn: #a76c12;
+  --ok: #21763c;
+  --brand-magenta: #c12682;
+  --brand-purple: #5b2987;
+  --brand-deep: #391153;
+  --brand-cyan: #34dde5;
+  --brand-yellow: #fce765;
+}
+
+.oi[data-theme="dark"] {
+  --bg: #212427;
+  --bg-2: #1a1d1f;
+  --surface: #2a2e31;
+  --surface-2: #323639;
+  --border: #34393c;
+  --border-2: #2d3134;
+  --text: #ecebe7;
+  --text-dim: #a6a4a1;
+  --text-mute: #7b7a77;
+  --accent: #795bbf;
+  --accent-2: #8e71d6;
+  --accent-soft: #3a2a5e;
+  --accent-fg: #ffffff;
+  --accent-text: #8e71d6;
+  --action: #22c55e;
+  --action-2: #34d36a;
+  --action-soft: #143324;
+  --action-fg: #08110b;
+  --info: #2ea7ff;
+  --danger: #ff716b;
+  --warn: #ffb330;
+  --ok: #44d070;
+  --brand-magenta: #c85bff;
+  --brand-purple: #9a2bcb;
+  --brand-deep: #7a0b7e;
+  --brand-cyan: #34dde5;
+  --brand-yellow: #f5e05d;
+}

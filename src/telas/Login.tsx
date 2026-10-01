@@ -1,5 +1,6 @@
-// Login do app — topo com gradiente da marca (design-v3 LoginScreen), mas com
-// usuário e senha do ERP: o app entra por token Passport (password grant).
+// Login — desenho v4 (tela 00 "Login + empresa"): fundo no roxo do DS, marca em branco,
+// cartão translúcido, botão branco. Usuário e senha do ERP → token Passport (password grant).
+// Fora do v4 de propósito: "Entrar com OAuth" e "Escolha a empresa" (sem seletor na v1 — [W]).
 import { useState, type FormEvent } from 'react';
 import { DEMO, entrar } from '../api';
 import logo from '../assets/oimpresso-logo.png';
@@ -26,44 +27,31 @@ export function Login({ aoEntrar }: { aoEntrar: () => void }) {
   };
 
   return (
-    <div className="oi oi-app" data-theme="light">
-      <div style={{ padding: 'calc(40px + env(safe-area-inset-top, 0px)) 24px 36px',
-        background: 'linear-gradient(150deg, var(--brand-deep), var(--brand-purple) 55%, var(--brand-magenta))',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-        borderBottomLeftRadius: 28, borderBottomRightRadius: 28, marginTop: 'calc(-1 * env(safe-area-inset-top, 0px))' }}>
-        <div style={{ width: 88, height: 88, borderRadius: 22, background: 'rgba(255,255,255,.12)',
-          display: 'grid', placeItems: 'center', border: '1px solid rgba(255,255,255,.18)' }}>
-          <img src={logo} alt="" style={{ width: 52, height: 'auto' }} />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 27, fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>oimpresso</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 2 }}>Gestão para comunicação visual</div>
-        </div>
-      </div>
-
-      <form className="oi-scroll" style={{ padding: '28px 24px 24px' }} onSubmit={enviar}>
-        {DEMO && <div className="app-banner demo" style={{ borderRadius: 10, marginBottom: 16 }}>Modo demonstração — dados simulados, nada vai para o servidor.</div>}
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Bem-vindo de volta</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Entre com o mesmo usuário do oimpresso.</div>
-
-        <label className="ptm-lbl" htmlFor="usuario">Usuário ou e-mail</label>
-        <input id="usuario" className="ptm-in" style={{ margin: '6px 0 14px' }} autoComplete="username" autoCapitalize="none"
-          autoCorrect="off" inputMode="email" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
-
-        <label className="ptm-lbl" htmlFor="senha">Senha</label>
-        <div style={{ position: 'relative', margin: '6px 0 18px' }}>
-          <input id="senha" className="ptm-in" type={mostrar ? 'text' : 'password'} autoComplete="current-password"
-            value={senha} onChange={(e) => setSenha(e.target.value)} required style={{ paddingRight: 78 }} />
-          <button type="button" onClick={() => setMostrar((v) => !v)} aria-label={mostrar ? 'Esconder senha' : 'Mostrar senha'}
-            style={{ position: 'absolute', right: 4, top: 1, bottom: 1, minWidth: 70, border: 0, background: 'none', color: 'var(--accent)', font: 'inherit', fontSize: 13 }}>
-            {mostrar ? 'Esconder' : 'Mostrar'}
-          </button>
+    <div className="oi oi-app l4" data-theme="light">
+      <form className="l4-corpo" onSubmit={enviar}>
+        <div className="l4-marca">
+          <div className="l4-logo"><img src={logo} alt="" /><span>oimpresso</span></div>
+          <span className="l4-sub">Sistema de gestão para gráficas</span>
         </div>
 
-        <button className="ptm-cta" style={{ width: '100%' }} disabled={enviando || !usuario || !senha}>
-          {enviando ? 'Entrando…' : 'Entrar'}
-        </button>
-        {erro && <p className="app-erro" role="alert" style={{ marginTop: 12 }}>{erro}</p>}
+        <div className="l4-cartao">
+          <span className="l4-titulo">Entrar</span>
+          <span className="l4-dica">Use o mesmo usuário do oimpresso.</span>
+          {DEMO && <div className="l4-erro">Modo demonstração — dados simulados, nada vai para o servidor.</div>}
+          {erro && <div className="l4-erro" role="alert">{erro}</div>}
+          <input className="l4-campo" aria-label="Usuário ou e-mail" placeholder="Usuário ou e-mail" autoComplete="username"
+            autoCapitalize="none" autoCorrect="off" inputMode="email" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
+          <div style={{ position: 'relative' }}>
+            <input className="l4-campo" aria-label="Senha" placeholder="Senha" type={mostrar ? 'text' : 'password'} autoComplete="current-password"
+              value={senha} onChange={(e) => setSenha(e.target.value)} required style={{ paddingRight: 84 }} />
+            <button type="button" className="l4-mostrar" onClick={() => setMostrar((v) => !v)} aria-label={mostrar ? 'Esconder senha' : 'Mostrar senha'}>
+              {mostrar ? 'Esconder' : 'Mostrar'}
+            </button>
+          </div>
+          <button className="l4-entrar" disabled={enviando || !usuario || !senha}>{enviando ? 'Entrando…' : 'Entrar'}</button>
+        </div>
+
+        <span className="l4-termos">Ao continuar você concorda com os termos de uso do app.</span>
       </form>
     </div>
   );

@@ -55,10 +55,11 @@ export const demo = {
       const hoje = new Date();
       const linhas = [];
       const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-      for (let d = 1; d < hoje.getDate(); d++) {
+      // Só demonstração: no começo do mês ainda não há dia apurado; gera 12 dias para a lista aparecer.
+      for (let d = 1; d < Math.max(hoje.getDate(), 13); d++) {
         const dt = new Date(hoje.getFullYear(), hoje.getMonth(), d);
         const fim = dt.getDay() === 0 || dt.getDay() === 6;
-        const div = d % 9 === 4;
+        const div = d === 7 || d % 9 === 4;
         linhas.push({ data: dt.toISOString().slice(0, 10), dow: nomes[dt.getDay()], dia: d, is_weekend: fim,
           trabalhado: fim ? 0 : div ? 412 : 480 + (d % 3) * 7, divergencia: !fim && div, estado: fim ? '' : div ? 'DIVERGENCIA' : 'OK',
           marcacoes: fim ? [] : div ? [{ hora: '08:01', tipo: 'ENTRADA', origem: 'MOBILE' }, { hora: '12:00', tipo: 'ALMOCO_INICIO', origem: 'MOBILE' }, { hora: '15:52', tipo: 'SAIDA', origem: 'MOBILE' }]
