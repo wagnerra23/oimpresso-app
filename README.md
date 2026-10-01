@@ -120,8 +120,12 @@ npx capacitor-assets generate
 ## O que falta
 
 - [ ] `google-services.json` (Firebase do [W]) para o push no Android; injetado no CI por secret.
-- [ ] iOS: capability Push Notifications + Background Modes (remote notifications), FirebaseMessaging
-      no AppDelegate, `GoogleService-Info.plist`. Exige Mac.
+- [x] iOS: `App.entitlements` com `aps-environment` (`CODE_SIGN_ENTITLEMENTS`), `UIBackgroundModes`
+      `remote-notification`, AppDelegate repassando o token APNs ao Capacitor,
+      `ITSAppUsesNonExemptEncryption = false` (TestFlight sem "Missing Compliance"). **Não compilado — sem Mac.**
+- [ ] iOS: o token que chega hoje é **APNs cru**. O servidor do ERP envia por FCM (ADR 0423), que precisa
+      do token FCM → adicionar Firebase Messaging (pacote SPM no Xcode) + `GoogleService-Info.plist` e
+      trocar o token no AppDelegate. Alternativa: servidor enviar por APNs direto. Decisão com a sessão PUSH.
 - [ ] Medir login + persistência de sessão entre aberturas (precisa da conta demo — sessão CONTA DEMO).
 - [ ] iOS: `<input type=file>` sem `NSCameraUsageDescription` — conferir que o seletor não oferece/câmera não quebra.
 - [ ] iOS: medir se `navigator.geolocation` na página remota mostra um 2º aviso ("oimpresso.com quer
