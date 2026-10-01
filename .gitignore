@@ -1,0 +1,26 @@
+node_modules/
+# Segredos e assinatura NUNCA no git (keystore vai pro Vaultwarden)
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+keystore.properties
+local.properties
+google-services.json
+GoogleService-Info.plist
+.env
+.env.*
+# build
+android/app/build/
+android/build/
+android/.gradle/
+android/.idea/
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+*.apk
+*.aab
+.DS_Store
+
+# saída PWA do @capacitor/assets (não usada: o app carrega o ERP remoto)
+/icons/

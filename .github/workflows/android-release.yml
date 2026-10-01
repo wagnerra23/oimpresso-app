@@ -1,0 +1,81 @@
+# Build de release Android (AAB assinado com a UPLOAD KEY).
+# A chave de assinatura definitiva fica no Google (Play App Signing).
+# Segredos do repo: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD, GOOGLE_SERVICES_JSON_BASE64 (FCM).
+# Original da keystore: Vaultwarden. Nada disso vai para o git.
+name: android-release
+on:
+  workflow_dispatch:
+    inputs:
+      sem_push:
+        description: 'Build sem google-services.json (push desligado). So para o 1o envio ao teste interno.'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+      - name: google-services.json (FCM)
+        shell: bash
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GS_B64" ]; then
+            if [ "${{ inputs.sem_push }}" = "true" ]; then
+              echo "::warning::Build SEM push (sem_push=true). Nao promover para producao."
+              echo "BUILD SEM PUSH — nao promover para producao" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::error::GOOGLE_SERVICES_JSON_BASE64 vazio — push nao funcionaria"; exit 2
+          fi
+          echo "$GS_B64" | base64 -d > android/app/google-services.json
+      - name: Keystore de upload
+        shell: bash
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          [ -n "$KS_B64" ] || { echo "::error::ANDROID_KEYSTORE_BASE64 vazio"; exit 2; }
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+      - name: bundleRelease
+        working-directory: android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+      - name: Confere assinatura e imprime SHA-256 da upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          keytool -printcert -jarfile "$AAB" | grep -E 'SHA256:' | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30

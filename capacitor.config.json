@@ -1,0 +1,30 @@
+{
+  "appId": "com.oimpresso.app",
+  "appName": "oimpresso Ponto",
+  "webDir": "www",
+  "appendUserAgent": "oimpressoApp",
+  "server": {
+    "url": "https://oimpresso.com/home",
+    "cleartext": false,
+    "allowNavigation": [
+      "oimpresso.com",
+      "*.oimpresso.com"
+    ],
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#795BBF",
+      "showSpinner": false
+    }
+  }
+}
