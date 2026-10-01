@@ -82,7 +82,10 @@ jobs:
       - name: Dependências + cap sync
         run: |
           set -euo pipefail
-          npm ci
+          # O sharp (de @capacitor/assets) baixa um binário pronto do GitHub; se esse
+          # download dá timeout, o npm tenta compilar e o link falha. Uma 2ª tentativa
+          # cobre a falha de rede (medido: run 36903662429, "Request timed out").
+          npm ci || { echo "::warning::npm ci falhou; tentando de novo"; sleep 15; npm ci; }
           npm run build
           if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
@@ -152,7 +155,10 @@ jobs:
       - name: Dependências + cap sync
         run: |
           set -euo pipefail
-          npm ci
+          # O sharp (de @capacitor/assets) baixa um binário pronto do GitHub; se esse
+          # download dá timeout, o npm tenta compilar e o link falha. Uma 2ª tentativa
+          # cobre a falha de rede (medido: run 36903662429, "Request timed out").
+          npm ci || { echo "::warning::npm ci falhou; tentando de novo"; sleep 15; npm ci; }
           npm run build
           if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
@@ -171,6 +177,15 @@ jobs:
           if [ "$SEM_PUSH" = "true" ]; then
             echo "::warning::Build SEM push (sem_push=true). Não enviar para revisão."
             echo "BUILD SEM PUSH — não enviar para revisão" >> "$GITHUB_STEP_SUMMARY"
+            # O projeto referencia o plist; este provisório deixa compilar e o
+            # AppDelegate não liga o Firebase com ele (GOOGLE_APP_ID 1:000000000000:).
+            cat > "$GS_PATH" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>GOOGLE_APP_ID</key><string>1:000000000000:ios:0000000000000000</string>
+          </dict></plist>
+          PLIST
             exit 0
           fi
           echo "::error::secret ausente: GOOGLE_SERVICE_INFO_PLIST_BASE64 (ou rode com sem_push=true)"

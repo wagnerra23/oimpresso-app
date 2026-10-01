@@ -1,13 +1,20 @@
 import UIKit
 import Capacitor
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Push via FCM (ADR 0423). O plist vem do CI por secret; o build de compilação
+        // usa um plist provisório, e nele o Firebase não é ligado.
+        if Self.firebaseConfiguravel() {
+            FirebaseApp.configure()
+            Messaging.messaging().delegate = self
+        }
         return true
     }
 
@@ -33,9 +40,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
-    // Push (@capacitor/push-notifications): repassa o token APNs ao Capacitor.
+    // Push (@capacitor/push-notifications): o evento 'registration' precisa entregar o
+    // token FCM (o servidor só fala com o FCM, ADR 0423), não o token APNs cru.
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+        guard FirebaseApp.app() != nil else {
+            NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+            return
+        }
+        Messaging.messaging().apnsToken = deviceToken
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+            } else if let token = token {
+                NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+            }
+        }
+    }
+
+    // O FCM pode trocar o token (reinstalação, restauração); reenviamos ao Capacitor.
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken else { return }
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+    }
+
+    private static func firebaseConfiguravel() -> Bool {
+        guard let caminho = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+              let dados = NSDictionary(contentsOfFile: caminho),
+              let appId = dados["GOOGLE_APP_ID"] as? String else { return false }
+        return !appId.hasPrefix("1:000000000000:")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
