@@ -1,58 +1,127 @@
 # Build iOS do app das lojas (Capacitor + ERP web) e envio ao TestFlight.
 #
 # Por que existe: o [W] não tem Mac (decisão 2026-10-01 — "sim, capacitor com ERP
-# inteiro, com.oimpresso.app"). O build, a assinatura e o upload rodam num runner
-# macOS do GitHub. Só roda sob demanda (workflow_dispatch), então não gasta minuto
-# macOS em PR.
+# inteiro, com.oimpresso.app"). Compilação, assinatura e upload rodam num runner
+# macOS do GitHub.
+#
+# Dois jobs:
+#   compilar   — build de SIMULADOR, sem assinatura e sem nenhum secret. Roda em PR que
+#                toca o iOS e prova que o projeto compila, mesmo sem conta Apple.
+#   testflight — archive assinado + upload. Só sob demanda (Run workflow, ref = main).
 #
 # Contrato com a sessão "APP CAPACITOR" (dona deste repositório):
 #   package.json + capacitor.config.json na raiz · appId com.oimpresso.app
 #   ios/App/App.xcodeproj (SPM, sem .xcworkspace) · scheme App · assinatura automática
 #
-# Secrets (valores no Vaultwarden, item "app-store-connect-api-key"; NUNCA no git):
-#   APPSTORE_API_KEY_P8     conteúdo do arquivo AuthKey_XXXX.p8
-#   APPSTORE_API_KEY_ID     Key ID da chave
-#   APPSTORE_API_ISSUER_ID  Issuer ID da conta
-#   APPLE_TEAM_ID           Team ID (10 caracteres) da conta Apple Developer
-# A chave precisa conseguir criar o certificado de distribuição gerenciado na nuvem:
+# Secrets do job testflight (valores no Vaultwarden; NUNCA no git):
+#   APPSTORE_API_KEY_P8                conteúdo do arquivo AuthKey_XXXX.p8 (API do App Store Connect)
+#   APPSTORE_API_KEY_ID                Key ID dessa chave
+#   APPSTORE_API_ISSUER_ID             Issuer ID da conta
+#   APPLE_TEAM_ID                      Team ID (10 caracteres) da conta Apple Developer
+#   GOOGLE_SERVICE_INFO_PLIST_BASE64   GoogleService-Info.plist do app iOS no Firebase, em base64
+#                                      (push via FCM, ADR 0423). Fica fora do git.
+# A API key precisa conseguir criar o certificado de distribuição gerenciado na nuvem:
 # papel Admin, ou App Manager com "Access to Certificates, Identifiers & Profiles"
 # e "Access to Cloud Managed Distribution Certificate".
-#
-# Uso: Actions → "iOS → TestFlight" → Run workflow (ref = main).
 name: iOS → TestFlight
 
 on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - "www/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - ".github/workflows/ios-testflight.yml"
   workflow_dispatch:
     inputs:
       upload:
-        description: "Enviar ao TestFlight (false = só compila e assina)"
+        description: "Enviar ao TestFlight (false = só compila e assina, .ipa vira artefato)"
         type: boolean
         default: true
+      sem_push:
+        description: "Aceitar build SEM GoogleService-Info.plist (push desligado). Nunca para revisão."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-testflight
-  cancel-in-progress: false
+  group: ios-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PROJECT: ios/App/App.xcodeproj
+  SCHEME: App
+  GS_PATH: ios/App/App/GoogleService-Info.plist
 
 jobs:
-  build:
+  compilar:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Dependências + cap sync
+        run: |
+          set -euo pipefail
+          npm ci
+          npx cap sync ios
+
+      # Só para compilar: um plist de mentira satisfaz a referência no projeto.
+      # O app gerado aqui não é instalável nem recebe push.
+      - name: GoogleService-Info.plist provisório (só compilação)
+        run: |
+          set -euo pipefail
+          [ -f "$GS_PATH" ] && exit 0
+          cat > "$GS_PATH" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>BUNDLE_ID</key><string>com.oimpresso.app</string>
+            <key>GOOGLE_APP_ID</key><string>1:000000000000:ios:0000000000000000</string>
+            <key>GCM_SENDER_ID</key><string>000000000000</string>
+            <key>PROJECT_ID</key><string>compilacao-ci</string>
+            <key>API_KEY</key><string>COMPILACAO-CI-NAO-E-CHAVE</string>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Build de simulador (sem assinatura)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO
+          echo "Compilou para simulador: ok" >> "$GITHUB_STEP_SUMMARY"
+
+  testflight:
+    if: github.event_name == 'workflow_dispatch'
+    needs: compilar
     runs-on: macos-15
     timeout-minutes: 60
     defaults:
       run:
         shell: bash
-    env:
-      APP_DIR: .
-      PROJECT: ios/App/App.xcodeproj
-      SCHEME: App
     steps:
       - uses: actions/checkout@v4
 
-      # Falha visível em vez de verde mudo: sem projeto ou sem secret, não há o
-      # que medir, e isso tem que aparecer como erro.
-      - name: Pré-condições (projeto + secrets)
+      # Falha visível em vez de verde mudo: sem secret não há o que assinar.
+      - name: Pré-condições (secrets)
         env:
           P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
           KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
@@ -61,8 +130,6 @@ jobs:
         run: |
           set -euo pipefail
           falta=0
-          [ -f "$APP_DIR/package.json" ] || { echo "::error::$APP_DIR/package.json não existe — o projeto Capacitor ainda não está no ref"; falta=1; }
-          [ -f "$PROJECT/project.pbxproj" ] || { echo "::error::$PROJECT não existe — o projeto iOS não está no ref"; falta=1; }
           for v in P8 KEY_ID ISSUER TEAM; do
             [ -n "${!v}" ] || { echo "::error::secret ausente: $v"; falta=1; }
           done
@@ -77,10 +144,27 @@ jobs:
       - name: Dependências + cap sync
         run: |
           set -euo pipefail
-          cd "$APP_DIR"
           npm ci
           npx cap sync ios
-          xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      - name: GoogleService-Info.plist (push FCM)
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          SEM_PUSH: ${{ inputs.sem_push }}
+        run: |
+          set -euo pipefail
+          if [ -n "$GS_B64" ]; then
+            printf '%s' "$GS_B64" | base64 --decode > "$GS_PATH"
+            plutil -lint "$GS_PATH"
+            exit 0
+          fi
+          if [ "$SEM_PUSH" = "true" ]; then
+            echo "::warning::Build SEM push (sem_push=true). Não enviar para revisão."
+            echo "BUILD SEM PUSH — não enviar para revisão" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error::secret ausente: GOOGLE_SERVICE_INFO_PLIST_BASE64 (ou rode com sem_push=true)"
+          exit 1
 
       - name: Chave da API do App Store Connect
         env:
@@ -153,4 +237,4 @@ jobs:
 
       - name: Apaga a chave do runner
         if: always()
-        run: rm -rf "$RUNNER_TEMP/asc"
+        run: rm -rf "$RUNNER_TEMP/asc" "$GS_PATH"
