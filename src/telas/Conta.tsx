@@ -47,6 +47,9 @@ export function Conta({ aoSair, avisar }: { aoSair: () => void; avisar: Aviso })
             <button className="oi-btn block" style={{ minHeight: 46 }} onClick={() => Browser.open({ url: 'https://oimpresso.com/privacidade' })}>
               Política de privacidade
             </button>
+            <button className="oi-btn block" style={{ minHeight: 46 }} onClick={() => Browser.open({ url: 'https://oimpresso.com/privacidade/ponto/exclusao' })}>
+              Excluir minha conta
+            </button>
           </div>
         </div>
         <div className="oi-section">

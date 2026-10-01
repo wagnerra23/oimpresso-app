@@ -30,6 +30,10 @@ on:
     paths:
       - "ios/**"
       - "www/**"
+      - "src/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig.json"
       - "package.json"
       - "package-lock.json"
       - "capacitor.config.json"
@@ -80,6 +84,7 @@ jobs:
           set -euo pipefail
           npm ci
           npm run build
+          if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
 
       # Só para compilar: um plist de mentira satisfaz a referência no projeto.
@@ -149,6 +154,7 @@ jobs:
           set -euo pipefail
           npm ci
           npm run build
+          if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
 
       - name: GoogleService-Info.plist (push FCM)
