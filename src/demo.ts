@@ -68,6 +68,14 @@ export const demo = {
       const util = linhas.filter((l) => !l.is_weekend);
       return r({ totais: { trabalhado: util.reduce((s, l) => s + l.trabalhado, 0), atraso: 22, falta: 68, he_diurna: 95, he_noturna: 0, divergencias: util.filter((l) => l.divergencia).length }, linhas });
     }
+    if (metodo === 'GET' && caminho.endsWith('/me')) {
+      return r({ nome: 'Colaborador Demonstração', matricula: '0021', empresa: 'Empresa Demonstração', limites: { accuracy_max: 500, drift_max: 30 } });
+    }
+    if (metodo === 'GET' && caminho.endsWith('/intercorrencias/tipos')) {
+      return r([['CONSULTA_MEDICA', 'Consulta médica'], ['ATESTADO_MEDICO', 'Atestado médico'], ['REUNIAO_EXTERNA', 'Reunião externa'],
+        ['VISITA_CLIENTE', 'Visita a cliente'], ['HORA_EXTRA_AUTORIZADA', 'Hora extra autorizada'], ['ESQUECIMENTO_MARCACAO', 'Esquecimento de marcação'],
+        ['PROBLEMA_EQUIPAMENTO', 'Problema no equipamento'], ['OUTRO', 'Outro']].map(([value, label]) => ({ value, label })));
+    }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);
   },

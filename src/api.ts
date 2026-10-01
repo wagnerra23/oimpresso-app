@@ -37,6 +37,9 @@ export interface MarcacaoCriada {
   id: string; nsr: number; tipo: string; momento: string; hash_trunc: string; origem: string; revisar: boolean;
 }
 
+/** GET /ponto/api/me (ERP #8481). */
+export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
+
 /** Saída de EspelhoController::buildTotaisEspelho / buildLinhasEspelho. */
 export interface Espelho {
   totais: { trabalhado: number; atraso: number; falta: number; he_diurna: number; he_noturna: number; divergencias: number } | null;
@@ -143,8 +146,9 @@ export const api = {
     chamar<{ sucesso: boolean; intercorrencia: Intercorrencia }>('POST', '/ponto/api/intercorrencias', i),
   marcar: (p: { tipo: TipoMarcacao; lat: number; lng: number; accuracy: number; device_uuid: string; timestamp_device: string }) =>
     chamar<{ sucesso: boolean; marcacao: MarcacaoCriada }>('POST', '/ponto/api/marcar', p),
-  // PROPOSTO ao ERP (ainda não existe): mesmos builders do Espelho/Show.
-  // Enquanto não existir, o servidor devolve 404 e a tela diz que está indisponível.
+  // ERP #8481. Enquanto não estiverem em produção, o servidor devolve 404 e o app usa o fallback.
+  me: () => chamar<Me>('GET', '/ponto/api/me'),
+  tipos: () => chamar<Array<{ value: string; label: string }>>('GET', '/ponto/api/intercorrencias/tipos'),
   espelho: (mes: string) => chamar<Espelho>('GET', `/ponto/api/espelho?mes=${mes}`),
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>

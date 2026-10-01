@@ -5,8 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
 import { api, drift, ErroApi, type Espelho, type EscalaHoje, type Intercorrencia, type MarcacaoCriada,
-  type MarcacaoHoje, type Saldo, type TipoMarcacao } from '../api';
-import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, fmtMin, hojeIso, rotuloTipo } from '../ponto-regras';
+  type MarcacaoHoje, type Me, type Saldo, type TipoMarcacao } from '../api';
+import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, aplicarLimites, fmtMin, hojeIso, rotuloTipo } from '../ponto-regras';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 type Aba = 'bater' | 'espelho' | 'justificar';
@@ -25,6 +25,12 @@ export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
   const [aba, setAba] = useState<Aba>('bater');
   const [diaJustificar, setDiaJustificar] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+
+  // GET /ponto/api/me: nome e matrícula no cabeçalho e os limites do servidor. Sem a rota (404), segue sem.
+  useEffect(() => {
+    api.me().then((m) => { setMe(m); aplicarLimites(m.limites); }).catch((e) => { if (semColaborador(e)) setBloqueado(true); });
+  }, []);
 
   const titulo = aba === 'bater' ? 'Ponto' : aba === 'espelho' ? 'Meu espelho' : 'Justificar';
   const justificarDia = (data: string) => { setDiaJustificar(data); setAba('justificar'); };
@@ -35,7 +41,7 @@ export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
         <div className="p4-head-row">
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="p4-titulo">{titulo}</div>
-            <div className="p4-sub">REP-P · Portaria MTP 671/2021</div>
+            <div className="p4-sub">{me ? `${me.nome}${me.matricula ? ` · matrícula ${me.matricula}` : ''}` : 'REP-P · Portaria MTP 671/2021'}</div>
           </div>
           <span className="p4-selo">REP-P</span>
         </div>
@@ -304,7 +310,10 @@ function Justificar({ avisar, diaInicial }: { avisar: Aviso; diaInicial: string 
   const vazio = { tipo: '', data: diaInicial ?? hojeIso(), dia_todo: false, ini: '', fim: '', just: '' };
   const [f, setF] = useState(vazio);
   const [enviando, setEnviando] = useState(false);
+  const [motivos, setMotivos] = useState(MOTIVOS);
   useEffect(() => { if (diaInicial) setF((o) => ({ ...o, data: diaInicial })); }, [diaInicial]);
+  // Motivos vêm do ERP (GET /ponto/api/intercorrencias/tipos); a lista fixa é só fallback.
+  useEffect(() => { api.tipos().then((t) => { if (Array.isArray(t) && t.length) setMotivos(t); }).catch(() => {}); }, []);
 
   const erro = !f.tipo ? 'Escolha o motivo.'
     : !f.dia_todo && (!f.ini || !f.fim) ? 'Informe o horário (das/às) ou marque Dia todo — o gestor decide pela janela.'
@@ -330,7 +339,7 @@ function Justificar({ avisar, diaInicial }: { avisar: Aviso; diaInicial: string 
     <div className="p4-corpo">
       <div className="p4-rotulo">O que aconteceu</div>
       <div className="p4-motivos">
-        {MOTIVOS.map((m) => (
+        {motivos.map((m) => (
           <button key={m.value} aria-pressed={f.tipo === m.value} className={'p4-motivo' + (f.tipo === m.value ? ' on' : '')}
             onClick={() => setF((o) => ({ ...o, tipo: m.value }))}>{m.label}</button>
         ))}
