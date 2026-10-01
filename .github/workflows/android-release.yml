@@ -30,6 +30,22 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Trava — login não pode ir à loja quebrado
+        env:
+          VITE_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+        run: |
+          if [ "${{ inputs.sem_push }}" = "true" ]; then
+            echo "::warning::sem_push=true (teste interno): não exige OAUTH_CLIENT_ID."
+          else
+            [ -n "$VITE_OAUTH_CLIENT_ID" ] || { echo "::error::OAUTH_CLIENT_ID vazio — login não funcionaria"; exit 2; }
+          fi
+      - name: Build da interface (Vite → www/)
+        run: npm run build
+        env:
+          VITE_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+      - name: Trava — modo demonstração nunca no build de loja
+        run: |
+          if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
       - run: npx cap sync android
       - name: google-services.json (FCM)
         shell: bash
