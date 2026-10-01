@@ -1,4 +1,4 @@
-# oimpresso Ponto — app Capacitor
+# oimpresso — app Capacitor
 
 Casca nativa (Android + iOS) do ERP oimpresso **inteiro** ([W] 2026-10-01: um app só, o ERP no
 celular junto com o ponto). Entra por **https://oimpresso.com/home** (logado → painel; sem sessão →
@@ -8,7 +8,7 @@ Node/Gradle/Xcode não entram na CI do `oimpresso.com`.
 | Item | Valor |
 |---|---|
 | appId / package | `com.oimpresso.app` (permanente nas lojas — decisão [W] 2026-10-01) |
-| Nome | oimpresso Ponto (provisório — "oimpresso" em avaliação pelo [W]) |
+| Nome | oimpresso (Android e iOS — decisão [W] 2026-10-01) |
 | Capacitor | 8.5.2 (Node ≥ 22) |
 | Android | AGP 8.13.0 · Gradle 8.14.3 · JDK 21 · compile/target SDK 36 · minSdk 24 |
 | iOS | Swift Package Manager (sem CocoaPods, sem `.xcworkspace`: abrir `ios/App/App.xcodeproj`, scheme `App`) · só iPhone (`TARGETED_DEVICE_FAMILY = 1`) · precisa de Mac + Xcode |

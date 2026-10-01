@@ -1,6 +1,6 @@
 {
   "appId": "com.oimpresso.app",
-  "appName": "oimpresso Ponto",
+  "appName": "oimpresso",
   "webDir": "www",
   "appendUserAgent": "oimpressoApp",
   "server": {
