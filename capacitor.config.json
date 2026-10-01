@@ -3,15 +3,6 @@
   "appName": "oimpresso",
   "webDir": "www",
   "appendUserAgent": "oimpressoApp",
-  "server": {
-    "url": "https://oimpresso.com/home",
-    "cleartext": false,
-    "allowNavigation": [
-      "oimpresso.com",
-      "*.oimpresso.com"
-    ],
-    "errorPath": "offline.html"
-  },
   "android": {
     "allowMixedContent": false
   },
@@ -25,6 +16,9 @@
       "launchAutoHide": true,
       "backgroundColor": "#795BBF",
       "showSpinner": false
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   }
 }

@@ -30,6 +30,10 @@ on:
     paths:
       - "ios/**"
       - "www/**"
+      - "src/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig.json"
       - "package.json"
       - "package-lock.json"
       - "capacitor.config.json"
@@ -53,6 +57,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  # client_id do client OAuth público do ERP (não é segredo) — entra no build da interface.
+  VITE_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
   PROJECT: ios/App/App.xcodeproj
   SCHEME: App
   GS_PATH: ios/App/App/GoogleService-Info.plist
@@ -77,6 +83,8 @@ jobs:
         run: |
           set -euo pipefail
           npm ci
+          npm run build
+          if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
 
       # Só para compilar: um plist de mentira satisfaz a referência no projeto.
@@ -145,6 +153,8 @@ jobs:
         run: |
           set -euo pipefail
           npm ci
+          npm run build
+          if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
 
       - name: GoogleService-Info.plist (push FCM)
