@@ -1,39 +1,42 @@
 # oimpresso — app Capacitor
 
-App do oimpresso (Android + iOS) com **telas próprias**, no visual do protótipo Mobile do Cowork
-(`mobile/ref/design-v3/oimpresso-mobile/` e `prototipo-ui/cowork/Wagner/ponto-mobile.jsx` no repo do
-ERP). [W] 2026-10-01 recusou o app que só abria o site (*"foi pego o site e emulado. eu quero o
-Mobile mesmo"*). A 1ª versão traz o **ponto**: Início · Ponto (Bater ponto, Meu espelho, Justificar) · Conta.
+Casca nativa (Android + iOS) do oimpresso. As telas do app vivem **no ERP**, como páginas Inertia em
+**https://oimpresso.com/m** (sessão BASE MOBILE), no visual do protótipo Mobile do Cowork. Decisão [W]
+2026-10-01: "Telas no ERP (/m)". O app abre esse endereço e acrescenta o que só o nativo dá:
+localização com permissão do sistema, push, tela de erro/sem conexão, botão voltar e ícone/splash.
+
+> A versão anterior, com telas do ponto empacotadas no app e login por token (PR #3), está guardada na
+> tag `v0-telas-ponto-no-app` como referência visual.
 
 | Item | Valor |
 |---|---|
 | appId / package | `com.oimpresso.app` (permanente nas lojas — decisão [W] 2026-10-01) |
 | Nome | oimpresso (Android e iOS — decisão [W] 2026-10-01) |
-| Capacitor | 8.5.2 (Node ≥ 22) · interface React 19 + Vite + TypeScript, em `src/` |
+| Capacitor | 8.5.2 (Node ≥ 22) · sem interface própria: `www/` só tem a tela de erro local |
 | Android | AGP 8.13.0 · Gradle 8.14.3 · JDK 21 · compile/target SDK 36 · minSdk 24 |
 | iOS | SPM (abrir `ios/App/App.xcodeproj`, scheme `App`) · só iPhone · build no CI macOS (sessão iOS) |
 
 ## Como o app fala com o ERP
 
-- **Pacote local**, não o site: o Vite gera `www/` e o Capacitor empacota. Sem `server.url`.
-- **Login por token**: usuário e senha do ERP vão para `POST /oauth/token` (Passport, password grant,
-  client **público** — o app não guarda segredo). O token fica em `@capacitor/preferences`.
-- **API do ponto**: `/ponto/api/*` (`auth:api`), contrato de `MobileMarcacaoController`.
-- **HTTP nativo** (`CapacitorHttp`): as chamadas não passam por CORS — nada a mudar no ERP por isso.
-- **Relógio**: a diferença aparelho × servidor sai do header `Date` das respostas; acima de 30 s o botão
-  de bater fica bloqueado (o servidor recusa igual).
-- **Modo demonstração** (`npm run build:demo`, `.env.demo`): dados simulados, faixa visível em toda
-  tela. Para ver as telas sem servidor. Nunca no build de loja.
+- `server.url = https://oimpresso.com/m` (sem barra no fim: medido, `/m/` redireciona para `/public/m/`).
+- Login, sessão e dados são os do próprio ERP (cookie de sessão `SameSite=lax`, first-party na
+  WebView — medido em 2026-10-01 com a casca anterior).
+- `allowNavigation`: só `oimpresso.com` e subdomínios; outro host abre no navegador do sistema.
+- A ponte do Capacitor chega à página remota (medido): o ERP usa `window.Capacitor.Plugins.*`
+  (`PushNotifications`, `Geolocation`) sem importar pacote.
+- Enquanto `/m` não existe (hoje responde **404**), o app mostra a tela de erro local, e o build de
+  loja **falha de propósito** (trava no `android-release.yml`, se solta quando `/m` responder 200/302).
 
-## Pendências no ERP (fora deste repo)
+## Para a BASE MOBILE (medido no emulador Android 16)
 
-| # | O quê | Sem isso |
+| Tema | O que acontece | O que a página precisa |
 |---|---|---|
-| 1 | client OAuth **público** de password grant; o `client_id` entra no build por `VITE_OAUTH_CLIENT_ID` | ninguém entra no app real |
-| 2 | `GET /ponto/api/espelho?mes=YYYY-MM` (mesmos builders do Espelho/Show) | "Meu espelho" mostra "ainda não disponível" |
-| 3 | `GET /ponto/api/me` (nome, matrícula, empresa, limites) | Início sem o nome; limites fixos 500 m / 30 s |
-| 4 | rotas de push sob a API — PR #8457 do ERP (sessão PUSH) | lembrete não registra |
-| 5 | conta demo para o revisor das lojas (sessão CONTA DEMO) | revisão bloqueada |
+| Botão voltar (Android) | navega no histórico da WebView → `popstate` → o Inertia trata. Na tela inicial, o app vai para segundo plano (código em `MainActivity`). | nada. Atenção: o evento `backButton` do plugin App **não** chega à página |
+| Histórico sem toque | entradas criadas por script sem toque do usuário são puladas pelo voltar (proteção do Chrome) | navegar só por ação do usuário (o normal no Inertia) |
+| Erro ao abrir | 404/500 e falta de rede caem na mesma tela local (`offline.html`), que distingue os dois casos | responder 200 em `/m` |
+| Área segura (Capacitor 8 é edge-to-edge) | sem ajuste, a barra inferior fica sob a barra de gestos | `viewport-fit=cover` + `padding: env(safe-area-inset-top/bottom)` no layout |
+| Localização | `navigator.geolocation` dispara o diálogo nativo "enquanto em uso" e devolve a coordenada | nada (iOS não medido) |
+| Push | plugin instalado; a página pede a permissão e registra o token na sessão web (`/ponto/mobile/push/dispositivo`) | chamar `Capacitor.Plugins.PushNotifications` só se `Capacitor.isNativePlatform()` |
 
 ## Decisões
 
@@ -51,14 +54,15 @@ Nunca adicionar permissão de câmera.
 
 ### 2. Links externos
 
-Abrem no navegador do sistema (`@capacitor/browser`), ex.: política de privacidade.
+Hosts fora de `allowNavigation` saem do app e abrem no navegador do sistema (medido com `gov.br`).
 
 ### 3. Sem conexão
 
-Faixa "Sem conexão" no topo (`@capacitor/network`). O app não grava marcação offline: marcação só
-existe com NSR do servidor.
+`server.errorPath: "offline.html"`: qualquer falha ao abrir o ERP (sem rede **ou** erro 404/500) mostra a
+tela local, que distingue os dois casos e tem "Tentar de novo"; com a rede de volta, retorna sozinha. O
+app não grava marcação offline: marcação só existe com NSR do servidor.
 
-## Medido no emulador Android — 1ª versão (site dentro do app, 2026-10-01, substituída)
+## Medido no emulador Android — casca anterior (abria /home, 2026-10-01)
 
 Android 16 (API 36, `sdk_gphone64_x86_64`), APK debug, inspeção da WebView por DevTools remoto:
 
@@ -75,18 +79,10 @@ Android 16 (API 36, `sdk_gphone64_x86_64`), APK debug, inspeção da WebView por
 Não medido (sem credencial de teste / sem Mac): login completo e persistência do cookie entre
 aberturas do app; qualquer coisa no iOS.
 
-## Medido no emulador Android — telas próprias (2026-10-01, build de demonstração)
-
-Login → Início (próxima marcação pela escala, KPIs) → Ponto: o pedido de localização "enquanto em uso"
-aparece ao abrir a tela; GPS ±5 m; **Bater ponto** devolve NSR + hash e a lista de hoje atualiza; Meu
-espelho com totais; Justificar com os 8 motivos do ERP; Conta com lembrete, privacidade e sair.
-Não medido: o caminho real (falta o client OAuth no ERP) e qualquer coisa no iOS.
-
 ## Como rodar
 
 ```bash
 npm ci
-npm run build        # ou: npm run build:demo
 npx cap sync
 ```
 
@@ -125,10 +121,8 @@ npx capacitor-assets generate
 
 ## O que falta
 
-- [ ] Pendências no ERP — tabela acima (client OAuth, espelho, `/me`, push, conta demo).
+- [ ] BASE MOBILE pôr `/m` no ar (o build de loja se destrava sozinho).
 - [ ] `google-services.json` (Firebase do [W]) para o push no Android; injetado no CI por secret.
-- [ ] Push no iOS por token FCM — PR #2 (sessão iOS), esperando merge.
-- [ ] Medir no aparelho o caminho real: login, bater ponto em produção (num colaborador de teste, biz≠4),
-      sessão que persiste entre aberturas.
-- [ ] iOS: medir o app inteiro (sem Mac aqui; o CI macOS só compila).
-- [ ] Workflow de release assinado (sessão PUBLICAÇÃO ANDROID) — precisa da variável `OAUTH_CLIENT_ID`.
+- [ ] Push no iOS por token FCM — PR #2 (sessão iOS).
+- [ ] iOS: medir o app inteiro (sem Mac aqui; o CI macOS só compila). No iOS não há botão voltar: as
+      telas de `/m` precisam de voltar visível.

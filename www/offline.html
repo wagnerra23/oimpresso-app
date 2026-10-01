@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sem conexão</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2430; --muted:#5b6170; --accent:#6b3fd6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161c; --fg:#eef0f4; --muted:#a3a8b5; --accent:#a98bff; } }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { min-height:100%; box-sizing:border-box; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; gap:16px;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+  h1 { font-size:22px; margin:0; }
+  p { margin:0; color:var(--muted); font-size:16px; line-height:1.5; max-width:320px; }
+  button { min-height:48px; min-width:200px; border:0; border-radius:10px; background:var(--accent);
+    color:#fff; font-size:17px; font-weight:600; padding:0 24px; }
+  #st { font-size:14px; min-height:20px; }
+</style>
+</head>
+<body>
+<main role="main">
+  <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/>
+    <line x1="12" y1="19" x2="12.01" y2="19"/><line x1="3" y1="3" x2="21" y2="21"/>
+  </svg>
+  <h1 id="tit">Sem conexão com a internet</h1>
+  <p id="txt">O oimpresso precisa de internet. A batida de ponto também: o horário e a localização são conferidos pelo servidor.</p>
+  <button type="button" id="retry">Tentar de novo</button>
+  <p id="st" aria-live="polite"></p>
+</main>
+<script>
+  // Volta pro ERP. Não grava marcação offline: a marcação só existe com NSR do servidor (Portaria 671).
+  var URL_APP = 'https://oimpresso.com/m';
+  var st = document.getElementById('st');
+  // O Capacitor mostra esta página em QUALQUER falha ao abrir o ERP — sem rede, mas também erro
+  // do servidor (404/500, medido: /m antes de existir caiu aqui). Com rede, a mensagem é outra.
+  if (navigator.onLine !== false) {
+    document.getElementById('tit').textContent = 'Não foi possível abrir o oimpresso';
+    document.getElementById('txt').textContent = 'O servidor não respondeu como esperado. Tente de novo em instantes.';
+    document.title = 'Indisponível';
+  }
+  function tentar() {
+    if (navigator.onLine === false) { st.textContent = 'Ainda sem conexão.'; return; }
+    st.textContent = 'Conectando…';
+    window.location.replace(URL_APP);
+  }
+  document.getElementById('retry').addEventListener('click', tentar);
+  window.addEventListener('online', tentar);
+  try {
+    var Net = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Network;
+    if (Net) Net.addListener('networkStatusChange', function (s) { if (s.connected) tentar(); });
+  } catch (e) {}
+</script>
+</body>
+</html>

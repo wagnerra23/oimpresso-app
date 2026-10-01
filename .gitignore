@@ -10,7 +10,6 @@ google-services.json
 GoogleService-Info.plist
 .env
 .env.*
-!.env.demo
 # build
 android/app/build/
 android/build/
@@ -26,5 +25,3 @@ ios/DerivedData/
 # saída PWA do @capacitor/assets (não usada: o app carrega o ERP remoto)
 /icons/
 
-# build do Vite (gerado por npm run build)
-/www/
