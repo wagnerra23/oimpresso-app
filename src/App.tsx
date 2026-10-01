@@ -1,21 +1,25 @@
-// Shell do app: login → 3 abas (Início · Ponto · Conta), barra inferior do design-v3.
+// Shell do app: login → abas (Início · Pedidos · Ponto · Conta). As 7 áreas da v1 (D13) entram aos poucos.
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { Network } from '@capacitor/network';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { App as AppNativo } from '@capacitor/app';
 import { carregarToken, DEMO, quandoExpirar } from './api';
 import { renovarLembrete } from './push';
 import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
+import { tratarVoltar } from './voltar';
+import { Pedidos } from './telas/Pedidos';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
 
-type Aba = 'inicio' | 'ponto' | 'conta';
+type Aba = 'inicio' | 'pedidos' | 'ponto' | 'conta';
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
 const ABAS: Array<{ id: Aba; label: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'inicio', label: 'Início', Icone: Ic.inicio },
+  { id: 'pedidos', label: 'Pedidos', Icone: Ic.pedido },
   { id: 'ponto', label: 'Ponto', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', Icone: Ic.usuario },
 ];
@@ -28,6 +32,19 @@ export function App() {
   const [online, setOnline] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
   const timer = useRef<number | undefined>(undefined);
+  const abaAtual = useRef<Aba>('inicio');
+  abaAtual.current = aba;
+
+  // Voltar do Android: a tela empilhada trata (ex.: detalhe → lista); senão volta ao Início;
+  // no Início, o app vai para segundo plano.
+  useEffect(() => {
+    const h = AppNativo.addListener('backButton', () => {
+      if (tratarVoltar()) return;
+      if (abaAtual.current !== 'inicio') { setAba('inicio'); return; }
+      AppNativo.minimizeApp().catch(() => {});
+    });
+    return () => { h.then((x) => x.remove()); };
+  }, []);
 
   const avisar = useCallback((texto: string, tom: 'ok' | 'warn' | 'erro' = 'ok') => {
     setToast({ texto, tom });
@@ -56,6 +73,7 @@ export function App() {
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
         {aba === 'inicio' && <Inicio irParaPonto={() => setAba('ponto')} />}
+        {aba === 'pedidos' && <Pedidos />}
         {aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
         {aba === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} />}
       </div>

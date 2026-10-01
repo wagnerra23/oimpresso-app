@@ -12,6 +12,27 @@ const marcacoes: MarcacaoDemo[] = [
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
 
+// Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
+const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const ACAO: Record<string, string> = { orcamento: 'Enviar para aprovação', aprovacao: 'Aprovar pedido', producao: 'Liberar para entrega', entrega: 'Confirmar entrega' };
+const PEDIDOS = [
+  { id: 101, numero: '0042', cliente: 'Marília Costa', valor: 248.0, prazo: diaRel(-1), atrasado: true, progresso: 0.25,
+    etapa: { chave: 'awaiting_approval', rotulo: 'Aguardando aprovação', grupo: 'aprovacao' as const },
+    itens: [{ produto: 'Cartão de visita 9×5 4/4 — 1.000 un', quantidade: 1, total: 248.0 }] },
+  { id: 102, numero: '0041', cliente: 'Clínica Vita', valor: 612.0, prazo: diaRel(1), atrasado: false, progresso: 0.75,
+    etapa: { chave: 'out_for_delivery', rotulo: 'Saiu para entrega', grupo: 'entrega' as const },
+    itens: [{ produto: 'Folder A4 4/4', quantidade: 500, total: 540.0 }, { produto: 'Envelope ofício', quantidade: 100, total: 72.0 }] },
+  { id: 103, numero: '0040', cliente: 'Restaurante 88', valor: 480.0, prazo: diaRel(3), atrasado: false, progresso: 0.5,
+    etapa: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' as const },
+    itens: [{ produto: 'Banner 3×1 m lona', quantidade: 1, total: 480.0 }] },
+  { id: 104, numero: '0039', cliente: 'Bistrô do Forno', valor: 320.0, prazo: diaRel(5), atrasado: false, progresso: 0,
+    etapa: { chave: 'quote_draft', rotulo: 'Orçamento', grupo: 'orcamento' as const },
+    itens: [{ produto: 'Cardápio A3 dobrado', quantidade: 50, total: 320.0 }] },
+  { id: 105, numero: '0038', cliente: 'Papelaria Sol', valor: 1190.5, prazo: diaRel(-3), atrasado: false, progresso: 1,
+    etapa: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' as const },
+    itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
+];
+
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hhmm = () => new Date().toTimeString().slice(0, 5);
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
@@ -75,6 +96,26 @@ export const demo = {
       return r([['CONSULTA_MEDICA', 'Consulta médica'], ['ATESTADO_MEDICO', 'Atestado médico'], ['REUNIAO_EXTERNA', 'Reunião externa'],
         ['VISITA_CLIENTE', 'Visita a cliente'], ['HORA_EXTRA_AUTORIZADA', 'Hora extra autorizada'], ['ESQUECIMENTO_MARCACAO', 'Esquecimento de marcação'],
         ['PROBLEMA_EQUIPAMENTO', 'Problema no equipamento'], ['OUTRO', 'Outro']].map(([value, label]) => ({ value, label })));
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pedidos')) {
+      const m = caminho.match(/^\/api\/app\/pedidos\/(\d+)/);
+      if (m) {
+        const p = PEDIDOS.find((x) => x.id === Number(m[1]));
+        if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404 });
+        const ordem = ['orcamento', 'aprovacao', 'producao', 'entrega', 'concluido'] as const;
+        const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
+        const pos = ordem.indexOf(p.etapa.grupo);
+        return r({ ...p, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
+          itens_venda: p.itens, etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
+          acoes: p.etapa.grupo === 'concluido' ? [] : [{ chave: 'avancar', rotulo: ACAO[p.etapa.grupo], pode: true }] });
+      }
+      const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
+      const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
+      const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? PEDIDOS.filter((p) => p.etapa.grupo === 'concluido')
+        : filtro === 'atrasados' ? PEDIDOS.filter((p) => p.atrasado) : ativos;
+      return r({ itens: lista.map(({ itens: _i, ...p }) => p), pagina: 1, tem_mais: false,
+        contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
+          concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);
