@@ -71,7 +71,8 @@ function Lista({ aoAbrir }: { aoAbrir: (id: number) => void }) {
                 <span className={'pd-prazo' + (p.atrasado ? ' atrasado' : '')}>{p.atrasado ? `atrasado · ${dataCurta(p.prazo)}` : `prazo ${dataCurta(p.prazo)}`}</span>
                 <span className="pd-status" style={{ color: TINTA[p.etapa.grupo] }}><i style={{ background: TINTA[p.etapa.grupo] }} />{p.etapa.rotulo}</span>
               </span>
-              <span className="pd-card-l2"><b>{p.cliente}</b><span className="pd-valor">{reais(p.valor)}</span></span>
+              <span className="pd-card-l2"><b>{p.resumo ?? p.cliente}</b></span>
+              <span className="pd-card-l3"><span>{p.cliente}</span><span className="pd-valor">{reais(p.valor)}</span></span>
               <span className="pd-barra" aria-hidden="true"><i style={{ width: `${Math.round(p.progresso * 100)}%` }} /></span>
             </button>
           ))}

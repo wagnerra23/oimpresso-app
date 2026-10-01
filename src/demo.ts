@@ -105,7 +105,7 @@ export const demo = {
         const ordem = ['orcamento', 'aprovacao', 'producao', 'entrega', 'concluido'] as const;
         const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
         const pos = ordem.indexOf(p.etapa.grupo);
-        return r({ ...p, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
+        return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
           itens_venda: p.itens, etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
           acoes: p.etapa.grupo === 'concluido' ? [] : [{ chave: 'avancar', rotulo: ACAO[p.etapa.grupo], pode: true }] });
       }
@@ -113,7 +113,7 @@ export const demo = {
       const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
       const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? PEDIDOS.filter((p) => p.etapa.grupo === 'concluido')
         : filtro === 'atrasados' ? PEDIDOS.filter((p) => p.atrasado) : ativos;
-      return r({ itens: lista.map(({ itens: _i, ...p }) => p), pagina: 1, tem_mais: false,
+      return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
     }

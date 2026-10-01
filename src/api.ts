@@ -41,7 +41,10 @@ export interface MarcacaoCriada {
 export type GrupoEtapa = 'orcamento' | 'aprovacao' | 'producao' | 'entrega' | 'concluido';
 export type FiltroPedidos = 'ativos' | 'atrasados' | 'concluidos' | 'todos';
 export interface PedidoResumo {
-  id: number; numero: string; cliente: string; valor: number; prazo: string | null; atrasado: boolean;
+  id: number; numero: string; cliente: string;
+  /** Nome do 1º item da venda (título do cartão no v4); null se a venda não tem item. */
+  resumo: string | null;
+  valor: number; prazo: string | null; atrasado: boolean;
   etapa: { chave: string; rotulo: string; grupo: GrupoEtapa }; progresso: number;
 }
 export interface ListaPedidos {

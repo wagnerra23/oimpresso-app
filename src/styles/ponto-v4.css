@@ -161,3 +161,5 @@
 a.p4-link { text-decoration: none; }
 .pd-rodape { flex-shrink: 0; padding: 12px 16px 14px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
 .pd-rodape-nota { font-size: 12px; color: var(--text-dim); text-align: center; }
+.pd-card-l3 { display: flex; align-items: baseline; gap: 8px; }
+.pd-card-l3 > span:first-child { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
