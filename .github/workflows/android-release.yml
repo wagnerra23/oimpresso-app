@@ -30,6 +30,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Build da interface (Vite → www/)
+        run: npm run build
+        env:
+          VITE_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
       - run: npx cap sync android
       - name: google-services.json (FCM)
         shell: bash
