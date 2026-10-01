@@ -49,10 +49,8 @@ export function Inicio({ irParaPonto }: { irParaPonto: () => void }) {
               <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)' }}>
                 {proxima ? 'Próxima marcação' : hoje ? 'Jornada de hoje' : 'Carregando…'}
               </span>
-              <b style={{ display: 'block', fontSize: 18 }}>
-                {proxima ? proxima.label : hoje ? 'Todas registradas' : '—'}
-                {horaPrevista ? <span className="oi-mono" style={{ fontWeight: 500, color: 'var(--text-dim)' }}> · prevista {horaPrevista.slice(0, 5)}</span> : null}
-              </b>
+              <b style={{ display: 'block', fontSize: 18 }}>{proxima ? proxima.label : hoje ? 'Todas registradas' : '—'}</b>
+              {horaPrevista && <span className="oi-mono" style={{ display: 'block', fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>prevista {horaPrevista.slice(0, 5)}</span>}
               {escala?.escala && <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)' }}>Escala {escala.escala.nome}</span>}
             </span>
             <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 14 }}>Bater ›</span>

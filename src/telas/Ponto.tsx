@@ -1,4 +1,6 @@
 // Ponto — desenho v4 (mobile/ref/design-v4, telas 36 Bater ponto · 37 Meu espelho · 38 Justificar).
+// Sem "REP-P" nem citação da Portaria na tela: ressalva legal (ERP #8417, D9) — não anunciar REP-P
+// antes do registro no INPI e do certificado ICP-Brasil. O v4 mostra o selo; aqui ele sai de propósito.
 // Sem câmera, sem biometria (ADR 0383). Regras do servidor (MobileMarcacaoService) repetidas só
 // para não mandar o que vai voltar 422: GPS > 500 m e relógio > 30 s travam o botão.
 import { useCallback, useEffect, useState } from 'react';
@@ -41,9 +43,8 @@ export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
         <div className="p4-head-row">
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="p4-titulo">{titulo}</div>
-            <div className="p4-sub">{me ? `${me.nome}${me.matricula ? ` · matrícula ${me.matricula}` : ''}` : 'REP-P · Portaria MTP 671/2021'}</div>
+            <div className="p4-sub">{me ? `${me.nome}${me.matricula ? ` · matrícula ${me.matricula}` : ''}` : 'Registro de ponto'}</div>
           </div>
-          <span className="p4-selo">REP-P</span>
         </div>
         {!bloqueado && (
           <div className="p4-abas" role="tablist" aria-label="Telas do ponto">
@@ -202,7 +203,7 @@ function BaterPonto({ avisar, online, aoSemCadastro }: { avisar: Aviso; online: 
           );
         })}
       </div>
-      <p className="p4-legal">Marcação imutável (Portaria MTP 671/2021). Correção só por intercorrência. Sem selfie nem biometria.</p>
+      <p className="p4-legal">Marcação imutável: correção só por justificativa, que o gestor aprova. Sem selfie nem biometria.</p>
     </div>
   );
 }

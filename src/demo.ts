@@ -8,7 +8,7 @@ interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; 
 let logado = false;
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
-  { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: true },
+  { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
 
