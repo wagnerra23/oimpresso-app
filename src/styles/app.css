@@ -1,6 +1,8 @@
 /* Ajustes do app real sobre os tokens do protótipo (design-v3). */
 html, body, #root { margin: 0; height: 100%; }
-body { background: oklch(0.975 0.004 322); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+/* Fundo fora do .oi (ao rolar além do fim): o --bg de oi-v4.css nos dois temas, seguindo o celular (D14). */
+body { background: #fbfaf8; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+@media (prefers-color-scheme: dark) { body { background: #212427; } }
 .oi { --mono: var(--font-mono); --pos: var(--ok); --neg: var(--danger); }
 .oi *, .oi *::before, .oi *::after { box-sizing: border-box; }
 /* O protótipo usa padding fixo por moldura de aparelho; no aparelho real vale a área segura. */
@@ -11,7 +13,9 @@ body { background: oklch(0.975 0.004 322); -webkit-tap-highlight-color: transpar
 .oi-tabbar { grid-template-columns: repeat(3, 1fr); }
 .ptm-screen { background: transparent; min-height: auto; }
 .app-banner { padding: 8px 14px; font-size: 12px; text-align: center; }
-.app-banner.demo { background: var(--accent-soft); color: var(--accent); }
+.app-banner.demo { background: var(--accent-soft); color: var(--accent-text); }
+/* Texto em roxo usa --accent-text (v4: claro no tema escuro, para contraste). */
+.oi-tab.active { color: var(--accent-text); }
 .app-banner.off { background: color-mix(in oklch, var(--warn) 18%, transparent); color: var(--text); }
 .app-erro { margin: 0; font-size: 12px; line-height: 1.5; color: var(--danger); }
 .app-toast { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 50;
@@ -21,4 +25,4 @@ body { background: oklch(0.975 0.004 322); -webkit-tap-highlight-color: transpar
 .app-toast.erro { background: var(--danger); color: #fff; }
 .app-seg { display: flex; gap: 4px; padding: 3px; margin: 0 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--border); }
 .app-seg button { flex: 1; min-height: 44px; border: 0; border-radius: 9px; background: none; color: var(--text-dim); font: inherit; font-size: 13px; }
-.app-seg button.on { background: var(--surface); color: var(--accent); font-weight: 600; box-shadow: var(--shadow-soft); }
+.app-seg button.on { background: var(--surface); color: var(--accent-text); font-weight: 600; box-shadow: var(--shadow-soft); }

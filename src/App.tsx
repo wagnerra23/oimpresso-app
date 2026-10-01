@@ -4,6 +4,7 @@ import { Network } from '@capacitor/network';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { carregarToken, DEMO, quandoExpirar } from './api';
 import { renovarLembrete } from './push';
+import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -20,6 +21,7 @@ const ABAS: Array<{ id: Aba; label: string; Icone: (p: { tamanho?: number }) => 
 ];
 
 export function App() {
+  const tema = useTemaDoCelular();
   const [pronto, setPronto] = useState(false);
   const [logado, setLogado] = useState(false);
   const [aba, setAba] = useState<Aba>('inicio');
@@ -49,7 +51,7 @@ export function App() {
   if (!logado) return <Login aoEntrar={() => { setLogado(true); setAba('inicio'); }} />;
 
   return (
-    <div className="oi oi-app" data-theme="light">
+    <div className="oi oi-app" data-theme={tema}>
       {DEMO && <div className="app-banner demo">Modo demonstração — dados simulados</div>}
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
