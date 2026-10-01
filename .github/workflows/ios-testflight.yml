@@ -82,7 +82,10 @@ jobs:
       - name: Dependências + cap sync
         run: |
           set -euo pipefail
-          npm ci
+          # O sharp (de @capacitor/assets) baixa um binário pronto do GitHub; se esse
+          # download dá timeout, o npm tenta compilar e o link falha. Uma 2ª tentativa
+          # cobre a falha de rede (medido: run 36903662429, "Request timed out").
+          npm ci || { echo "::warning::npm ci falhou; tentando de novo"; sleep 15; npm ci; }
           npm run build
           if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
@@ -152,7 +155,10 @@ jobs:
       - name: Dependências + cap sync
         run: |
           set -euo pipefail
-          npm ci
+          # O sharp (de @capacitor/assets) baixa um binário pronto do GitHub; se esse
+          # download dá timeout, o npm tenta compilar e o link falha. Uma 2ª tentativa
+          # cobre a falha de rede (medido: run 36903662429, "Request timed out").
+          npm ci || { echo "::warning::npm ci falhou; tentando de novo"; sleep 15; npm ci; }
           npm run build
           if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
           npx cap sync ios
