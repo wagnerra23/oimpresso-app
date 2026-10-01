@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O oimpresso acessa as suas fotos somente quando você escolhe uma imagem para anexar a uma ordem de serviço.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -11,7 +17,7 @@
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDisplayName</key>
-        <string>oimpresso Ponto</string>
+        <string>oimpresso</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
