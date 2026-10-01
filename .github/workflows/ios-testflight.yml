@@ -1,0 +1,156 @@
+# Build iOS do app das lojas (Capacitor + ERP web) e envio ao TestFlight.
+#
+# Por que existe: o [W] não tem Mac (decisão 2026-10-01 — "sim, capacitor com ERP
+# inteiro, com.oimpresso.app"). O build, a assinatura e o upload rodam num runner
+# macOS do GitHub. Só roda sob demanda (workflow_dispatch), então não gasta minuto
+# macOS em PR.
+#
+# Contrato com a sessão "APP CAPACITOR" (dona deste repositório):
+#   package.json + capacitor.config.json na raiz · appId com.oimpresso.app
+#   ios/App/App.xcodeproj (SPM, sem .xcworkspace) · scheme App · assinatura automática
+#
+# Secrets (valores no Vaultwarden, item "app-store-connect-api-key"; NUNCA no git):
+#   APPSTORE_API_KEY_P8     conteúdo do arquivo AuthKey_XXXX.p8
+#   APPSTORE_API_KEY_ID     Key ID da chave
+#   APPSTORE_API_ISSUER_ID  Issuer ID da conta
+#   APPLE_TEAM_ID           Team ID (10 caracteres) da conta Apple Developer
+# A chave precisa conseguir criar o certificado de distribuição gerenciado na nuvem:
+# papel Admin, ou App Manager com "Access to Certificates, Identifiers & Profiles"
+# e "Access to Cloud Managed Distribution Certificate".
+#
+# Uso: Actions → "iOS → TestFlight" → Run workflow (ref = main).
+name: iOS → TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Enviar ao TestFlight (false = só compila e assina)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: .
+      PROJECT: ios/App/App.xcodeproj
+      SCHEME: App
+    steps:
+      - uses: actions/checkout@v4
+
+      # Falha visível em vez de verde mudo: sem projeto ou sem secret, não há o
+      # que medir, e isso tem que aparecer como erro.
+      - name: Pré-condições (projeto + secrets)
+        env:
+          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          falta=0
+          [ -f "$APP_DIR/package.json" ] || { echo "::error::$APP_DIR/package.json não existe — o projeto Capacitor ainda não está no ref"; falta=1; }
+          [ -f "$PROJECT/project.pbxproj" ] || { echo "::error::$PROJECT não existe — o projeto iOS não está no ref"; falta=1; }
+          for v in P8 KEY_ID ISSUER TEAM; do
+            [ -n "${!v}" ] || { echo "::error::secret ausente: $v"; falta=1; }
+          done
+          exit $falta
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Dependências + cap sync
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          npm ci
+          npx cap sync ios
+          xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      - name: Chave da API do App Store Connect
+        env:
+          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s' "$P8" > "$RUNNER_TEMP/asc/AuthKey_${KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/asc/AuthKey_${KEY_ID}.p8"
+
+      - name: Archive (assinatura automática)
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${KEY_ID}.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER"
+
+      - name: Export (e upload ao TestFlight)
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          UPLOAD: ${{ inputs.upload }}
+        run: |
+          set -euo pipefail
+          destino=export
+          [ "$UPLOAD" = "true" ] && destino=upload
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>${destino}</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${KEY_ID}.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER"
+          echo "build ${{ github.run_number }} — destino: ${destino}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guarda o .ipa (só quando não enviou)
+        if: ${{ !inputs.upload }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.run_number }}
+          path: ${{ runner.temp }}/export/*.ipa
+          retention-days: 7
+
+      - name: Apaga a chave do runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
