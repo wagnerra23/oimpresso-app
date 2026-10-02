@@ -27,6 +27,20 @@ describe('montarNavegacao', () => {
     expect(n.modulosMais).toEqual(['pessoas', 'ponto', 'conta']);
   });
 
+  it('Financeiro (D16 Onda C) mora em Mais, depois de Orçamentos, e só com a área liberada', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'orcamentos', 'financeiro', 'ponto', 'mais'], 'inicio');
+    expect(n.abas).not.toContain('financeiro');
+    expect(n.modulosMais).toEqual(['orcamentos', 'financeiro', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
+  it('Fiscal (D16 Onda C) mora em Mais, depois de Orçamentos, e só com a área liberada', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'orcamentos', 'fiscal', 'ponto', 'mais'], 'inicio');
+    expect(n.abas).not.toContain('fiscal');
+    expect(n.modulosMais).toEqual(['orcamentos', 'fiscal', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
   it('Relatórios (D16 Onda C) mora em Mais e só com a área liberada', () => {
     const n = montarNavegacao('erp', ['inicio', 'pedidos', 'orcamentos', 'relatorios', 'ponto', 'mais'], 'inicio');
     expect(n.abas).not.toContain('relatorios');
@@ -53,6 +67,6 @@ describe('montarNavegacao', () => {
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'relatorios', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'ponto', 'conta']);
   });
 });
