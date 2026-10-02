@@ -7,6 +7,9 @@ import { api, type EscalaHoje, type MarcacaoHoje, type PainelInicio } from '../a
 import { TIPOS } from '../ponto-regras';
 import { Ic } from '../icones';
 import { reais } from './Pedidos';
+import { Notificacoes } from './Notificacoes';
+import { useVoltar } from '../voltar';
+import type { DestinoNotificacao } from '../api';
 
 const saudacao = (h: number) => (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite');
 const PREVISTO: Record<string, keyof NonNullable<EscalaHoje['turno']>> = {
@@ -15,10 +18,16 @@ const PREVISTO: Record<string, keyof NonNullable<EscalaHoje['turno']>> = {
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 const pct = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 
-interface Props { irParaPonto: () => void; irParaPedidos: () => void; irParaTarefas: () => void }
+interface Props {
+  irParaPonto: () => void; irParaPedidos: () => void; irParaTarefas: () => void;
+  /** Abre a área de destino de uma notificação (tela 16). */
+  abrirDestino: (tipo: DestinoNotificacao) => void;
+}
 
-export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas }: Props) {
+export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino }: Props) {
   const [painel, setPainel] = useState<PainelInicio | null>(null);
+  const [notif, setNotif] = useState(false);
+  useVoltar(notif, () => setNotif(false));
   const [erro, setErro] = useState<string | null>(null);
   // Ponto: só aparece para quem é colaborador (as rotas do ponto respondem erro para os demais).
   const [ponto, setPonto] = useState<{ escala: EscalaHoje; hoje: MarcacaoHoje[] } | null>(null);
@@ -38,11 +47,21 @@ export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas }: Props) {
   const k = painel?.kpis;
   const temKpi = !!k && (k.pedidos_ativos !== null || k.pedidos_atrasados !== null || k.estoque_baixo !== null);
 
+  if (notif) return <Notificacoes aoVoltar={() => setNotif(false)} abrirDestino={(tipo) => { setNotif(false); abrirDestino(tipo); }} />;
+
   return (
     <>
       <div className="pd-head">
-        <div className="p4-rotulo">Início · Hoje, {data}</div>
-        <div className="pd-titulo">{saudacao(agora.getHours())}{painel?.usuario ? `, ${painel.usuario}` : ''}</div>
+        <div className="p4-head-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="p4-rotulo">Início · Hoje, {data}</div>
+            <div className="pd-titulo">{saudacao(agora.getHours())}{painel?.usuario ? `, ${painel.usuario}` : ''}</div>
+          </div>
+          <button className="nt-sino" onClick={() => setNotif(true)}
+            aria-label={painel?.nao_lidas ? `Notificações, ${painel.nao_lidas} não lidas` : 'Notificações'}>
+            <Ic.sino tamanho={22} />{!!painel?.nao_lidas && <i aria-hidden="true" />}
+          </button>
+        </div>
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">

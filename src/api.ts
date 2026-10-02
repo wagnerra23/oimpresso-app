@@ -116,7 +116,23 @@ export interface PainelInicio {
   financeiro: { a_receber: number; a_pagar: number } | null;
   /** Até 3, mesmo item de /tarefas. */
   proximas_tarefas: Tarefa[];
+  /** Notificações não lidas, para o ponto no sino (pedido ao ERP; ausente = sem ponto). */
+  nao_lidas?: number | null;
 }
+
+/** Tela 16 · Notificações (D16, Onda A). Contrato §6.1 (ERP #8557): tabela notifications do Laravel (o sino da web),
+ *  20 por página, da mais nova para a mais antiga. `texto` sai null hoje; só tarefa nova traz destino (id "todo:<n>"). */
+export type DestinoNotificacao = 'pedido' | 'orcamento' | 'tarefa' | 'ponto' | 'producao';
+export interface Notificacao {
+  id: string;
+  /** Chip de origem: FIN, TAR, RH, CRM, IA, PAT, LOJ, DOC ou SIS (as sem cor própria saem em chip neutro). */
+  origem: string;
+  titulo: string; texto: string | null; lida: boolean;
+  /** ISO com hora. */
+  quando: string;
+  destino: { tipo: DestinoNotificacao | null; id: number | string | null };
+}
+export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -238,6 +254,7 @@ export const api = {
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
+  notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */

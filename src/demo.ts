@@ -58,6 +58,15 @@ const PESSOAS = [
   { id: 14, nome: 'Restaurante 88', tipo: 'PJ', documento: '00.000.000/0005-00', papeis: ['cliente'], saldo_aberto: 0, telefone: '(48) 90000-0005', email: null, cidade: 'Tubarão' },
 ]; // já em ordem alfabética: chamada no topo do módulo impediria o build de produção de descartar o demo
 
+// Notificações de demonstração (tela 16), como a API (#8557): texto null, só tarefa com destino.
+const NOTIFICACOES = [
+  { id: 'a1b2c3d4-0001', origem: 'TAR', titulo: 'Nova tarefa: Conferir arte do cardápio do Bistrô', texto: null, lida: false, min: 12, destino: { tipo: 'tarefa', id: 'todo:16' } },
+  { id: 'a1b2c3d4-0002', origem: 'FIN', titulo: 'Fatura recorrente gerada para Clínica Vita', texto: null, lida: false, min: 60, destino: { tipo: null, id: null } },
+  { id: 'a1b2c3d4-0003', origem: 'IA', titulo: 'A Jana terminou o resumo do dia', texto: null, lida: false, min: 180, destino: { tipo: null, id: null } },
+  { id: 'a1b2c3d4-0004', origem: 'CRM', titulo: 'Novo contato: Bistrô do Forno', texto: null, lida: true, min: 60 * 26, destino: { tipo: null, id: null } },
+  { id: 'a1b2c3d4-0005', origem: 'SIS', titulo: 'Backup diário concluído', texto: null, lida: true, min: 60 * 28, destino: { tipo: null, id: null } },
+];
+
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
   { id: 'todo:15', origem: 'todo' as const, titulo: 'Ligar para o fornecedor de lona', subtitulo: 'ToDo · Compras', prazo: diaRel(-1), atrasado: true, grupo: 'atrasadas' as const },
@@ -192,7 +201,12 @@ export const demo = {
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
         financeiro: { a_receber: 8200, a_pagar: 3100 },
-        proximas_tarefas: TAREFAS.slice(0, 3) });
+        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/notificacoes')) {
+      // Hora calculada aqui, nunca no topo do módulo: chamada no topo impede o build de produção de descartar o demo.
+      const itens = NOTIFICACOES.map(({ min, ...x }) => ({ ...x, quando: new Date(Date.now() - min * 60000).toISOString() }));
+      return r({ itens, nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, pagina: 1, tem_mais: false });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
