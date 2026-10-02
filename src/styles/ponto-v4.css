@@ -292,3 +292,5 @@ a.p4-link { text-decoration: none; }
 .np-seg.tres button { font-size: 12px; padding: 0 4px; }
 .np-linha2.num { grid-template-columns: 96px minmax(0, 1fr); }
 .np-form > .p4-rotulo { margin-bottom: -4px; }
+.np-cep { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.np-cep > .oi-btn { min-height: 44px; margin-top: 19px; padding: 0 16px; }
