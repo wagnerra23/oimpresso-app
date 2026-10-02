@@ -1,0 +1,29 @@
+name: pr-check
+
+# Gate de todo PR do app: tipos + testes de unidade das regras do ponto.
+# Os outros workflows (android-release, ios-testflight) só rodam no build de loja.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tipos-e-testes:
+    name: Tipos e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Tipos (tsc)
+        run: npm run typecheck
+      - name: Testes de unidade (vitest)
+        run: npm test
