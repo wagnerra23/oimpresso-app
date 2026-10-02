@@ -3,7 +3,7 @@
 // mostra o total que o ERP devolveu. A conta é feita em centavos inteiros para não acumular erro de float,
 // e o envio leva preço e quantidade como texto com 2 casas e ponto decimal (nunca float ambíguo).
 
-// Boleto fica fora da v1 (no ERP é venda a prazo, e a emissão de boleto está desligada em produção). Decisão [W].
+// Boleto fora da v1: decisão [W] em 2026-10-02 (no ERP é venda a prazo, e a emissão de boleto está desligada em produção).
 export type MetodoPagamento = 'pix' | 'credito' | 'debito' | 'dinheiro';
 
 /** Métodos do protótipo (s11), na ordem dele. */

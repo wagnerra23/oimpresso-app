@@ -3,7 +3,7 @@
 // carrinho é só prévia, e a tela de conclusão mostra o total que o ERP gravou. Contra venda duplicada, o botão
 // trava enquanto envia e cada tentativa leva uma Idempotency-Key que só muda quando o carrinho ou o método mudam.
 // Fora de propósito: câmera e leitor de código de barras (ADR 0383); "Imprimir" e "Enviar no WhatsApp" do
-// recibo (não estão no contrato); escolher cliente (a venda sai no consumidor final do ERP); Boleto (decisão [W]).
+// recibo (não estão no contrato); escolher cliente (a venda sai no consumidor final do ERP); Boleto (fora da v1, decisão [W] em 2026-10-02).
 // Contrato fechado com a sessão ERP da tela 11 (ver api.ts); o ERP recalcula preço e total e recusa (422) se divergir.
 import { useEffect, useRef, useState } from 'react';
 import { api, camposDoErro, type VendaCriada } from '../api';
