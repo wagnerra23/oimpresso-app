@@ -2,7 +2,6 @@
 // Decisão [W] 2026-10-02: criar produto SEM preço, como a tela React de hoje. O produto nasce com o preço
 // zerado e o preço se acerta na web; por isso o passo "Preço" do protótipo sai e a tela não grava valor.
 // Unidade e categorias vêm do ERP (GET /api/app/produtos/opcoes): não há m²/un/milheiro fixos.
-// Até o endpoint do ERP estar em produção, a tela só é oferecida na demo (ESCRITA_PRODUTO).
 // Fora de propósito: "origem" (não existe em products) e "Baixar estoque ao concluir a OP".
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { api, camposDoErro, ErroApi, type NovoProduto, type OpcoesProduto } from '../api';

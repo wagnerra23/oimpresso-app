@@ -1,5 +1,5 @@
 // Produtos — desenho v4 (tela 19), dados pelo contrato API-CONTRATO-v1 §9.1 (ERP #8574). Só leitura.
-// "+ Produto" abre a tela 20 (NovoProduto.tsx), por enquanto só na demo (ESCRITA_PRODUTO).
+// "+ Produto" abre a tela 20 (NovoProduto.tsx).
 // Fora de propósito: a barra de abas própria do protótipo
 // (no app, Produtos mora dentro de Mais). Os chips são as categorias que o ERP devolve, com a contagem
 // da busca atual; a busca vai ao servidor (nome, código ou categoria).

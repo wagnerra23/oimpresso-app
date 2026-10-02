@@ -240,8 +240,8 @@ export interface NovoProduto {
   prateleira: { rack: string | null; fileira: string | null; posicao: string | null } | null;
   fiscal: { ncm: string | null; cest: string | null; cfop_interno: string | null; cfop_externo: string | null };
 }
-/** Liga a tela 20. Só a demo, até o #8582 estar em produção. */
-export const ESCRITA_PRODUTO = DEMO;
+/** Tela 20 ligada no app de loja: o ERP #8582 está em produção (rotas medidas respondendo 401 sem token). */
+export const ESCRITA_PRODUTO = true;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
@@ -449,7 +449,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corp
   return r.data as T;
 }
 
-/** Cadastro de produto fora da demo não sai do aparelho até o #8582 estar em produção. */
+/** Porta única do cadastro de produto (ESCRITA_PRODUTO desligada = nada sai do aparelho). */
 function escritaProduto<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
   if (!ESCRITA_PRODUTO) return Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastro de produto pelo app ainda não está disponível.'));
   return chamar<T>(metodo, caminho, corpo);
