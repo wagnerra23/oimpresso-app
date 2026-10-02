@@ -101,7 +101,8 @@ export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefa
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'ponto' | 'mais';
 
-/** Tela 04 · Orçamentos (D16, Onda A). Formato PROPOSTO pelo app — rota ainda sem endpoint no ERP. */
+/** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
+ *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
 export type StatusOrcamento = 'rascunho' | 'enviado' | 'aprovado' | 'convertido';
 export type FiltroOrcamentos = 'todos' | StatusOrcamento;
 export interface OrcamentoResumo {

@@ -1,7 +1,7 @@
 // Orçamentos — desenho v4 (tela 04), D16 Onda A. Só leitura: ficam de fora "+ Novo", "Editar", "PDF" e
 // "Converter em pedido" (escrevem ou geram documento — PR próprio; converter mexe em valor e passa pela
-// regra mestre). Mora dentro de Mais (a barra de baixo é a do §7.1). Rota PROPOSTA pelo app
-// (GET /api/app/orcamentos) — ver ListaOrcamentos em api.ts; até existir, roda contra a demo.
+// regra mestre). Mora dentro de Mais (a barra de baixo é a do §7.1). Rota GET /api/app/orcamentos,
+// contrato §2.1 (ERP #8555).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroOrcamentos, type ListaOrcamentos, type StatusOrcamento } from '../api';
 import { reais } from './Pedidos';
@@ -74,7 +74,7 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
                 <div className="oc-l1">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <b>{q.titulo ?? q.numero}</b>
-                    <small>{q.cliente} · validade {dataCurta(q.validade)}</small>
+                    <small>{q.cliente}{q.validade ? ` · validade ${dataCurta(q.validade)}` : ''}</small>
                   </div>
                   <span className="oc-status" style={{ color: s.cor, borderColor: s.cor }}><i style={{ background: s.cor }} aria-hidden="true" />{s.label}</span>
                 </div>
