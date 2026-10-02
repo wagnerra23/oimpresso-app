@@ -401,6 +401,14 @@ a.p4-link { text-decoration: none; }
 .mov-qtd.pos { color: var(--ok); }
 .mov-qtd.neg { color: var(--danger); }
 
+/* Tela 20 · Novo produto (prefixo npr-) */
+.np-linha2.npr-cfop { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.npr-prateleira { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.npr-feito { padding-top: 64px; }
+.npr-ok { width: 56px; height: 56px; margin-bottom: 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text);
+  display: flex; align-items: center; justify-content: center; }
+.np-rodape.npr-rodape-fim { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
 /* ── Financeiro (tela 06) ── */
 .fn-saldo { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .fn-saldo-v { font-family: var(--font-mono); font-size: 30px; font-weight: 600; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; color: var(--ok); }

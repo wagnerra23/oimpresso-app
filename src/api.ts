@@ -225,6 +225,24 @@ export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pag
 /** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
 export const DETALHE_ESTOQUE = DEMO;
 
+/** Tela 20 · Novo produto (Onda B escrita), contrato §9.4 (ERP #8582). Decisão [W] 2026-10-02: sem preço — o
+ *  produto nasce com preço zerado e o preço se acerta na web, então a tela não grava valor. Só tipo simples. */
+export interface OpcoesProduto {
+  categorias: Array<{ id: number; nome: string }>;
+  /** Unidades do business ("Metro quadrado" / "m²"). Não há m²/un/milheiro fixos. */
+  unidades: Array<{ id: number; nome: string; curta: string }>;
+}
+export interface NovoProduto {
+  nome: string; codigo: string | null; categoria_id: number | null; unidade_id: number;
+  /** minimo vai como número JSON (ponto decimal): o ERP não passa pelo num_uf. */
+  estoque: { controla: boolean; minimo: number | null };
+  /** Vai para a loja padrão do usuário (a primeira permitida). */
+  prateleira: { rack: string | null; fileira: string | null; posicao: string | null } | null;
+  fiscal: { ncm: string | null; cest: string | null; cfop_interno: string | null; cfop_externo: string | null };
+}
+/** Liga a tela 20. Só a demo, até o #8582 estar em produção. */
+export const ESCRITA_PRODUTO = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'ponto' | 'mais';
@@ -415,6 +433,12 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corp
   return r.data as T;
 }
 
+/** Cadastro de produto fora da demo não sai do aparelho até o #8582 estar em produção. */
+function escritaProduto<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
+  if (!ESCRITA_PRODUTO) return Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastro de produto pelo app ainda não está disponível.'));
+  return chamar<T>(metodo, caminho, corpo);
+}
+
 export const api = {
   marcacoesHoje: () => chamar<{ data: string; marcacoes: MarcacaoHoje[] }>('GET', '/ponto/api/marcacoes/hoje'),
   kpis: () => chamar<Kpis>('GET', '/ponto/api/dashboard/kpis'),
@@ -456,6 +480,12 @@ export const api = {
   estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
     ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
+
+  /** Tela 20 · categorias e unidades do business (contrato §9.4). */
+  opcoesProduto: () => escritaProduto<OpcoesProduto>('GET', '/api/app/produtos/opcoes'),
+  /** Tela 20 · Novo produto. 201 { id, codigo } · 422 { erro: "validacao", campos } (chaves aninhadas, ex. "fiscal.ncm";
+   *  unidade ou categoria de outra empresa voltam em unidade_id / categoria_id) · 403 sem_permissao (product.create). */
+  criarProduto: (p: NovoProduto) => escritaProduto<{ id: number; codigo: string }>('POST', '/api/app/produtos', p),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */

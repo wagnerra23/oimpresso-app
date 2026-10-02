@@ -49,7 +49,9 @@ const PEDIDOS = [
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
-const PRODUTOS = [
+const UNIDADES = [{ id: 1, nome: 'Metro quadrado', curta: 'm²' }, { id: 2, nome: 'Unidade', curta: 'un' }, { id: 3, nome: 'Milheiro', curta: 'mil' }];
+interface ProdutoDemo { id: number; nome: string; codigo: string; cat: number | null; unidade: string; preco: number | null; variacoes: number | null; qtd: number | null; baixo: boolean }
+const PRODUTOS: ProdutoDemo[] = [
   { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
   { id: 202, nome: 'Caneca personalizada', codigo: 'BRD-CAN', cat: 5, unidade: 'un', preco: 29, variacoes: 3, qtd: 46, baixo: false },
   { id: 203, nome: 'Cartão de visita 4×4', codigo: 'CRT-500', cat: 3, unidade: 'mil', preco: 145, variacoes: null, qtd: null, baixo: false },
@@ -324,6 +326,35 @@ export const demo = {
       const busca = ESTOQUE.filter((x) => !q || x.nome.toLowerCase().includes(q) || x.codigo.toLowerCase().includes(q));
       return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
         pagina: 1, tem_mais: false });
+    }
+    // Tela 20 (contrato §9.4). A demo faz o papel do ERP: produto nasce sem preço.
+    if (metodo === 'GET' && caminho === '/api/app/produtos/opcoes') {
+      return r({ categorias: CATEGORIAS, unidades: UNIDADES });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/produtos') {
+      const n = (corpo ?? {}) as { nome?: string; codigo?: string | null; categoria_id?: number | null; unidade_id?: number;
+        estoque?: { controla?: boolean; minimo?: number | null }; fiscal?: Record<string, string | null> };
+      const campos: Record<string, string> = {};
+      if (!String(n.nome ?? '').trim()) campos.nome = 'Informe o nome do produto.';
+      const unidade = UNIDADES.find((u) => u.id === n.unidade_id);
+      if (!unidade) campos.unidade_id = 'Unidade inválida.';
+      if (n.categoria_id != null && !CATEGORIAS.some((c) => c.id === n.categoria_id)) campos.categoria_id = 'Categoria inválida.';
+      if (n.codigo && PRODUTOS.some((x) => x.codigo.toLowerCase() === String(n.codigo).toLowerCase())) campos.codigo = 'Este código já está em uso.';
+      if (n.estoque?.minimo != null && n.estoque.minimo < 0) campos['estoque.minimo'] = 'O estoque mínimo não pode ser negativo.';
+      const tam: Record<string, number> = { ncm: 8, cest: 7, cfop_interno: 4, cfop_externo: 4 };
+      for (const [k, t] of Object.entries(tam)) {
+        const v = n.fiscal?.[k];
+        if (v && (v.length !== t || /[^0-9]/.test(v))) campos['fiscal.' + k] = 'Informe ' + t + ' dígitos.';
+      }
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const id = 1 + Math.max(...PRODUTOS.map((x) => x.id));
+      const codigo = n.codigo || 'PRD-' + id;
+      PRODUTOS.push({ id, nome: String(n.nome).trim(), codigo, cat: n.categoria_id ?? null, unidade: unidade!.curta, preco: null,
+        variacoes: null, qtd: n.estoque?.controla === false ? null : 0,
+        // Regra do alerta da web: saldo ≤ mínimo. Nasce com saldo 0.
+        baixo: n.estoque?.controla !== false && n.estoque?.minimo != null && 0 <= n.estoque.minimo });
+      PRODUTOS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return r({ id, codigo });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
       const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';

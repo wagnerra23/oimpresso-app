@@ -1,11 +1,14 @@
 // Produtos — desenho v4 (tela 19), dados pelo contrato API-CONTRATO-v1 §9.1 (ERP #8574). Só leitura.
-// Fora de propósito: "+ Produto" é a tela 20 (Onda B escrita) e a barra de abas própria do protótipo
+// "+ Produto" abre a tela 20 (NovoProduto.tsx), por enquanto só na demo (ESCRITA_PRODUTO).
+// Fora de propósito: a barra de abas própria do protótipo
 // (no app, Produtos mora dentro de Mais). Os chips são as categorias que o ERP devolve, com a contagem
 // da busca atual; a busca vai ao servidor (nome, código ou categoria).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type ListaProdutos, type ProdutoResumo } from '../api';
+import { api, ErroApi, ESCRITA_PRODUTO, type ListaProdutos, type ProdutoResumo } from '../api';
 import { Ic } from '../icones';
 import { reais } from './Pedidos';
+import { NovoProdutoTela } from './NovoProduto';
+import { useVoltar } from '../voltar';
 
 /** Quantidade como o protótipo ("18 m²", "9 un"): até 2 casas, sem zeros sobrando. */
 export function textoEstoque(e: ProdutoResumo['estoque']): string {
@@ -24,7 +27,21 @@ export function textoMeta(p: Pick<ProdutoResumo, 'codigo' | 'categoria' | 'calcu
   return [p.codigo, p.categoria ?? 'Sem categoria', p.calculo].filter((x): x is string => !!x);
 }
 
-export function Produtos({ voltar }: { voltar?: ReactNode }) {
+type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
+
+export function Produtos({ voltar, avisar }: { voltar?: ReactNode; avisar: Aviso }) {
+  const [novo, setNovo] = useState(false);
+  // Muda depois de um cadastro: o catálogo volta recarregado, com o produto novo.
+  const [versao, setVersao] = useState(0);
+  useVoltar(novo, () => setNovo(false));
+  if (novo) {
+    return <NovoProdutoTela avisar={avisar} aoCancelar={() => setNovo(false)}
+      aoVerCatalogo={() => { setNovo(false); setVersao((v) => v + 1); }} />;
+  }
+  return <Catalogo key={versao} voltar={voltar} aoNovo={ESCRITA_PRODUTO ? () => setNovo(true) : undefined} />;
+}
+
+function Catalogo({ voltar, aoNovo }: { voltar?: ReactNode; aoNovo?: () => void }) {
   const [categoria, setCategoria] = useState<number | 'todas'>('todas');
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
@@ -69,6 +86,7 @@ export function Produtos({ voltar }: { voltar?: ReactNode }) {
             <div className="p4-rotulo">{rotulo}</div>
             <div className="pd-titulo">Produtos</div>
           </div>
+          {aoNovo && <button className="np-nova" onClick={aoNovo}>+ Produto</button>}
         </div>
       </div>
       <div className="oi-scroll">
