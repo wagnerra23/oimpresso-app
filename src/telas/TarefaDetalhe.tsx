@@ -1,6 +1,7 @@
 // Detalhe da tarefa — desenho v4 (tela 28), D16 Onda A. Só ToDo (justificativa do ponto abre o Ponto).
 // Mostra responsável, cliente, prazo, origem, checklist e comentários. A única ação é "Concluir tarefa",
-// a mesma rota que a lista já usava (§3); marcar item do checklist fica para um PR de escrita próprio.
+// a mesma rota que a lista já usava (§3). Marcar item do checklist saiu da Onda A por decisão do Wagner
+// (2026-10-02): o ToDo do Essentials não tem checklist (o GET devolve sempre []), não há onde gravar.
 // Como no protótipo, não conclui com checklist pendente. Rota GET /api/app/tarefas/todo/{id}, contrato
 // §3.1 (ERP #8556). Linha ou bloco que vem vazio (cliente, origem, checklist) não aparece. A descrição não
 // está no protótipo; entra porque, sem checklist, é o conteúdo principal do ToDo.
@@ -96,7 +97,7 @@ export function TarefaDetalheTela({ id, avisar, aoVoltar, aoConcluir }: Props) {
                 ))}
               </ol>
             )}
-            <p className="p4-legal">Marcar itens do checklist e comentar continuam no computador.</p>
+            <p className="p4-legal">Comentar continua no computador.</p>
           </div>
         )}
       </div>
