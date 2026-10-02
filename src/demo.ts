@@ -84,6 +84,23 @@ const ORDENS = [
   { id: 1039, numero: 'OS-01039', placa: 'RBA2H78', veiculo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
   { id: 1036, numero: 'OS-01036', placa: 'QHX5B33', veiculo: null, cliente: 'Studio Forma', valor: 980, etapa: 'pronto_retirada' },
 ];
+
+
+// Detalhe das OS da demo (tela 03). A 1042 imita o protótipo; as outras têm o mínimo.
+const DETALHE_OS: Record<number, { local: string | null; km: number | null; queixa: string | null; diagnostico: string | null; fotos: number;
+  itens: Array<{ tipo: 'servico' | 'peca'; descricao: string; detalhe: string | null; valor: number }> }> = {
+  1042: { local: 'Box 2', km: 48312, fotos: 3,
+    queixa: 'Barulho na suspensão dianteira em lombada, volante puxando para a direita.',
+    diagnostico: 'Bieleta dianteira direita com folga e batente gasto. Alinhamento fora do padrão.',
+    itens: [
+      { tipo: 'servico', descricao: 'Troca de bieleta dianteira', detalhe: '1,5 h', valor: 180 },
+      { tipo: 'servico', descricao: 'Alinhamento e balanceamento', detalhe: '1 h', valor: 150 },
+      { tipo: 'peca', descricao: 'Bieleta dianteira direita', detalhe: '1 un', valor: 138 },
+      { tipo: 'peca', descricao: 'Kit batente + coifa', detalhe: '2 un', valor: 282 },
+    ] },
+  1045: { local: 'Box 1', km: 161880, fotos: 0, queixa: 'Motor falhando na partida a frio.', diagnostico: null, itens: [] },
+};
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -391,6 +408,20 @@ export const demo = {
       const i = TAREFAS.findIndex((x) => x.id === id);
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
+      const o = ORDENS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
+      const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
+      const d = DETALHE_OS[o.id] ?? { local: null, km: null, queixa: null, diagnostico: null, fotos: 0,
+        itens: o.valor ? [{ tipo: 'servico' as const, descricao: 'Serviço', detalhe: null, valor: o.valor }] : [] };
+      // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
+      const pecas = d.itens.filter((i) => i.tipo === 'peca').reduce((t, i) => t + i.valor, 0);
+      const mao = d.itens.filter((i) => i.tipo === 'servico').reduce((t, i) => t + i.valor, 0);
+      return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
+        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length },
+        veiculo: o.veiculo ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
+        queixa: d.queixa, diagnostico: d.diagnostico, itens: d.itens, totais: { pecas, mao_de_obra: mao, total: pecas + mao }, fotos_entrada: d.fotos });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
