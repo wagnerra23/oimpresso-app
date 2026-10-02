@@ -69,6 +69,15 @@ const NOTIFICACOES = [
   { id: 'a1b2c3d4-0005', origem: 'SIS', titulo: 'Backup diário concluído', texto: null, lida: true, min: 60 * 28, destino: { tipo: null, id: null } },
 ];
 
+// Orçamentos de demonstração (tela 04). Clientes fictícios. Como a API (#8555): validade e área sempre null.
+const ORCAMENTOS = [
+  { id: 201, numero: 'ORC-0118', titulo: 'Fachada ACM 4×1,2 m com letra caixa', cliente: 'Bistrô do Forno', validade: null, status: 'enviado', valor: 3840, area_m2: null, itens: 3 },
+  { id: 202, numero: 'ORC-0117', titulo: 'Adesivação de frota — 3 utilitários', cliente: 'Gráfica Lona Sul', validade: null, status: 'aprovado', valor: 2650, area_m2: null, itens: 6 },
+  { id: 203, numero: 'ORC-0116', titulo: 'Banner 3×1 m lona 440 g', cliente: 'Restaurante 88', validade: null, status: 'rascunho', valor: 480, area_m2: null, itens: 1 },
+  { id: 204, numero: 'ORC-0115', titulo: 'Cardápio A3 laminado — 20 un', cliente: 'Bistrô do Forno', validade: null, status: 'convertido', valor: 210, area_m2: null, itens: 1 },
+  { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
+];
+
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
   { id: 'todo:15', origem: 'todo' as const, titulo: 'Ligar para o fornecedor de lona', subtitulo: 'ToDo · Compras', prazo: diaRel(-1), atrasado: true, grupo: 'atrasadas' as const },
@@ -230,7 +239,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -241,6 +250,24 @@ export const demo = {
       // Hora calculada aqui, nunca no topo do módulo: chamada no topo impede o build de produção de descartar o demo.
       const itens = NOTIFICACOES.map(({ min, ...x }) => ({ ...x, quando: new Date(Date.now() - min * 60000).toISOString() }));
       return r({ itens, nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && /^\/api\/app\/tarefas\/todo\/\d+$/.test(caminho)) {
+      const id = Number(caminho.split('/')[5]);
+      const tf = TAREFAS.find((x) => x.id === 'todo:' + id);
+      if (!tf) throw Object.assign(new Error('Tarefa não encontrada.'), { status: 404 });
+      // Como a API (#8556): checklist sempre [], cliente e origem null, comentários do mais antigo ao mais novo.
+      return r({ id: tf.id, titulo: tf.titulo, modulo: 'Tarefa · alta', responsavel: 'Colaborador Demonstração, Carla',
+        descricao: id === 16 ? 'Conferir medidas e ortografia antes de mandar para o cliente aprovar.' : null,
+        cliente: null, prazo: tf.prazo, atrasado: tf.atrasado, origem: null, checklist: [],
+        comentarios: [{ quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Carla', texto: 'pediu letra maior ao fornecedor', detalhe: null },
+          { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
+        concluida: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
+      return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';

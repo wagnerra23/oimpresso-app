@@ -129,9 +129,46 @@ export interface Tarefa {
 }
 export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
 
+/** Tela 28 · Detalhe da tarefa (D16, Onda A) — só ToDo. Contrato §3.1 (ERP #8556). Hoje o ToDo do
+ *  Essentials não tem checklist (sempre []), nem cliente e origem (sempre null): a tela esconde o que vier vazio. */
+export interface TarefaDetalhe {
+  /** Mesmo id da lista, ex.: "todo:15". */
+  id: string; titulo: string;
+  /** Rótulo pronto para o topo, igual ao da lista (ex.: "Tarefa · alta"); null quando não houver. */
+  modulo: string | null;
+  descricao: string | null;
+  /** Atribuídos, separados por vírgula. */
+  responsavel: string | null; cliente: string | null;
+  /** Data (YYYY-MM-DD) ou data-hora (ISO) do prazo. */
+  prazo: string | null; atrasado: boolean;
+  /** De onde a tarefa veio, ex.: "Orçamento #4812"; null quando não houver. */
+  origem: string | null;
+  checklist: Array<{ texto: string; feito: boolean }>;
+  /** Do mais antigo para o mais novo (a tela mostra o mais novo primeiro, como o protótipo). */
+  comentarios: Array<{ quando: string; autor: string; texto: string; detalhe: string | null }>;
+  concluida: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'ponto' | 'mais';
+
+/** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
+ *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
+export type StatusOrcamento = 'rascunho' | 'enviado' | 'aprovado' | 'convertido';
+export type FiltroOrcamentos = 'todos' | StatusOrcamento;
+export interface OrcamentoResumo {
+  id: number; numero: string;
+  /** Nome do 1º item (como o resumo do pedido); null se não tiver item. */
+  titulo: string | null;
+  cliente: string; validade: string | null; status: StatusOrcamento; valor: number;
+  /** Área total em m² (comunicação visual); null quando não se aplica. */
+  area_m2: number | null;
+  itens: number;
+}
+export interface ListaOrcamentos {
+  itens: OrcamentoResumo[]; contadores: Record<FiltroOrcamentos, number>; pagina: number; tem_mais: boolean;
+}
 export interface PainelInicio {
   /** D6: colaborador abre direto no ponto; quem tem o ERP vê as abas da v1. */
   perfil: 'erp' | 'colaborador';
@@ -301,8 +338,11 @@ export const api = {
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
+    chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
+  tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
   concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
