@@ -430,13 +430,14 @@ export const demo = {
         concluida: false });
     }
     if (metodo === 'GET' && caminho === '/api/app/equipe') {
-      // Nomes do protótipo (tela 26). Formato proposto, ainda sem rota no ERP.
+      // Nomes do protótipo (tela 26), nas regras do ERP #8588: ordem alfabética, carga só de OS, status montado
+      // pelo ERP (Em serviço quando tem carga, Disponível sem, Inativo para usuário inativo).
       return r({ itens: [
+        { id: 2, nome: 'André Silva', funcao: 'Impressor · plotter 1,60', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 3, nome: 'Bruno Cruz', funcao: 'Mecânico · Box 1', carga: '1 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 4, nome: 'Carla Menezes', funcao: 'Administrativo · financeiro', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
         { id: 1, nome: 'Jefferson Moraes', funcao: 'Mecânico · Box 2', carga: '2 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
-        { id: 2, nome: 'André Silva', funcao: 'Impressor · plotter 1,60', carga: '3 OPs', status: { rotulo: 'Na impressão', tom: 'ocupado' } },
-        { id: 3, nome: 'Bruno Cruz', funcao: 'Mecânico · Box 1', carga: '1 OS', status: { rotulo: 'Disponível', tom: 'livre' } },
-        { id: 4, nome: 'Carla Menezes', funcao: 'Administrativo · financeiro', carga: null, status: { rotulo: 'Online', tom: 'livre' } },
-        { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Ausente', tom: 'ausente' } },
+        { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Inativo', tom: 'ausente' } },
       ] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {

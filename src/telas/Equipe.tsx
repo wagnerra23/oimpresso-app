@@ -1,6 +1,6 @@
 // Equipe — desenho v4 (tela 26), D16 Onda E. Só leitura: nome, função, carga (itens de OS/OP abertos
 // atribuídos) e status. Marcação de ponto não aparece aqui (fica no Ponto). Mora dentro de Mais.
-// Rota GET /api/app/equipe: FORMATO PROPOSTO, ainda sem PR no ERP — ver ListaEquipe em api.ts.
+// Rota GET /api/app/equipe: contrato §12 (ERP #8588) — ver ListaEquipe em api.ts. O rótulo do status vem pronto do ERP.
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type ListaEquipe, type TomStatusEquipe } from '../api';
 

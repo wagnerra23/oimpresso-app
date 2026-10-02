@@ -247,8 +247,10 @@ export const ESCRITA_PRODUTO = DEMO;
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'equipe' | 'ponto' | 'mais';
 
-/** Tela 26 · Equipe (D16, Onda E). Só leitura. FORMATO PROPOSTO, ainda sem rota no ERP: muda quando a sessão ERP
- *  da Onda E fechar o contrato. `carga` = itens de OS/OP abertos atribuídos (null = não se aplica, ex.: administrativo). */
+/** Tela 26 · Equipe (D16, Onda E). Só leitura. Contrato §12 (ERP #8588): equipe inteira do business, inativos
+ *  inclusos, em ordem alfabética; acesso = user.view (sem ela, 403 sem_permissao).
+ *  `carga` = OS da Oficina abertas atribuídas ("2 OS"); null sem OS aberta — o ERP não atribui OP a ninguém.
+ *  `status` vem montado pelo ERP: Inativo/ausente (usuário inativo) · Em serviço/ocupado (tem carga) · Disponível/livre. */
 export type TomStatusEquipe = 'ocupado' | 'livre' | 'ausente';
 export interface MembroEquipe { id: number; nome: string; funcao: string | null; carga: string | null; status: { rotulo: string; tom: TomStatusEquipe } }
 export interface ListaEquipe { itens: MembroEquipe[] }
@@ -520,7 +522,7 @@ export const api = {
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
-  /** Tela 26 (proposta, sem rota no ERP ainda). */
+  /** Tela 26. Contrato §12 (ERP #8588). */
   equipe: () => chamar<ListaEquipe>('GET', '/api/app/equipe'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
