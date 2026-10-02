@@ -547,14 +547,15 @@ export const demo = {
         const p = CATALOGO.find((x) => x.id === it.variacao_id);
         const qC = centavosDoTexto(it.quantidade), pC = centavosDoTexto(it.preco_unitario);
         if (!p) { campos[`itens.${k}.variacao_id`] = 'Produto não encontrado.'; return; }
+        // Como o ERP (#8597): na v1 a quantidade é inteira ("3.00" vale, "2.50" não).
         if (qC === null || qC <= 0 || qC % 100 !== 0) { campos[`itens.${k}.quantidade`] = 'Quantidade inválida.'; return; }
         const q = qC / 100;
         if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque})`; return; }
         const precoC = Math.round(p.preco * 100);
-        if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`; return; }
+        if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`; return; }
         totalC += precoC * q; baixas.push({ p, q });
       });
-      if (!Object.keys(campos).length && centavosDoTexto(n.total_previsto) !== totalC) campos.total_previsto = 'O total mudou. Revise o carrinho.';
+      if (!Object.keys(campos).length && centavosDoTexto(n.total_previsto) !== totalC) campos.total_previsto = `O total mudou para ${(totalC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Revise o carrinho.`;
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
       for (const b of baixas) if (b.p.estoque !== null) b.p.estoque -= b.q;
       numeroVenda += 1;

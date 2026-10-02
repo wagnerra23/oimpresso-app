@@ -45,3 +45,19 @@ describe('venda na demo', () => {
     expect(achar(await produtos(), 'Cartão').estoque).toBe(cartao.estoque);
   });
 });
+
+describe('regras do ERP #8597 na demo', () => {
+  it('quantidade fracionada e total divergente voltam 422', async () => {
+    const banner = achar(await produtos(), 'Banner');
+    const corpo = corpoVenda([{ produto: banner, qtd: 1 }], 'pix');
+    await expect(vender({ ...corpo, itens: [{ ...corpo.itens[0], quantidade: '2.50' }] }, novaChave()))
+      .rejects.toMatchObject({ status: 422, campos: { 'itens.0.quantidade': expect.any(String) } });
+    await expect(vender({ ...corpo, total_previsto: '1.00' }, novaChave()))
+      .rejects.toMatchObject({ status: 422, campos: { total_previsto: expect.stringMatching(/^O total mudou para R\$\s.+\. Revise o carrinho\.$/) } });
+  });
+  it('método fora de pix, credito, debito e dinheiro volta 422 (boleto incluído)', async () => {
+    const banner = achar(await produtos(), 'Banner');
+    await expect(vender({ ...corpoVenda([{ produto: banner, qtd: 1 }], 'pix'), metodo: 'boleto' }, novaChave()))
+      .rejects.toMatchObject({ status: 422, campos: { metodo: expect.any(String) } });
+  });
+});
