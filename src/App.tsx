@@ -14,15 +14,15 @@ import { Pedidos } from './telas/Pedidos';
 import { Producao } from './telas/Producao';
 import { Tarefas } from './telas/Tarefas';
 import { Mais, VoltarMais, type SubMais } from './telas/Mais';
-import { montarNavegacao, NAV_PADRAO, type Navegacao } from './navegacao';
+import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
+import { Orcamentos } from './telas/Orcamentos';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
 
-type Aba = Exclude<Area, 'pessoas'>;
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
 const ABAS: Array<{ id: Aba; label: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
@@ -113,6 +113,7 @@ export function App() {
         {nav && aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
         {nav && aba === 'mais' && subMais === null && <Mais abrir={setSubMais} modulos={n.modulosMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>
