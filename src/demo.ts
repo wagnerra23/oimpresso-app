@@ -283,7 +283,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'equipe', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -317,6 +317,16 @@ export const demo = {
         comentarios: [{ quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Carla', texto: 'pediu letra maior ao fornecedor', detalhe: null },
           { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
         concluida: false });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/equipe') {
+      // Nomes do protótipo (tela 26). Formato proposto, ainda sem rota no ERP.
+      return r({ itens: [
+        { id: 1, nome: 'Jefferson Moraes', funcao: 'Mecânico · Box 2', carga: '2 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 2, nome: 'André Silva', funcao: 'Impressor · plotter 1,60', carga: '3 OPs', status: { rotulo: 'Na impressão', tom: 'ocupado' } },
+        { id: 3, nome: 'Bruno Cruz', funcao: 'Mecânico · Box 1', carga: '1 OS', status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 4, nome: 'Carla Menezes', funcao: 'Administrativo · financeiro', carga: null, status: { rotulo: 'Online', tom: 'livre' } },
+        { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Ausente', tom: 'ausente' } },
+      ] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

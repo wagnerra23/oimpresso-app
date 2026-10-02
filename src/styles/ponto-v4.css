@@ -345,3 +345,14 @@ a.p4-link { text-decoration: none; }
 .nt-ponto { width: 8px; height: 8px; margin-top: 6px; border-radius: 99px; flex-shrink: 0; }
 .nt-linha.nova .nt-ponto { background: var(--accent); }
 .nt-todas { min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12.5px; font-weight: 600; flex-shrink: 0; }
+
+/* Tela 26 · Equipe (eq-) */
+.eq-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.eq-linha { min-height: 64px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2, var(--border)); }
+.eq-linha:last-child { border-bottom: 0; }
+.eq-quem { flex: 1; min-width: 0; }
+.eq-quem b { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-quem small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eq-status { font-size: 11px; font-weight: 500; }

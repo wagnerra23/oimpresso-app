@@ -17,6 +17,7 @@ import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
+import { Equipe } from './telas/Equipe';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -122,6 +123,7 @@ export function App() {
         {nav && aba === 'mais' && subMais === null && <Mais abrir={setSubMais} modulos={n.modulosMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'equipe' && <Equipe voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>

@@ -44,8 +44,14 @@ describe('montarNavegacao', () => {
     expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
   });
 
+  it('Equipe (tela 26) mora em Mais e só aparece se a área vier liberada', () => {
+    expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').modulosMais).toEqual(['equipe', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'equipe', 'ponto', 'conta']);
   });
 });
