@@ -73,7 +73,6 @@ function Lista({ aoAbrir }: { aoAbrir: (id: number) => void }) {
               </span>
               <span className="pd-card-l2"><b>{p.resumo ?? p.cliente}</b></span>
               <span className="pd-card-l3"><span>{p.cliente}</span><span className="pd-valor">{reais(p.valor)}</span></span>
-              <span className="pd-barra" aria-hidden="true"><i style={{ width: `${Math.round(p.progresso * 100)}%` }} /></span>
             </button>
           ))}
           {dados?.tem_mais && <button className="oi-btn block" style={{ minHeight: 44 }} disabled={carregandoMais} onClick={mais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</button>}
