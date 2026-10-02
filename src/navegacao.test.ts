@@ -27,6 +27,13 @@ describe('montarNavegacao', () => {
     expect(n.modulosMais).toEqual(['pessoas', 'ponto', 'conta']);
   });
 
+  it('Dashboard (D16 Onda C) mora em Mais e só com a área liberada', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'orcamentos', 'dashboard', 'ponto', 'mais'], 'inicio');
+    expect(n.abas).not.toContain('dashboard');
+    expect(n.modulosMais).toEqual(['orcamentos', 'dashboard', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
   it('colaborador sem ponto liberado: abre em Mais, que é a única aba', () => {
     const n = montarNavegacao('colaborador', ['mais'], 'mais');
     expect(n.abas).toEqual(['mais']);
@@ -46,6 +53,6 @@ describe('montarNavegacao', () => {
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'dashboard', 'ponto', 'conta']);
   });
 });

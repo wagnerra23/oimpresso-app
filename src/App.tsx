@@ -17,6 +17,7 @@ import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
+import { Dashboard } from './telas/Dashboard';
 import { Produtos } from './telas/Produtos';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
@@ -124,6 +125,8 @@ export function App() {
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'dashboard' && <Dashboard irParaPedidos={() => irPara('pedidos')} irParaProducao={() => irPara('producao')}
+          voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>

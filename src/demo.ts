@@ -305,7 +305,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'dashboard', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -345,6 +345,15 @@ export const demo = {
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/dashboard') {
+      // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
+      return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
+        kpis: { pedidos_ativos: ativos.length, pedidos_novos: PEDIDOS.filter((x) => x.etapa.grupo === 'orcamento').length,
+          producao_em_curso: PEDIDOS.filter((x) => x.etapa.grupo === 'producao').length, a_receber: 11415, vencido: 1260 },
+        pedidos_por_dia: [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, ativos.length].map((total, i) => ({ data: diaRel(i - 13), total })),
+        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: { concluidas: 7, total: 10 } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
