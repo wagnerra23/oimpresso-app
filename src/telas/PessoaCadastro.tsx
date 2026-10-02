@@ -1,10 +1,13 @@
-// Dados cadastrais da pessoa — desenho v4 (tela 34 · Ficha cadastral), D16 Onda A. Só leitura: o
-// "Editar" do protótipo fica de fora até a escrita entrar num PR próprio. Abre a partir da ficha
-// (tela 18). Rota GET /api/app/pessoas/{id}/cadastro, contrato §4.1 (ERP #8552).
-import { useEffect, useState } from 'react';
+// Dados cadastrais da pessoa — desenho v4 (tela 34 · Ficha cadastral), D16 Onda A. Abre a partir da ficha
+// (tela 18). Rota GET /api/app/pessoas/{id}/cadastro, contrato §4.1 (ERP #8552). "Editar" abre o mesmo
+// assistente da tela 09 preenchido e salva com PATCH /api/app/pessoas/{id}, só o que mudou (§4.4, ERP #8570).
+import { useCallback, useEffect, useState } from 'react';
 import { api, type PapelPessoa, type PessoaCadastro } from '../api';
+import { useVoltar } from '../voltar';
+import { formDoCadastro, NovaPessoaTela } from './NovaPessoa';
 import { reais } from './Pedidos';
 
+const IE: Record<number, string> = { 1: 'Contribuinte de ICMS', 2: 'Isento de inscrição', 9: 'Não contribuinte' };
 const PAPEL: Record<PapelPessoa, string> = { cliente: 'Cliente', fornecedor: 'Fornecedor', funcionario: 'Funcionário' };
 const autorizado = (v: boolean | null) => (v === null ? '—' : v ? 'Autorizado' : 'Não autorizado');
 const dataHora = (iso: string | null) => {
@@ -28,12 +31,21 @@ function Bloco({ titulo, linhas }: { titulo: string; linhas: Linha[] }) {
   );
 }
 
-export function Cadastro({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+export function Cadastro({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => void; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [c, setC] = useState<PessoaCadastro | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  useEffect(() => {
-    api.pessoaCadastro(id).then(setC).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'));
-  }, [id]);
+  const [editando, setEditando] = useState(false);
+  useVoltar(editando, () => setEditando(false));
+  const carregar = useCallback(() => api.pessoaCadastro(id).then(setC)
+    .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')), [id]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (editando && c) {
+    return <NovaPessoaTela avisar={avisar} aoCancelar={() => setEditando(false)}
+      editar={{ id: c.id, inicial: formDoCadastro(c), documentoMascarado: c.identificacao.documento }}
+      // Recarrega antes de fechar, para a ficha não mostrar o valor antigo por um instante.
+      aoSalvar={() => { carregar().finally(() => setEditando(false)); }} />;
+  }
 
   const pj = c?.tipo === 'PJ';
   return (
@@ -46,6 +58,7 @@ export function Cadastro({ id, aoVoltar }: { id: number; aoVoltar: () => void })
           <div className="p4-rotulo">Dados cadastrais</div>
           <div className="pd-dtitulo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.nome ?? '…'}</div>
         </div>
+        {c && <button className="nt-todas" onClick={() => setEditando(true)}>Editar</button>}
       </div>
       <div className="oi-scroll">
         {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
@@ -55,7 +68,7 @@ export function Cadastro({ id, aoVoltar }: { id: number; aoVoltar: () => void })
             <Bloco titulo="Identificação" linhas={[
               { k: pj ? 'Razão social' : 'Nome', v: c.identificacao.razao_social ?? '—' },
               { k: pj ? 'CNPJ' : 'CPF', v: c.identificacao.documento ?? '—', mono: true },
-              { k: 'Indicador IE', v: c.identificacao.indicador_ie ?? '—' },
+              { k: 'Indicador IE', v: c.identificacao.indicador_ie !== null ? IE[c.identificacao.indicador_ie] ?? String(c.identificacao.indicador_ie) : '—' },
               { k: 'Papéis', v: c.identificacao.papeis.map((x) => PAPEL[x]).join(' · ') || '—' },
             ]} />
             <Bloco titulo="Endereço fiscal" linhas={[
@@ -75,7 +88,7 @@ export function Cadastro({ id, aoVoltar }: { id: number; aoVoltar: () => void })
               { k: 'SMS', v: autorizado(c.consentimento.sms) },
               { k: 'Registrado em', v: dataHora(c.consentimento.registrado_em), mono: true },
             ]} />
-            <p className="p4-legal">Editar o cadastro continua no computador.</p>
+            <p className="p4-legal">Papel, limite de crédito e classificação continuam no computador.</p>
           </div>
         )}
       </div>

@@ -71,8 +71,13 @@ export interface ListaPessoas {
  *  campo que o ERP não tem vem null e a linha mostra "—". Pessoa de outra empresa → 404. */
 export interface PessoaCadastro {
   id: number; nome: string; tipo: 'PF' | 'PJ' | null;
-  identificacao: { razao_social: string | null; documento: string | null; indicador_ie: string | null; papeis: PapelPessoa[] };
-  endereco_fiscal: { cidade: string | null; uf: string | null; cep: string | null; codigo_ibge: string | null; email_nfe: string | null };
+  /** documento vem MASCARADO (***.***.789-09): nunca devolver no PATCH. indicador_ie é o código 1/2/9. */
+  identificacao: { razao_social: string | null; documento: string | null; indicador_ie: number | null; papeis: PapelPessoa[];
+    /** Contrato §4.4 (ERP #8570); opcional para quem ainda não tem. Ausente = o campo abre vazio e não é enviado. */
+    nome_fantasia?: string | null };
+  endereco_fiscal: { cidade: string | null; uf: string | null; cep: string | null; codigo_ibge: string | null; email_nfe: string | null;
+    logradouro?: string | null; numero?: string | null; complemento?: string | null; bairro?: string | null };
+  contato?: { telefone: string | null; email: string | null };
   comercial: { classificacao: string | null; limite_credito: number | null; prazo_padrao_dias: number | null };
   /** LGPD Art. 7º: true = autorizado, false = não autorizado, null = sem registro. */
   consentimento: { whatsapp: boolean | null; email_nfe: boolean | null; sms: boolean | null; registrado_em: string | null };
@@ -98,6 +103,9 @@ export interface NovaPessoa {
   /** Chave ausente não muda nada no ERP. */
   consentimento: { whatsapp?: boolean; email_nfe?: boolean };
 }
+
+/** Corpo do PATCH /api/app/pessoas/{id}: os campos do POST menos tipo e papeis (mudar papel fica na web). */
+export type EdicaoPessoa = Partial<Omit<NovaPessoa, 'tipo' | 'papeis'>>;
 
 export interface PessoaDetalhe {
   id: number; nome: string; tipo: 'PF' | 'PJ' | null;
@@ -274,7 +282,7 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
-async function chamar<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corpo?: unknown): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo);
   let r: HttpResponse;
   try {
@@ -331,6 +339,9 @@ export const api = {
   pessoaCadastro: (id: number) => chamar<PessoaCadastro>('GET', `/api/app/pessoas/${id}/cadastro`),
   /** Tela 09 · Nova pessoa. 201 { id } · 422 { erro: "validacao", campos } · 403 sem permissão para o papel. */
   criarPessoa: (p: NovaPessoa) => chamar<{ id: number }>('POST', '/api/app/pessoas', p),
+  /** Editar cadastro (tela 34). PATCH PARCIAL: só as chaves enviadas mudam; null limpa o campo. Mesmas regras do POST
+   *  (422 com `campos`); 403 sem_permissao (cliente exige customer.update, fornecedor supplier.update); 404 nao_encontrado. */
+  editarPessoa: (id: number, p: EdicaoPessoa) => chamar<{ id: number }>('PATCH', `/api/app/pessoas/${id}`, p),
   /** "Buscar" do CEP na tela 09 (contrato §4.3, ERP #8560): proxy com cache do ERP, 60 buscas/min.
    *  404 nao_encontrado (CEP inexistente ou serviço fora) · 422 validacao (não tem 8 dígitos) ·
    *  429 é o throttle padrão do Laravel ({ message: "Too Many Attempts." } + Retry-After), tratado pelo status. */
