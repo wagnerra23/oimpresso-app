@@ -1,6 +1,7 @@
 // Assistente — desenho v4 (tela 25 "Chat de suporte"), D16 Onda E. Decisão [W] 2026-10-02: quem responde é a
 // Jana (IA do ERP). Mora dentro de Mais: a barra de baixo é a do §7.1 (D6), por isso não vira aba como no protótipo.
-// Rotas /api/app/chat: FORMATO PROPOSTO, ainda sem PR no ERP — ver RespostaChat/ConversaChat em api.ts.
+// Rotas /api/app/chat: contrato §12 (ERP #8596). São as mesmas conversas do chat web (/ia). Falha da IA chega como texto
+// da Jana, não como erro; 429 = mais de 60 mensagens por minuto (mesmo teto da web).
 // A conversa vale enquanto o app está aberto (conversa_id em memória); reabrir a tela recarrega pelo GET.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type MensagemChat } from '../api';
@@ -19,6 +20,16 @@ export const horaCurta = (iso: string) => {
 export const podeEnviar = (texto: string, esperando: boolean, online: boolean) => online && !esperando && texto.trim().length > 0;
 
 type Linha = MensagemChat & { falhou?: boolean };
+
+/** Texto em PT-BR para cada erro da rota (o 429 do Laravel chega em inglês). */
+export function mensagemDeErro(e: unknown): string {
+  if (e instanceof ErroApi) {
+    if (e.status === 429) return 'Muitas mensagens em pouco tempo. Espere um minuto e tente de novo.';
+    if (e.codigo === 'sem_permissao') return 'Seu usuário não tem acesso ao assistente.';
+    if (e.status === 404) return 'Esta conversa não está mais disponível. Comece outra.';
+  }
+  return e instanceof Error && e.message ? e.message : 'Não foi possível enviar.';
+}
 
 export function Assistente({ online, voltar }: { online: boolean; voltar?: ReactNode }) {
   const [msgs, setMsgs] = useState<Linha[]>([]);
@@ -44,8 +55,9 @@ export function Assistente({ online, voltar }: { online: boolean; voltar?: React
       conversaId = r.conversa_id;
       setMsgs((m) => [...m, r.resposta]);
     } catch (e) {
-      const msg = e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não tem acesso ao assistente.'
-        : e instanceof Error ? e.message : 'Não foi possível enviar.';
+      const msg = mensagemDeErro(e);
+      // Conversa que não existe mais (404): a próxima mensagem abre uma nova.
+      if (e instanceof ErroApi && e.status === 404) conversaId = null;
       setMsgs((m) => m.map((x) => (x === minha ? { ...x, falhou: true } : x)));
       setMsgs((m) => [...m, { de: 'jana', texto: msg, criada_em: '', falhou: true }]);
       setTexto(t);
