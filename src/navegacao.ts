@@ -1,12 +1,12 @@
 // Navegação do app a partir das áreas que o ERP liberou (contrato §6 `perfil`/`abre_em`/`areas`, D6).
-// Barra de baixo (§7.1): Início · Tarefas · Pedidos · Produção · Mais, com Pessoas, Orçamentos, Produtos, Ponto e Conta dentro
+// Barra de baixo (§7.1): Início · Tarefas · Pedidos · Produção · Mais, com Pessoas, Orçamentos, Produtos, Estoque, Ponto e Conta dentro
 // de Mais. Colaborador (sem ERP) abre direto no Ponto, que vira aba: Ponto · Mais.
 // Arquivo sem dependência do Capacitor, para o teste de unidade rodar em Node.
 import type { Area } from './api';
 import type { SubMais } from './telas/Mais';
 
 /** Áreas que moram dentro de Mais (nunca na barra), na ordem em que aparecem lá. */
-const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'dashboard'] as const;
+const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard'] as const;
 export type Aba = Exclude<Area, (typeof DENTRO_DE_MAIS)[number]>;
 export interface Navegacao {
   /** Abas da barra, na ordem. "mais" sempre por último. */
@@ -34,4 +34,4 @@ export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], ab
 }
 
 /** Sem resposta do ERP (rota ainda não publicada, por exemplo): mostra tudo, como antes da D6. */
-export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'dashboard', 'ponto', 'mais'], 'inicio');
+export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'mais'], 'inicio');
