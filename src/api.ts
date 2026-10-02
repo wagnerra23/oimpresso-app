@@ -252,6 +252,18 @@ export interface OsDetalhe {
   fotos_laudo: number;
 }
 
+/** Tela 08 · Veículos. FORMATO PROVISÓRIO (pedido ao ERP). Busca no servidor por placa, marca, modelo ou cliente. */
+export interface VeiculoResumo {
+  id: number; placa: string;
+  /** Desenho da placa; null quando o ERP não sabe. */
+  padrao_placa: 'mercosul' | 'antiga' | null;
+  /** Marca/modelo · ano. */
+  modelo: string; cliente: string; km: number | null; cor: string | null;
+}
+export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }
+/** Histórico de OS do veículo, da mais nova para a mais antiga. */
+export interface HistoricoVeiculo { itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string; valor: number | null }> }
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'oficina' | 'ponto' | 'mais';
@@ -454,6 +466,11 @@ export const api = {
     chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
   /** Tela 03 · Detalhe da OS. OS de outra empresa ou inexistente → 404 nao_encontrado. */
   osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
+  /** Tela 08 · Veículos. Rota PROVISÓRIA. */
+  veiculos: (pagina = 1, q = '') =>
+    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Histórico de OS do veículo (tela 08, ao expandir). Rota PROVISÓRIA. */
+  veiculoOs: (id: number) => chamar<HistoricoVeiculo>('GET', `/api/app/veiculos/${id}/os`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
