@@ -2,7 +2,8 @@
 // Decisão [W] 2026-10-02: Produção usa as ETAPAS DA VENDA, não OPs. As 4 colunas são fixas e o
 // contador de cada uma escolhe qual lista aparece embaixo. Só leitura na v1: fora do v4 de propósito
 // "Gerar OP", o botão de avançar etapa, "Arte" e "Link" (mover de etapa é ação da FSM, fora da v1).
-// A busca filtra no aparelho: a rota não recebe texto e devolve no máximo 50 itens por coluna.
+// A busca filtra no aparelho: a rota não recebe texto e devolve no máximo 50 itens por coluna
+// (o `total` traz a contagem real).
 import { useEffect, useState } from 'react';
 import { api, COLUNAS_PRODUCAO, ErroApi, type ColunaProducao, type FilaProducao } from '../api';
 import { useVoltar } from '../voltar';
@@ -42,10 +43,10 @@ function Fila({ aoAbrir }: { aoAbrir: (id: number) => void }) {
   const colunas = COLUNAS_PRODUCAO.map((id) => {
     const c = dados?.colunas.find((x) => x.id === id);
     const itens = (c?.itens ?? []).filter((p) => !termo || casa(p.cliente) || casa(p.resumo) || p.numero.includes(termo));
-    return { id, rotulo: c?.rotulo ?? '', itens, cheia: (c?.itens.length ?? 0) >= 50 };
+    return { id, rotulo: c?.rotulo ?? '', itens, total: c?.total ?? 0, recebidos: c?.itens.length ?? 0 };
   });
   const atual = colunas.find((c) => c.id === coluna)!;
-  const total = dados?.colunas.reduce((a, c) => a + c.itens.length, 0) ?? 0;
+  const total = dados?.colunas.reduce((a, c) => a + c.total, 0) ?? 0;
   const atrasados = dados?.colunas.reduce((a, c) => a + c.itens.filter((p) => p.atrasado).length, 0) ?? 0;
   const posicao = (id: ColunaProducao) => COLUNAS_PRODUCAO.indexOf(id);
 
@@ -68,7 +69,7 @@ function Fila({ aoAbrir }: { aoAbrir: (id: number) => void }) {
               <div className="pr-etapas" role="tablist" aria-label="Etapa da produção">
                 {colunas.map((c) => (
                   <button key={c.id} role="tab" aria-selected={coluna === c.id} className={'pr-etapa' + (coluna === c.id ? ' on' : '')} onClick={() => setColuna(c.id)}>
-                    <b><i style={{ background: TINTA[c.id] }} aria-hidden="true" />{c.itens.length}{c.cheia && !termo ? '+' : ''}</b>
+                    <b><i style={{ background: TINTA[c.id] }} aria-hidden="true" />{termo ? c.itens.length : c.total}</b>
                     <span>{c.rotulo}</span>
                   </button>
                 ))}
@@ -90,7 +91,7 @@ function Fila({ aoAbrir }: { aoAbrir: (id: number) => void }) {
                   </span>
                 </button>
               ))}
-              {atual.cheia && !termo && <p className="p4-legal">Mostrando os 50 de prazo mais próximo desta etapa.</p>}
+              {atual.recebidos < atual.total && <p className="p4-legal">Mostrando os {atual.recebidos} de prazo mais próximo, de {atual.total} nesta etapa.</p>}
               <p className="p4-legal">Mudar a etapa de um pedido continua no computador.</p>
             </>
           )}

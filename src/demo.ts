@@ -152,6 +152,7 @@ export const demo = {
     if (metodo === 'GET' && caminho === '/api/app/producao') {
       const rotulos: Record<string, string> = { quote_approved: 'Aprovado pelo cliente', in_production: 'Em produção', on_hold: 'Em espera', ready_for_invoice: 'Pronto pra faturar' };
       const colunas = Object.keys(rotulos).map((id) => ({ id, rotulo: rotulos[id],
+        total: PEDIDOS.filter((x) => x.etapa.chave === id).length,
         itens: PEDIDOS.filter((x) => x.etapa.chave === id).map(({ itens, ...x }) => ({ ...x, resumo: itens[0]?.produto ?? null }))
           .sort((a, b) => (a.prazo ?? '9').localeCompare(b.prazo ?? '9')) }));
       return r({ colunas });

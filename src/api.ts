@@ -82,8 +82,9 @@ export interface PessoaDetalhe {
 export const COLUNAS_PRODUCAO = ['quote_approved', 'in_production', 'on_hold', 'ready_for_invoice'] as const;
 export type ColunaProducao = (typeof COLUNAS_PRODUCAO)[number];
 export interface FilaProducao {
-  /** Até 50 itens por coluna, prazo mais próximo primeiro; item igual ao da lista de pedidos. */
-  colunas: Array<{ id: ColunaProducao; rotulo: string; itens: PedidoResumo[] }>;
+  /** Até 50 itens por coluna, prazo mais próximo primeiro; item igual ao da lista de pedidos.
+   *  `total` é a contagem real da etapa (pode passar de 50). */
+  colunas: Array<{ id: ColunaProducao; rotulo: string; total: number; itens: PedidoResumo[] }>;
 }
 
 // ── Tarefas (API-CONTRATO-v1 §3): ToDo do usuário + justificativas do Ponto. ──
