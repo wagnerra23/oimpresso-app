@@ -6,6 +6,7 @@
 import { CapacitorHttp, type HttpResponse } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { demo } from './demo';
+import type { CorpoVenda, ProdutoVenda } from './venda';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -211,6 +212,23 @@ export interface Notificacao {
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
+// ── Venda rápida (tela 11, D16 Onda A). FORMATO PROVISÓRIO: proposto pelo app em 2026-10-02, ainda não fechado
+//    pela sessão ERP da tela 11. Mexe em VALOR e ESTOQUE — trocar só com o contrato fechado e o PR do ERP. ──
+/** GET /api/app/venda/produtos?q=: busca por nome ou categoria, 20 no máximo. */
+export interface ListaProdutosVenda { itens: ProdutoVenda[] }
+/** 201 do POST /api/app/vendas. Repetir a mesma Idempotency-Key devolve a MESMA venda (200), sem criar outra. */
+export interface VendaCriada {
+  id: number;
+  /** Número do recibo/fatura do ERP (ex.: "V-4821"). */
+  numero: string;
+  /** ISO com hora, do servidor. */
+  data: string;
+  /** Total gravado pelo ERP, em reais. É o valor que a tela mostra. */
+  total: number;
+  itens: number;
+  metodo: string;
+}
+
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
 
@@ -282,8 +300,8 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corpo?: unknown): Promise<T> {
-  if (DEMO) return demo.chamar<T>(metodo, caminho, corpo);
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+  if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
   let r: HttpResponse;
   try {
     r = await CapacitorHttp.request({
@@ -293,6 +311,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corp
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token ?? ''}`,
+        ...extra,
       },
       data: corpo,
     });
@@ -354,6 +373,11 @@ export const api = {
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  /** Tela 11 · busca de produto (formato provisório). */
+  produtosVenda: (q = '') => chamar<ListaProdutosVenda>('GET', `/api/app/venda/produtos${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 11 · cria a venda (formato provisório). 201 VendaCriada · 422 { erro: "validacao", campos } (ex.: "itens.0.quantidade"
+   *  sem estoque, "total_previsto" divergente) · 403 sem_permissao. `chave` = Idempotency-Key da tentativa. */
+  criarVenda: (corpo: CorpoVenda, chave: string) => chamar<VendaCriada>('POST', '/api/app/vendas', corpo, { 'Idempotency-Key': chave }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),

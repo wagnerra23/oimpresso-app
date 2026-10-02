@@ -116,7 +116,7 @@ export function App() {
           abrirDestino={(tipo, id) => (tipo === 'ponto' ? abrirPonto() : tipo === 'tarefa' ? abrirTarefa(id) : tipo === 'producao' ? irPara('producao')
             : tipo === 'pedido' ? irPara('pedidos') : irPara('mais'))} />}
         {nav && aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} />}
-        {nav && aba === 'pedidos' && <Pedidos />}
+        {nav && aba === 'pedidos' && <Pedidos avisar={avisar} online={online} />}
         {nav && aba === 'producao' && <Producao />}
         {nav && aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
         {nav && aba === 'mais' && subMais === null && <Mais abrir={setSubMais} modulos={n.modulosMais} />}
