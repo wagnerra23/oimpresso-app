@@ -12,6 +12,7 @@ import { tratarVoltar } from './voltar';
 import { Pedidos } from './telas/Pedidos';
 import { Tarefas } from './telas/Tarefas';
 import { Mais, VoltarMais, type SubMais } from './telas/Mais';
+import { Pessoas } from './telas/Pessoas';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -85,6 +86,7 @@ export function App() {
         {aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={() => irPara('mais', 'ponto')} />}
         {aba === 'pedidos' && <Pedidos />}
         {aba === 'mais' && subMais === null && <Mais abrir={setSubMais} />}
+        {aba === 'mais' && subMais === 'pessoas' && <Pessoas voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>

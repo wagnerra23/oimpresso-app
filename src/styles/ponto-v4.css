@@ -202,3 +202,38 @@ a.p4-link { text-decoration: none; }
   display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-pop); }
 .tf-alca { width: 36px; height: 4px; border-radius: 99px; background: var(--border); align-self: center; margin-bottom: 4px; }
 .tf-folha-titulo { font-size: 17px; font-weight: 600; }
+
+/* Pessoas — telas 17 e 18 do v4 */
+.ps-busca { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text-mute); }
+.ps-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: var(--text); min-height: 42px; }
+.ps-busca input::placeholder { color: var(--text-mute); }
+.ps-grupo { display: flex; flex-direction: column; gap: 6px; }
+.ps-letra { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--text-mute); padding-left: 2px; }
+.ps-linha { min-height: 60px; width: 100%; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border: 0;
+  border-bottom: 1px solid var(--border-2); background: transparent; font: inherit; color: var(--text); text-align: left; }
+.ps-linha:last-child { border-bottom: 0; }
+.ps-texto { flex: 1; min-width: 0; }
+.ps-texto b { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-texto small { display: block; font-size: 12px; color: var(--text-dim); }
+.ps-debito { color: var(--danger); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.ps-tipo { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: var(--bg-2); color: var(--text-dim); }
+.ps-topo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; }
+.ps-topo .pd-avatar { width: 48px; height: 48px; font-size: 16px; }
+.ps-nome { font-size: 18px; font-weight: 600; text-align: center; }
+.ps-doc { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.ps-papeis { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 2px; }
+.ps-papel { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text); }
+.ps-acoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; margin-top: 10px; }
+.ps-acoes a { min-height: 44px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  color: var(--accent-text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.ps-acoes a[aria-disabled="true"] { color: var(--text-mute); pointer-events: none; }
+.ps-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ps-kpi { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ps-kpi span { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-mute); }
+.ps-kpi b { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+.ps-kpi b.debito { color: var(--danger); }
+.ps-dado { min-height: 44px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2); }
+.ps-dado:last-child { border-bottom: 0; }
+.ps-dado span { font-size: 12.5px; color: var(--text-mute); width: 96px; flex-shrink: 0; }
+.ps-dado b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 400; text-align: right; overflow-wrap: anywhere; }
