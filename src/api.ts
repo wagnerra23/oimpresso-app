@@ -97,17 +97,22 @@ export interface Tarefa {
 }
 export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
 
-/** Tela 28 · Detalhe da tarefa (D16, Onda A) — só ToDo. Formato PROPOSTO pelo app; rota ainda sem endpoint no ERP. */
+/** Tela 28 · Detalhe da tarefa (D16, Onda A) — só ToDo. Contrato §3.1 (ERP #8556). Hoje o ToDo do
+ *  Essentials não tem checklist (sempre []), nem cliente e origem (sempre null): a tela esconde o que vier vazio. */
 export interface TarefaDetalhe {
-  id: number; titulo: string;
-  /** Módulo de origem para o rótulo "Tarefa · <módulo>"; null quando não houver. */
+  /** Mesmo id da lista, ex.: "todo:15". */
+  id: string; titulo: string;
+  /** Rótulo pronto para o topo, igual ao da lista (ex.: "Tarefa · alta"); null quando não houver. */
   modulo: string | null;
+  descricao: string | null;
+  /** Atribuídos, separados por vírgula. */
   responsavel: string | null; cliente: string | null;
   /** Data (YYYY-MM-DD) ou data-hora (ISO) do prazo. */
   prazo: string | null; atrasado: boolean;
   /** De onde a tarefa veio, ex.: "Orçamento #4812"; null quando não houver. */
   origem: string | null;
   checklist: Array<{ texto: string; feito: boolean }>;
+  /** Do mais antigo para o mais novo (a tela mostra o mais novo primeiro, como o protótipo). */
   comentarios: Array<{ quando: string; autor: string; texto: string; detalhe: string | null }>;
   concluida: boolean;
 }

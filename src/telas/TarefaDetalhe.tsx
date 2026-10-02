@@ -1,8 +1,9 @@
 // Detalhe da tarefa — desenho v4 (tela 28), D16 Onda A. Só ToDo (justificativa do ponto abre o Ponto).
 // Mostra responsável, cliente, prazo, origem, checklist e comentários. A única ação é "Concluir tarefa",
 // a mesma rota que a lista já usava (§3); marcar item do checklist fica para um PR de escrita próprio.
-// Como no protótipo, não conclui com checklist pendente. Rota PROPOSTA pelo app
-// (GET /api/app/tarefas/todo/{id}) — ver TarefaDetalhe em api.ts; até existir, roda contra a demo.
+// Como no protótipo, não conclui com checklist pendente. Rota GET /api/app/tarefas/todo/{id}, contrato
+// §3.1 (ERP #8556). Linha ou bloco que vem vazio (cliente, origem, checklist) não aparece. A descrição não
+// está no protótipo; entra porque, sem checklist, é o conteúdo principal do ToDo.
 import { useEffect, useState } from 'react';
 import { api, type TarefaDetalhe } from '../api';
 
@@ -49,7 +50,7 @@ export function TarefaDetalheTela({ id, avisar, aoVoltar, aoConcluir }: Props) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="p4-rotulo">{t?.modulo ? `Tarefa · ${t.modulo}` : 'Tarefa'}</div>
+          <div className="p4-rotulo">{t?.modulo ?? 'Tarefa'}</div>
           <div className="pd-dtitulo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t?.titulo ?? '…'}</div>
         </div>
       </div>
@@ -60,11 +61,13 @@ export function TarefaDetalheTela({ id, avisar, aoVoltar, aoConcluir }: Props) {
           <div className="pd-corpo">
             <div className="p4-lista">
               <div className="ps-dado"><span>Responsável</span><b>{t.responsavel ?? '—'}</b></div>
-              <div className="ps-dado"><span>Cliente</span><b>{t.cliente ?? '—'}</b></div>
+              {t.cliente && <div className="ps-dado"><span>Cliente</span><b>{t.cliente}</b></div>}
               <div className="ps-dado"><span>Prazo</span>
                 <b style={{ fontFamily: 'var(--font-mono)', color: t.atrasado ? 'var(--danger)' : undefined }}>{prazoTexto(t.prazo)}{t.atrasado ? ' · atrasada' : ''}</b></div>
-              <div className="ps-dado"><span>Origem</span><b style={{ fontFamily: 'var(--font-mono)' }}>{t.origem ?? '—'}</b></div>
+              {t.origem && <div className="ps-dado"><span>Origem</span><b style={{ fontFamily: 'var(--font-mono)' }}>{t.origem}</b></div>}
             </div>
+
+            {t.descricao && <p className="td-descricao">{t.descricao}</p>}
 
             {t.checklist.length > 0 && (
               <>
@@ -84,7 +87,7 @@ export function TarefaDetalheTela({ id, avisar, aoVoltar, aoConcluir }: Props) {
             {t.comentarios.length === 0 && <p className="p4-legal">Sem comentários.</p>}
             {t.comentarios.length > 0 && (
               <ol style={{ listStyle: 'none', margin: 0, padding: '2px 2px 0' }} aria-label="Comentários">
-                {t.comentarios.map((c, i) => (
+                {[...t.comentarios].reverse().map((c, i) => (
                   <li key={i} className="td-linha">
                     <small>{hora(c.quando)}</small>
                     <p><b>{c.autor}</b> {c.texto}</p>
