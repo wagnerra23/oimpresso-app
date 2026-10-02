@@ -14,7 +14,8 @@ const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { ta
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },
 ];
 
-export function Mais({ abrir }: { abrir: (s: SubMais) => void }) {
+/** `modulos`: quais entradas mostrar (Pessoas e Ponto só quando a área é permitida; Conta sempre). */
+export function Mais({ abrir, modulos }: { abrir: (s: SubMais) => void; modulos: SubMais[] }) {
   return (
     <>
       <div className="pd-head"><div className="pd-titulo">Mais</div></div>
@@ -22,7 +23,7 @@ export function Mais({ abrir }: { abrir: (s: SubMais) => void }) {
         <div className="pd-corpo">
           <div className="p4-rotulo">Módulos</div>
           <div className="ms-grade">
-            {MODULOS.map(({ id, label, desc, Icone }) => (
+            {MODULOS.filter((m) => modulos.includes(m.id)).map(({ id, label, desc, Icone }) => (
               <button key={id} className="ms-mod" onClick={() => abrir(id)}>
                 <span className="ms-ico"><Icone tamanho={20} /></span>
                 <b>{label}</b>
