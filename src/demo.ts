@@ -237,6 +237,18 @@ export const demo = {
         financeiro: { a_receber: 8200, a_pagar: 3100 },
         proximas_tarefas: TAREFAS.slice(0, 3) });
     }
+    if (metodo === 'GET' && /^\/api\/app\/tarefas\/todo\/\d+$/.test(caminho)) {
+      const id = Number(caminho.split('/')[5]);
+      const tf = TAREFAS.find((x) => x.id === 'todo:' + id);
+      if (!tf) throw Object.assign(new Error('Tarefa não encontrada.'), { status: 404 });
+      // Como a API (#8556): checklist sempre [], cliente e origem null, comentários do mais antigo ao mais novo.
+      return r({ id: tf.id, titulo: tf.titulo, modulo: 'Tarefa · alta', responsavel: 'Colaborador Demonstração, Carla',
+        descricao: id === 16 ? 'Conferir medidas e ortografia antes de mandar para o cliente aprovar.' : null,
+        cliente: null, prazo: tf.prazo, atrasado: tf.atrasado, origem: null, checklist: [],
+        comentarios: [{ quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Carla', texto: 'pediu letra maior ao fornecedor', detalhe: null },
+          { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
+        concluida: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
