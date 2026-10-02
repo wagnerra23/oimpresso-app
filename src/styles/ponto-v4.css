@@ -400,5 +400,9 @@ a.p4-link { text-decoration: none; }
 .osd-texto hr { border: 0; border-top: 1px solid var(--border-2); margin: 0; }
 .osd-tag { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 5px; background: var(--bg-2); color: var(--text-dim); }
 .osd-tag.peca { background: var(--accent-soft); color: var(--accent-text); }
+.osd-tag.servico_terceiro { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); }
+.osd-vist { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.osd-vist b { font-size: 13px; font-weight: 600; }
+.osd-vist b.ok { color: var(--ok-text, var(--text-dim)); } .osd-vist b.atencao { color: var(--warn-text, var(--text)); } .osd-vist b.critico { color: var(--danger); }
 .osd-sub { padding: 8px 14px; display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border-2); }
 .osd-sub span:last-child { font-family: var(--font-mono); }
