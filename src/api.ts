@@ -337,6 +337,11 @@ export const api = {
   cep: (cep: string) => chamar<EnderecoCep>('GET', `/api/app/cep/${cep.replace(/\D/g, '')}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
+  /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
+   *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
+  marcarLida: (id: string) => chamar<{ nao_lidas: number }>('POST', `/api/app/notificacoes/${encodeURIComponent(id)}/lida`),
+  /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
+  marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),

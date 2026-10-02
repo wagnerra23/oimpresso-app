@@ -112,7 +112,7 @@ export function App() {
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
         {!nav && <div className="pd-corpo"><p className="p4-legal">Carregando…</p></div>}
-        {nav && aba === 'inicio' && <Inicio irParaPonto={abrirPonto} irParaPedidos={() => irPara('pedidos')} irParaTarefas={() => irPara('tarefas')}
+        {nav && aba === 'inicio' && <Inicio avisar={avisar} irParaPonto={abrirPonto} irParaPedidos={() => irPara('pedidos')} irParaTarefas={() => irPara('tarefas')}
           abrirDestino={(tipo, id) => (tipo === 'ponto' ? abrirPonto() : tipo === 'tarefa' ? abrirTarefa(id) : tipo === 'producao' ? irPara('producao')
             : tipo === 'pedido' ? irPara('pedidos') : irPara('mais'))} />}
         {nav && aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} />}

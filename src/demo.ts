@@ -246,6 +246,17 @@ export const demo = {
         financeiro: { a_receber: 8200, a_pagar: 3100 },
         proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
     }
+    if (metodo === 'POST' && caminho === '/api/app/notificacoes/lidas') {
+      const marcadas = NOTIFICACOES.filter((x) => !x.lida).length;
+      NOTIFICACOES.forEach((x) => { x.lida = true; });
+      return r({ nao_lidas: 0, marcadas });
+    }
+    if (metodo === 'POST' && caminho.startsWith('/api/app/notificacoes/') && caminho.endsWith('/lida')) {
+      const nt = NOTIFICACOES.find((x) => x.id === decodeURIComponent(caminho.split('/')[4]));
+      if (!nt) throw Object.assign(new Error('Notificação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      nt.lida = true;
+      return r({ nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/notificacoes')) {
       // Hora calculada aqui, nunca no topo do módulo: chamada no topo impede o build de produção de descartar o demo.
       const itens = NOTIFICACOES.map(({ min, ...x }) => ({ ...x, quando: new Date(Date.now() - min * 60000).toISOString() }));
