@@ -20,12 +20,14 @@ const pct = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 
 
 interface Props {
   irParaPonto: () => void; irParaPedidos: () => void; irParaTarefas: () => void;
+  /** Abre a tela 05 em "Baixo estoque"; ausente = sem a área Estoque, e o card não é botão. */
+  irParaEstoque?: () => void;
   /** Abre a área de destino de uma notificação (tela 16). */
   abrirDestino: (tipo: DestinoNotificacao, id: number | string | null) => void;
   avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 }
 
-export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino, avisar }: Props) {
+export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, irParaEstoque, abrirDestino, avisar }: Props) {
   const [painel, setPainel] = useState<PainelInicio | null>(null);
   const [notif, setNotif] = useState(false);
   useVoltar(notif, () => setNotif(false));
@@ -116,7 +118,9 @@ export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino
                 <button className="in-kpi" onClick={irParaPedidos}><span>Atrasados</span><b className={k!.pedidos_atrasados > 0 ? 'atraso' : ''}>{k!.pedidos_atrasados}</b><small>pedidos</small></button>
               )}
               {k!.estoque_baixo !== null && (
-                <div className="in-kpi"><span>Estoque</span><b>{k!.estoque_baixo}</b><small>itens baixos</small></div>
+                irParaEstoque
+                  ? <button className="in-kpi" onClick={irParaEstoque}><span>Estoque</span><b>{k!.estoque_baixo}</b><small>itens baixos</small></button>
+                  : <div className="in-kpi"><span>Estoque</span><b>{k!.estoque_baixo}</b><small>itens baixos</small></div>
               )}
             </div>
           )}

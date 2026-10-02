@@ -47,6 +47,28 @@ const PEDIDOS = [
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
 
+// Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
+const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
+const PRODUTOS = [
+  { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
+  { id: 202, nome: 'Caneca personalizada', codigo: 'BRD-CAN', cat: 5, unidade: 'un', preco: 29, variacoes: 3, qtd: 46, baixo: false },
+  { id: 203, nome: 'Cartão de visita 4×4', codigo: 'CRT-500', cat: 3, unidade: 'mil', preco: 145, variacoes: null, qtd: null, baixo: false },
+  { id: 204, nome: 'Letra caixa inox', codigo: 'LTC-INX', cat: null, unidade: 'un', preco: 190, variacoes: null, qtd: null, baixo: false },
+  { id: 205, nome: 'Lona front-light 440g', codigo: 'LON-440', cat: 1, unidade: 'm²', preco: 42, variacoes: null, qtd: 18, baixo: true },
+  { id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', cat: 4, unidade: 'un', preco: 38, variacoes: null, qtd: 9, baixo: true },
+];
+
+// Estoque da demo (contrato §9.2): uma linha por variação × loja, imitando o protótipo da tela 05.
+const ESTOQUE = [
+  { id: 301, produto_id: 205, nome: 'Lona front-light 440g', codigo: 'LON-440', qtd: 18, minimo: 50, unidade: 'm²', local: 'Loja Centro', prateleira: 'A · 1 · 2' },
+  { id: 302, produto_id: 201, nome: 'Vinil adesivo branco brilho', codigo: 'VIN-BR', qtd: 64, minimo: 40, unidade: 'm²', local: 'Loja Centro', prateleira: 'A · 3 · 1' },
+  { id: 303, produto_id: 207, nome: 'Chapa ACM 3 mm · Prata', codigo: 'ACM-3P', qtd: 3, minimo: 6, unidade: 'un', local: 'Loja Centro', prateleira: null },
+  { id: 304, produto_id: 208, nome: 'Tinta eco-solvente · Ciano', codigo: 'TNT-C', qtd: 2.5, minimo: 4, unidade: 'L', local: 'Loja Centro', prateleira: null },
+  { id: 305, produto_id: 209, nome: 'Ilhós latão 10 mm', codigo: 'ILH-10', qtd: 2400, minimo: 1000, unidade: 'un', local: 'Loja Centro', prateleira: 'G · 7 · 1' },
+  { id: 306, produto_id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', qtd: 9, minimo: 10, unidade: 'un', local: 'Filial Norte', prateleira: 'B · 2 · 4' },
+  { id: 307, produto_id: 202, nome: 'Caneca personalizada · Azul', codigo: 'BRD-CAN-AZ', qtd: 46, minimo: null, unidade: 'un', local: 'Filial Norte', prateleira: null },
+];
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -256,6 +278,25 @@ export const demo = {
       PESSOAS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       return r({ id });
     }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/estoque')) {
+      const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'todos';
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const baixo = (x: (typeof ESTOQUE)[number]) => x.minimo !== null && x.qtd <= x.minimo;
+      const busca = ESTOQUE.filter((x) => !q || x.nome.toLowerCase().includes(q) || x.codigo.toLowerCase().includes(q));
+      return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
+        pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
+      const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const nomeCat = (id: number | null) => CATEGORIAS.find((c) => c.id === id)?.nome ?? null;
+      const busca = PRODUTOS.filter((x) => !q || [x.nome, x.codigo, nomeCat(x.cat) ?? ''].some((t) => t.toLowerCase().includes(q)));
+      const categorias = CATEGORIAS.map((c) => ({ ...c, total: busca.filter((x) => x.cat === c.id).length })).filter((c) => c.total > 0);
+      const itens = busca.filter((x) => cat === 'todas' || x.cat === Number(cat)).map((x) => ({
+        id: x.id, nome: x.nome, codigo: x.codigo, categoria: nomeCat(x.cat), calculo: 'por ' + x.unidade, preco: x.preco, variacoes: x.variacoes,
+        estoque: { controla: x.qtd !== null, qtd: x.qtd, unidade: x.qtd !== null ? x.unidade : 'un' }, baixo: x.baixo }));
+      return r({ itens, categorias, total: busca.length, baixo_estoque: busca.filter((x) => x.baixo).length, pagina: 1, tem_mais: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pessoas')) {
       const det = caminho.match(/^\/api\/app\/pessoas\/(\d+)/);
       if (det) {
@@ -283,7 +324,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'equipe', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'equipe', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },

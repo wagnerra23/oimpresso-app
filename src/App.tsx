@@ -18,6 +18,8 @@ import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegac
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
 import { Equipe } from './telas/Equipe';
+import { Produtos } from './telas/Produtos';
+import { Estoque } from './telas/Estoque';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -41,6 +43,8 @@ export function App() {
   const [logado, setLogado] = useState(false);
   const [aba, setAba] = useState<Aba>('inicio');
   const [subMais, setSubMais] = useState<SubMais | null>(null);
+  // Card "Estoque" do Início abre a tela 05 já em "Baixo estoque"; pelo Mais abre em "Todos".
+  const [estoqueFiltro, setEstoqueFiltro] = useState<'todos' | 'baixo'>('todos');
   const [nav, setNav] = useState<Navegacao | null>(null);
   const navRef = useRef<Navegacao>(NAV_PADRAO);
   navRef.current = nav ?? NAV_PADRAO;
@@ -114,15 +118,18 @@ export function App() {
       <div className="oi-screen">
         {!nav && <div className="pd-corpo"><p className="p4-legal">Carregando…</p></div>}
         {nav && aba === 'inicio' && <Inicio avisar={avisar} irParaPonto={abrirPonto} irParaPedidos={() => irPara('pedidos')} irParaTarefas={() => irPara('tarefas')}
+          irParaEstoque={n.modulosMais.includes('estoque') ? () => { setEstoqueFiltro('baixo'); irPara('mais', 'estoque'); } : undefined}
           abrirDestino={(tipo, id) => (tipo === 'ponto' ? abrirPonto() : tipo === 'tarefa' ? abrirTarefa(id) : tipo === 'producao' ? irPara('producao')
             : tipo === 'pedido' ? irPara('pedidos') : irPara('mais'))} />}
         {nav && aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} />}
         {nav && aba === 'pedidos' && <Pedidos />}
         {nav && aba === 'producao' && <Producao />}
         {nav && aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
-        {nav && aba === 'mais' && subMais === null && <Mais abrir={setSubMais} modulos={n.modulosMais} />}
+        {nav && aba === 'mais' && subMais === null && <Mais abrir={(s) => { setEstoqueFiltro('todos'); setSubMais(s); }} modulos={n.modulosMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'estoque' && <Estoque filtroInicial={estoqueFiltro} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'equipe' && <Equipe voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
