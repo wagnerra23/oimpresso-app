@@ -69,12 +69,12 @@ export const lightPalette: OiPalette = {
   border2: "#e9e8e5", // --border-2
   text: "#1d1a15", // --text
   textDim: "#66635d", // --text-dim
-  textMute: "#928f88", // --text-mute
+  textMute: "#6e6b65", // --text-mute
   accent: "#795bbf", // --accent
   accent2: "#8e71d6", // --accent-2
   accentSoft: "#f0eaff", // --accent-soft
   accentFg: "#ffffff",
-  accentText: "#795bbf",
+  accentText: "#7759be",
   action: "#2c894e",
   action2: "#12773d",
   actionSoft: "#d3f5db",
@@ -103,12 +103,12 @@ export const darkPalette: OiPalette = {
   border2: "#2d3134",
   text: "#ecebe7",
   textDim: "#a6a4a1",
-  textMute: "#7b7a77",
+  textMute: "#9c9b98",
   accent: "#795bbf",
   accent2: "#8e71d6",
   accentSoft: "#3a2a5e",
   accentFg: "#ffffff",
-  accentText: "#8e71d6",
+  accentText: "#a68fdf",
   action: "#22c55e",
   action2: "#34d36a",
   actionSoft: "#143324",
