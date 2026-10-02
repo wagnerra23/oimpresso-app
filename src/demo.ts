@@ -69,6 +69,22 @@ const ESTOQUE = [
   { id: 307, produto_id: 202, nome: 'Caneca personalizada · Azul', codigo: 'BRD-CAN-AZ', qtd: 46, minimo: null, unidade: 'un', local: 'Filial Norte', prateleira: null },
 ];
 
+
+// Ordens de serviço da demo (tela 07, formato provisório). As etapas imitam o protótipo; no app real
+// elas vêm do pipeline do ERP. Placas, veículos e clientes fictícios.
+const ETAPAS_OS = [['recepcao', 'Recepção'], ['diagnostico', 'Diagnóstico'], ['orcamento', 'Orçamento'],
+  ['aguardando_aprovacao', 'Aguard. aprovação'], ['aguardando_pecas', 'Aguard. peças'], ['em_execucao', 'Em execução'],
+  ['revisao', 'Revisão'], ['pronto', 'Pronto'], ['entregue', 'Entregue']] as const;
+const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
+const ORDENS = [
+  { id: 1042, numero: '1042', placa: 'RLV2E48', veiculo: 'Fiat Strada 1.3 · 2022', cliente: 'Transportes Vale Norte', valor: 750, etapa: 'em_execucao' },
+  { id: 1044, numero: '1044', placa: 'QJT8A21', veiculo: 'VW Saveiro 1.6 · 2019', cliente: 'Auto Center Rota', valor: 1380, etapa: 'aguardando_aprovacao' },
+  { id: 1045, numero: '1045', placa: 'MLK4C09', veiculo: 'Renault Master · 2018', cliente: 'Mercado Bom Preço', valor: null, etapa: 'diagnostico' },
+  { id: 1039, numero: '1039', placa: 'RBA2H78', veiculo: 'VW Constellation 24.280', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
+  { id: 1036, numero: '1036', placa: 'QHX5B33', veiculo: 'Toyota Hilux · 2021', cliente: 'Studio Forma', valor: 980, etapa: 'pronto' },
+  { id: 1046, numero: '1046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
+];
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -324,7 +340,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'oficina', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -376,6 +392,15 @@ export const demo = {
       const i = TAREFAS.findIndex((x) => x.id === id);
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
+      const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
+      const pos = (k: string) => ETAPAS_OS.findIndex((e) => e[0] === k);
+      const itens = ORDENS.filter((o) => etapa === 'todas' || o.etapa === etapa).sort((a, b) => pos(b.etapa) - pos(a.etapa)).map((o) => ({
+        id: o.id, numero: o.numero, placa: o.placa, veiculo: o.veiculo, cliente: o.cliente, valor: o.valor, travada: OS_TRAVA.includes(o.etapa),
+        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
+      const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ORDENS.filter((o) => o.etapa === chave).length }));
+      return r({ itens, etapas, total: ORDENS.length, travadas: ORDENS.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);

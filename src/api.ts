@@ -203,9 +203,35 @@ export interface ListaEstoque {
   itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
 }
 
+// ── Ordens de serviço (tela 07, Onda D). FORMATO PROVISÓRIO: pedido ao ERP, ainda sem contrato fechado.
+//    Só a demo responde por enquanto; quando o ERP fechar a rota, este bloco segue o contrato dele. ──
+export interface EtapaOs {
+  chave: string; rotulo: string;
+  /** Posição da etapa no pipeline do ERP (1 = primeira) e quantas etapas ele tem: desenha a barra de progresso. */
+  indice: number; total_etapas: number;
+}
+export interface OsResumo {
+  id: number; numero: string;
+  placa: string | null;
+  /** Marca/modelo · ano; null quando a OS não tem veículo. */
+  veiculo: string | null;
+  cliente: string;
+  /** null = ainda sem valor (antes do orçamento). */
+  valor: number | null;
+  etapa: EtapaOs;
+  /** Regra do ERP para OS parada esperando terceiros (aprovação, peça). */
+  travada: boolean;
+}
+export interface ListaOs {
+  itens: OsResumo[];
+  /** Etapas do pipeline, na ordem do ERP, com a contagem de cada uma. */
+  etapas: Array<{ chave: string; rotulo: string; total: number }>;
+  total: number; travadas: number; pagina: number; tem_mais: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'oficina' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -399,6 +425,9 @@ export const api = {
   /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
   estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
     chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 07 · Ordens de serviço. Rota PROVISÓRIA (pedida ao ERP, ainda sem contrato): `etapa` = chave ou "todas". */
+  os: (etapa: string, pagina = 1) =>
+    chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
