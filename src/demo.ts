@@ -155,7 +155,8 @@ const LANCAMENTOS = [
 const FISCAIS = [
   { id: 1287, tipo: 'NFe', numero: '1287', referencia: 'Pedido #0038 · Papelaria Sol', valor: 3420, status: 'autorizado',
     chave: '0000 0000 0000 0000 0000 5500 1000 0012 8710 0000 0000', erro: null, dias: -5 },
-  { id: 342, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
+  // Mesmo id da NF-e acima de propósito: no ERP os ids vêm de tabelas diferentes (§10.2).
+  { id: 1287, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
   { id: 9001, tipo: 'NFCe', numero: null, referencia: 'Venda balcão #V-0010', valor: 186, status: 'rejeitado', chave: null,
     erro: 'Rejeição 539: duplicidade de NF-e com diferença na chave de acesso.', dias: -1 },
   { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },

@@ -77,7 +77,7 @@ export function Fiscal({ voltar }: { voltar?: ReactNode }) {
             const s = STATUS[d.status];
             const nome = `${TIPO[d.tipo] ?? d.tipo} ${d.numero ? '#' + d.numero : '— sem número'}`;
             return (
-              <article key={d.id} className="oc-card" aria-label={nome}>
+              <article key={d.tipo + ':' + d.id} className="oc-card" aria-label={nome}>
                 <div className="oc-l1">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <b>{nome}</b>

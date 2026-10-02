@@ -318,6 +318,7 @@ export interface PainelFinanceiro {
 export type StatusFiscal = 'rascunho' | 'processando' | 'autorizado' | 'cancelado' | 'rejeitado';
 export type FiltroFiscal = 'todos' | StatusFiscal;
 export interface DocumentoFiscal {
+  /** Id da tabela de origem: NF-e e NFS-e podem repetir o mesmo número — a chave na lista é tipo + id (§10.2, ERP #8593). */
   id: number; tipo: 'NFe' | 'NFCe' | 'NFSe'; numero: string | null;
   /** Texto pronto, ex.: "Pedido #4790 · Clínica Vita". */
   referencia: string | null; valor: number; status: StatusFiscal;
