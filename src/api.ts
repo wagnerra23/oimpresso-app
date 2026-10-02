@@ -357,8 +357,9 @@ export interface Dashboard {
   producao_concluida: { concluidas: number; total: number };
 }
 
-/** Tela 15 · Pagamentos (D16, Onda C) — leitura. Links de cobrança do provedor (Asaas). Formato proposto ao ERP
- *  (PR pendente). Gerar link, cancelar e consultar o provedor mexem em valor: PR de escrita, pela regra mestre. */
+/** Tela 15 · Pagamentos (D16, Onda C) — leitura. Contrato §10.5 (ERP #8600): tabela `cobrancas`, a mesma da web
+ *  /financeiro/cobranca; cobrança recusada pelo gateway não aparece; valor em reais; regra de acesso do Financeiro.
+ *  Gerar link, cancelar e consultar o provedor mexem em valor: PR de escrita, pela regra mestre. */
 export type StatusPagamento = 'pendente' | 'pago' | 'vencido' | 'cancelado';
 export type FiltroPagamentos = 'todos' | StatusPagamento;
 export type MetodoPagamento = 'qualquer' | 'pix' | 'boleto' | 'cartao';
@@ -367,7 +368,7 @@ export interface LinkPagamento {
   /** Texto pronto, ex.: "Pedido #4807 · Mercado Bom Preço". */
   descricao: string; valor: number; vencimento: string | null; metodo: MetodoPagamento; status: StatusPagamento;
   pago_em: string | null;
-  /** URL pública da cobrança; null quando o provedor não devolveu (ex.: sem configuração). */
+  /** PDF do boleto; null em PIX (e quando o provedor não devolveu). Bolepix sai com `metodo` "qualquer". */
   link: string | null;
 }
 export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
