@@ -2,10 +2,12 @@
 // Rota GET /api/app/os (formato fechado pela sessão ERP da Onda D): a mesma lista da web
 // /oficina-auto/ordens-servico — só OS ativas. As etapas (chips, rótulo e barra de progresso) vêm do
 // pipeline do ERP: o app não conhece a lista de etapas. Fora desta tela de propósito: "+ Nova OS", "→ próxima etapa" e
-// "Link" (são escritas, cada uma num PR próprio) e "Abrir" (o detalhe é a tela 03, PR seguinte).
+// "Link" (são escritas, cada uma num PR próprio). Tocar no cartão abre o detalhe (tela 03).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type ListaOs, type OsResumo } from '../api';
 import { reais } from './Pedidos';
+import { useVoltar } from '../voltar';
+import { OsDetalhe } from './OsDetalhe';
 
 /** Cor da etapa: travada em vermelho, última etapa do pipeline em verde, o resto no acento. */
 export function tintaOs(o: Pick<OsResumo, 'travada' | 'etapa'>): string {
@@ -31,6 +33,12 @@ export function rotuloOs(d: Pick<ListaOs, 'total' | 'travadas'> | null): string 
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
 export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
+  const [aberta, setAberta] = useState<number | null>(null);
+  useVoltar(aberta !== null, () => setAberta(null));
+  return aberta !== null ? <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} /> : <Lista voltar={voltar} aoAbrir={setAberta} />;
+}
+
+function Lista({ voltar, aoAbrir }: { voltar?: ReactNode; aoAbrir: (id: number) => void }) {
   const [etapa, setEtapa] = useState('todas');
   const [dados, setDados] = useState<ListaOs | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -86,7 +94,7 @@ export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
           {dados?.itens.map((o) => {
             const tinta = tintaOs(o);
             return (
-              <div key={o.id} className="pd-card os-card" style={{ borderLeftColor: tinta }}>
+              <button key={o.id} className="pd-card os-card" style={{ borderLeftColor: tinta }} onClick={() => aoAbrir(o.id)}>
                 <span className="pd-card-l1">
                   <span className="pd-num">{o.numero}</span>
                   <span className="pd-status" style={{ color: tinta }}><i style={{ background: tinta }} />{o.etapa.rotulo}{o.travada && <span className="sr-only"> (travada)</span>}</span>
@@ -102,11 +110,11 @@ export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
                 <span className="os-pipe" role="img" aria-label={`Etapa ${o.etapa.indice} de ${o.etapa.total_etapas}`}>
                   {segmentosOs(o.etapa).map((aceso, i) => <i key={i} style={aceso ? { background: tinta } : undefined} />)}
                 </span>
-              </div>
+              </button>
             );
           })}
           {dados?.tem_mais && <button className="oi-btn block" style={{ minHeight: 44 }} disabled={carregandoMais} onClick={mais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</button>}
-          {dados && dados.itens.length > 0 && <p className="p4-legal">No app a OS é só consulta. Para abrir, mudar de etapa ou faturar, use o computador.</p>}
+          {dados && dados.itens.length > 0 && <p className="p4-legal">Toque numa OS para ver os itens. Mudar de etapa ou faturar fica no computador.</p>}
         </div>
       </div>
     </>

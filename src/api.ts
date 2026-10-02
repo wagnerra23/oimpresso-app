@@ -270,6 +270,21 @@ export interface ListaOs {
   total: number; travadas: number; pagina: number; tem_mais: boolean;
 }
 
+/** Tela 03 · Detalhe da OS. FORMATO PROVISÓRIO (pedido ao ERP). Totais calculados pelo ERP, nunca pelo app. */
+export interface OsDetalhe {
+  id: number; numero: string;
+  /** Onde a OS está no pátio, ex.: "Box 2"; null quando o ERP não registra. */
+  local: string | null;
+  etapa: EtapaOs; travada: boolean;
+  veiculo: { placa: string | null; descricao: string; km: number | null } | null;
+  cliente: { id: number; nome: string };
+  queixa: string | null; diagnostico: string | null;
+  itens: Array<{ tipo: 'servico' | 'peca'; descricao: string; detalhe: string | null; valor: number }>;
+  totais: { pecas: number; mao_de_obra: number; total: number };
+  /** Só a contagem: o app não mostra nem tira foto (ADR 0383). */
+  fotos_entrada: number;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'oficina' | 'ponto' | 'mais';
@@ -546,6 +561,8 @@ export const api = {
    *  Sem oficinaauto.service_order.view ou sem o módulo no pacote → 403 sem_permissao. */
   os: (etapa: string, pagina = 1) =>
     chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
+  /** Tela 03 · Detalhe da OS. Rota PROVISÓRIA. OS de outra empresa → 404. */
+  osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
