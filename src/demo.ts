@@ -178,6 +178,14 @@ export const demo = {
       const itens = busca.filter((x) => noPapel(x, papel)).map(({ id, nome, tipo, papeis, saldo_aberto }) => ({ id, nome, tipo, papeis, saldo_aberto, ativo: true }));
       return r({ itens, contadores, pagina: 1, tem_mais: false });
     }
+    if (metodo === 'GET' && caminho === '/api/app/inicio') {
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
+      return r({ usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
+        faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
+        kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
+        financeiro: { a_receber: 8200, a_pagar: 3100 },
+        proximas_tarefas: TAREFAS.slice(0, 3) });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
       const itens = TAREFAS.filter((x) => origem === 'todas' || x.origem === origem);

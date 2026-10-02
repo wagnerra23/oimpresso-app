@@ -84,7 +84,7 @@ export function App() {
       {DEMO && <div className="app-banner demo">Modo demonstração — dados simulados</div>}
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
-        {aba === 'inicio' && <Inicio irParaPonto={() => irPara('mais', 'ponto')} />}
+        {aba === 'inicio' && <Inicio irParaPonto={() => irPara('mais', 'ponto')} irParaPedidos={() => irPara('pedidos')} irParaTarefas={() => irPara('tarefas')} />}
         {aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={() => irPara('mais', 'ponto')} />}
         {aba === 'pedidos' && <Pedidos />}
         {aba === 'producao' && <Producao />}
