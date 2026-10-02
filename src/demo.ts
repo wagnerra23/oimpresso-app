@@ -33,6 +33,15 @@ const PEDIDOS = [
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
 
+// Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
+const TAREFAS = [
+  { id: 'todo:15', origem: 'todo' as const, titulo: 'Ligar para o fornecedor de lona', subtitulo: 'ToDo · Compras', prazo: diaRel(-1), atrasado: true, grupo: 'atrasadas' as const },
+  { id: 'ponto:31', origem: 'ponto' as const, titulo: 'Justificativa pendente — Consulta médica', subtitulo: 'Ponto · aguardando o gestor', prazo: diaRel(0), atrasado: false, grupo: 'hoje' as const },
+  { id: 'todo:16', origem: 'todo' as const, titulo: 'Conferir arte do cardápio do Bistrô', subtitulo: 'ToDo · Pedido #0039', prazo: diaRel(0), atrasado: false, grupo: 'hoje' as const },
+  { id: 'todo:17', origem: 'todo' as const, titulo: 'Enviar orçamento para a Papelaria Sol', subtitulo: 'ToDo · Comercial', prazo: diaRel(1), atrasado: false, grupo: 'amanha' as const },
+  { id: 'todo:18', origem: 'todo' as const, titulo: 'Revisar estoque de vinil', subtitulo: 'ToDo · Produção', prazo: diaRel(4), atrasado: false, grupo: 'semana' as const },
+];
+
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hhmm = () => new Date().toTimeString().slice(0, 5);
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
@@ -116,6 +125,18 @@ export const demo = {
       return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
+      const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
+      const itens = TAREFAS.filter((x) => origem === 'todas' || x.origem === origem);
+      return r({ itens, contadores: { todas: TAREFAS.length, todo: TAREFAS.filter((x) => x.origem === 'todo').length,
+        ponto: TAREFAS.filter((x) => x.origem === 'ponto').length } });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/tarefas\/todo\/\d+\/concluir$/.test(caminho)) {
+      const id = 'todo:' + caminho.split('/')[5];
+      const i = TAREFAS.findIndex((x) => x.id === id);
+      if (i >= 0) TAREFAS.splice(i, 1);
+      return r({ sucesso: true });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);
