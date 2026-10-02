@@ -10,7 +10,7 @@ body { background: #fbfaf8; -webkit-tap-highlight-color: transparent; overscroll
 .oi-app { height: 100dvh; box-sizing: border-box;
   padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)); }
-.oi-tabbar { grid-template-columns: repeat(3, 1fr); }
+.oi-tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .ptm-screen { background: transparent; min-height: auto; }
 .app-banner { padding: 8px 14px; font-size: 12px; text-align: center; }
 .app-banner.demo { background: var(--accent-soft); color: var(--accent-text); }

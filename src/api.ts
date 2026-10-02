@@ -37,6 +37,27 @@ export interface MarcacaoCriada {
   id: string; nsr: number; tipo: string; momento: string; hash_trunc: string; origem: string; revisar: boolean;
 }
 
+// ── Pedidos (API-CONTRATO-v1 §2, ERP #8492). Pedido = venda do ERP; etapas agrupam a FSM. ──
+export type GrupoEtapa = 'orcamento' | 'aprovacao' | 'producao' | 'entrega' | 'concluido';
+export type FiltroPedidos = 'ativos' | 'atrasados' | 'concluidos' | 'todos';
+export interface PedidoResumo {
+  id: number; numero: string; cliente: string;
+  /** Nome do 1º item da venda (título do cartão no v4); null se a venda não tem item. */
+  resumo: string | null;
+  valor: number; prazo: string | null; atrasado: boolean;
+  etapa: { chave: string; rotulo: string; grupo: GrupoEtapa }; progresso: number;
+}
+export interface ListaPedidos {
+  itens: PedidoResumo[]; contadores: Record<FiltroPedidos, number>; pagina: number; tem_mais: boolean;
+}
+export interface PedidoDetalhe extends PedidoResumo {
+  itens_venda: Array<{ produto: string; quantidade: number; total: number }>;
+  etapas: Array<{ grupo: GrupoEtapa; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
+  acoes: Array<{ chave: string; rotulo: string; pode: boolean }>;
+}
+/** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
+export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
+
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
 
@@ -150,6 +171,9 @@ export const api = {
   me: () => chamar<Me>('GET', '/ponto/api/me'),
   tipos: () => chamar<Array<{ value: string; label: string }>>('GET', '/ponto/api/intercorrencias/tipos'),
   espelho: (mes: string) => chamar<Espelho>('GET', `/ponto/api/espelho?mes=${mes}`),
+  pedidos: (filtro: FiltroPedidos, pagina = 1, q = '') =>
+    chamar<ListaPedidos>('GET', `/api/app/pedidos?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  pedido: (id: number) => chamar<PedidoDetalheApi>('GET', `/api/app/pedidos/${id}`),
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),
