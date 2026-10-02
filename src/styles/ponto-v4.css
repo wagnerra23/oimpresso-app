@@ -271,6 +271,9 @@ a.p4-link { text-decoration: none; }
 .in-ver { margin-left: auto; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); }
 .in-secao-h { display: flex; align-items: center; }
 
+/* Dados cadastrais — tela 34 do v4 (coluna de rótulo de 120px, como o protótipo) */
+.pc-dado span { width: 120px; }
+
 /* Nova pessoa — tela 09 do v4 (assistente em passos) */
 .np-nova { min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font: inherit; font-size: 13.5px; font-weight: 600; flex-shrink: 0; }
 .np-passos { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; padding: 10px 16px 12px; border-bottom: 1px solid var(--border); }

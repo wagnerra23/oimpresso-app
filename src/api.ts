@@ -67,6 +67,17 @@ export interface PessoaResumo {
 export interface ListaPessoas {
   itens: PessoaResumo[]; contadores: Record<FiltroPessoas, number>; pagina: number; tem_mais: boolean;
 }
+/** Tela 34 · Dados cadastrais (D16, Onda A). Contrato §4.1 (ERP #8552). `sms` sai sempre null (o ERP não guarda SMS);
+ *  campo que o ERP não tem vem null e a linha mostra "—". Pessoa de outra empresa → 404. */
+export interface PessoaCadastro {
+  id: number; nome: string; tipo: 'PF' | 'PJ' | null;
+  identificacao: { razao_social: string | null; documento: string | null; indicador_ie: string | null; papeis: PapelPessoa[] };
+  endereco_fiscal: { cidade: string | null; uf: string | null; cep: string | null; codigo_ibge: string | null; email_nfe: string | null };
+  comercial: { classificacao: string | null; limite_credito: number | null; prazo_padrao_dias: number | null };
+  /** LGPD Art. 7º: true = autorizado, false = não autorizado, null = sem registro. */
+  consentimento: { whatsapp: boolean | null; email_nfe: boolean | null; sms: boolean | null; registrado_em: string | null };
+}
+
 /** Resposta 200 de GET /api/app/cep/{cep}. codigo_ibge pode vir null para CEP que já estava em cache. */
 export interface EnderecoCep {
   cep: string; logradouro: string | null; complemento: string | null; bairro: string | null;
@@ -264,6 +275,7 @@ export const api = {
   pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
+  pessoaCadastro: (id: number) => chamar<PessoaCadastro>('GET', `/api/app/pessoas/${id}/cadastro`),
   /** Tela 09 · Nova pessoa. 201 { id } · 422 { erro: "validacao", campos } · 403 sem permissão para o papel. */
   criarPessoa: (p: NovaPessoa) => chamar<{ id: number }>('POST', '/api/app/pessoas', p),
   /** "Buscar" do CEP na tela 09 (contrato §4.3, ERP #8560): proxy com cache do ERP, 60 buscas/min.
