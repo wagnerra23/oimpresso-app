@@ -5,7 +5,7 @@
 // (formato proposto ao ERP).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPagamentos, type LinkPagamento, type ListaPagamentos, type MetodoPagamento, type ReferenciaCobranca, type StatusPagamento } from '../api';
-import { corpoNovoLink, emAberto, PRAZOS, type Prazo } from '../pagamento-regras';
+import { corpoNovoLink, emAberto, mensagemGerar, PRAZOS, type MetodoApp, type Prazo } from '../pagamento-regras';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 
@@ -21,8 +21,9 @@ const STATUS: Record<StatusPagamento, { label: string; cor: string }> = {
   cancelado: { label: 'Cancelado', cor: 'var(--text-dim)' },
 };
 const METODO: Record<MetodoPagamento, string> = { qualquer: 'Qualquer método', pix: 'PIX', boleto: 'Boleto', cartao: 'Cartão' };
-const METODOS: Array<{ id: MetodoPagamento; label: string }> = [
-  { id: 'qualquer', label: 'Qualquer' }, { id: 'pix', label: 'PIX' }, { id: 'boleto', label: 'Boleto' }, { id: 'cartao', label: 'Cartão' },
+// Cartão não aparece: exige o token do cartão e não sai do app (§10.6).
+const METODOS: Array<{ id: MetodoApp; label: string }> = [
+  { id: 'qualquer', label: 'Qualquer' }, { id: 'pix', label: 'PIX' }, { id: 'boleto', label: 'Boleto' },
 ];
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 const msgErro = (e: unknown) => (e instanceof Error ? e.message : 'Não foi possível concluir.');
@@ -170,7 +171,7 @@ function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
   const [refs, setRefs] = useState<ReferenciaCobranca[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [sel, setSel] = useState<ReferenciaCobranca | null>(null);
-  const [metodo, setMetodo] = useState<MetodoPagamento>('qualquer');
+  const [metodo, setMetodo] = useState<MetodoApp>('qualquer');
   const [prazo, setPrazo] = useState<Prazo>(7);
 
   useEffect(() => {
@@ -184,7 +185,8 @@ function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
     if (!sel || ocupado) return;
     setOcupado('novo'); setErro(null);
     try { aoGerar(await api.gerarLink(corpoNovoLink(sel, metodo, prazo))); }
-    catch (e) { setErro(e instanceof ErroApi && e.codigo === 'ja_existe' ? 'Já existe um link em aberto para este documento.' : msgErro(e)); }
+    // 409 ja_existe (em aberto ou JÁ PAGA — a 2ª cobrança seria em dobro), 422, 503 e 429: a mensagem vem do ERP.
+    catch (e) { setErro(mensagemGerar(e)); }
     finally { setOcupado(null); }
   };
 

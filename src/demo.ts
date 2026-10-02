@@ -460,8 +460,13 @@ export const demo = {
       if (!ped && !orc) throw Object.assign(new Error('Escolha um pedido ou orçamento.'), { status: 422, codigo: 'validacao', campos: { referencia: 'Escolha um pedido ou orçamento.' } });
       if (![3, 7, 15].includes(Number(n.vencimento_dias))) throw Object.assign(new Error('Prazo inválido.'), { status: 422, codigo: 'validacao', campos: { vencimento_dias: 'Prazo inválido.' } });
       const ref = `${n.referencia!.tipo}:${n.referencia!.id}`;
-      if (PAGAMENTOS.some((x) => x.ref === ref && (x.status === 'pendente' || x.status === 'vencido'))) {
-        throw Object.assign(new Error('Já existe um link em aberto para este documento.'), { status: 409, codigo: 'ja_existe' });
+      if (n.metodo === 'cartao') throw Object.assign(new Error('Cartão não pode ser cobrado pelo app.'), { status: 422, codigo: 'validacao', campos: { metodo: 'Cartão não pode ser cobrado pelo app.' } });
+      // Como o ERP (§10.6): bloqueia a 2ª cobrança se já há uma em aberto no prazo ou se já foi paga (o gateway não baixa a venda).
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pendente')) {
+        throw Object.assign(new Error('Já existe uma cobrança em aberto para este documento.'), { status: 409, codigo: 'ja_existe' });
+      }
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pago')) {
+        throw Object.assign(new Error('Este documento já tem cobrança paga: registre o pagamento na venda antes de cobrar de novo.'), { status: 409, codigo: 'ja_existe' });
       }
       const id = 1 + Math.max(...PAGAMENTOS.map((x) => x.id));
       const novo = { id, descricao: ped ? `Pedido #${ped.numero} · ${ped.cliente}` : `Orçamento ${orc!.numero} · ${orc!.cliente}`,
