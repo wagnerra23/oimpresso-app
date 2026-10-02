@@ -162,6 +162,13 @@ export const demo = {
           .sort((a, b) => (a.prazo ?? '9').localeCompare(b.prazo ?? '9')) }));
       return r({ colunas });
     }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/cep/')) {
+      const cep = caminho.slice('/api/app/cep/'.length).replace(/\D/g, '');
+      if (cep.length !== 8) throw Object.assign(new Error('O CEP tem 8 dígitos.'), { status: 422, codigo: 'validacao' });
+      // Só um CEP conhecido na demo; o resto responde como CEP inexistente.
+      if (cep !== '88701000') throw Object.assign(new Error('CEP não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      return r({ cep, logradouro: 'Rua da Demonstração', complemento: null, bairro: 'Centro', cidade: 'Tubarão', uf: 'SC', codigo_ibge: '4218707' });
+    }
     if (metodo === 'POST' && caminho === '/api/app/pessoas') {
       const n = (corpo ?? {}) as Record<string, unknown>;
       const campos: Record<string, string> = {};

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conferir, corpo, raiz, VAZIO } from './NovaPessoa';
+import { aplicarCep, conferir, corpo, raiz, VAZIO } from './NovaPessoa';
 
 describe('Nova pessoa (tela 09) — corpo do POST /api/app/pessoas', () => {
   it('manda só os papéis marcados e null nos campos em branco', () => {
@@ -32,5 +32,27 @@ describe('Nova pessoa (tela 09) — corpo do POST /api/app/pessoas', () => {
   it('erro de item de lista ("papeis.0") volta ao campo da tela', () => {
     expect(raiz('papeis.0')).toBe('papeis');
     expect(raiz('nome')).toBe('nome');
+  });
+});
+
+describe('Nova pessoa (tela 09) — Buscar do CEP (GET /api/app/cep)', () => {
+  const achado = { cep: '88701000', logradouro: 'Rua A', complemento: 'sala 2', bairro: 'Centro', cidade: 'Tubarão', uf: 'SC', codigo_ibge: '4218707' };
+
+  it('preenche o endereço, formata o CEP e leva o codigo_ibge no POST como texto', () => {
+    const f = aplicarCep({ ...VAZIO, cep: '88701000' }, achado);
+    expect(f).toMatchObject({ cep: '88701-000', logradouro: 'Rua A', bairro: 'Centro', cidade: 'Tubarão', uf: 'SC', complemento: 'sala 2' });
+    expect(corpo(f).codigo_ibge).toBe('4218707');
+  });
+
+  it('não apaga o complemento que o usuário já escreveu', () => {
+    expect(aplicarCep({ ...VAZIO, complemento: 'fundos' }, achado).complemento).toBe('fundos');
+  });
+
+  it('codigo_ibge null (CEP em cache) vai null no POST', () => {
+    expect(corpo(aplicarCep(VAZIO, { ...achado, codigo_ibge: null })).codigo_ibge).toBeNull();
+  });
+
+  it('sem busca, codigo_ibge vai null', () => {
+    expect(corpo({ ...VAZIO, cidade: 'Tubarão', uf: 'SC' }).codigo_ibge).toBeNull();
   });
 });

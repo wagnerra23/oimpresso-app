@@ -1,10 +1,10 @@
 // Nova pessoa — tela 09 do v4 (assistente em 5 passos: Dados · Contato · Endereço · Comercial · LGPD),
 // POST /api/app/pessoas, contrato §4.2 (ERP #8559). Obrigatórios: tipo, nome e papeis.
 // Fora de propósito: papel "Funcionário", limite de crédito, classificação ABC, SMS e WhatsApp em
-// número separado (o ERP só tem o telefone). O "Buscar" do CEP aparece quando o ERP expuser
-// GET /api/app/cep/{cep}; até lá o endereço é digitado e codigo_ibge vai null.
+// número separado (o ERP só tem o telefone). "Buscar" do CEP: GET /api/app/cep/{cep} (§4.3, ERP #8560)
+// preenche o endereço e o codigo_ibge; se o CEP não existe ou o serviço falha, o endereço é digitado.
 import { useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, type NovaPessoa } from '../api';
+import { api, camposDoErro, ErroApi, type EnderecoCep, type NovaPessoa } from '../api';
 
 type Passo = 'dados' | 'contato' | 'endereco' | 'comercial' | 'lgpd';
 const PASSOS: Array<{ id: Passo; label: string }> = [
@@ -29,11 +29,13 @@ export interface Form {
   cliente: boolean; fornecedor: boolean;
   telefone: string; email: string; email_nfe: string;
   cep: string; logradouro: string; numero: string; complemento: string; bairro: string; cidade: string; uf: string;
+  /** Vem só do "Buscar" do CEP; some se o CEP, a cidade ou a UF forem mudados à mão. */
+  codigo_ibge: string;
   prazo: string; whatsapp: Sim; nfe_email: Sim;
 }
 export const VAZIO: Form = { tipo: 'PJ', nome: '', nome_fantasia: '', documento: '', indicador_ie: '', cliente: true, fornecedor: false,
   telefone: '', email: '', email_nfe: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '',
-  prazo: '', whatsapp: '', nfe_email: '' };
+  codigo_ibge: '', prazo: '', whatsapp: '', nfe_email: '' };
 
 const ou = (s: string) => (s.trim() ? s.trim() : null);
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -58,6 +60,18 @@ export function conferir(f: Form, passo: Passo): Record<string, string> {
   return e;
 }
 
+/** Endereço achado pelo CEP entra no formulário; complemento só se o usuário ainda não escreveu um. */
+export function aplicarCep(f: Form, e: EnderecoCep): Form {
+  return { ...f,
+    cep: e.cep.length === 8 ? `${e.cep.slice(0, 5)}-${e.cep.slice(5)}` : f.cep,
+    logradouro: e.logradouro ?? f.logradouro, bairro: e.bairro ?? f.bairro,
+    complemento: f.complemento.trim() ? f.complemento : (e.complemento ?? ''),
+    cidade: e.cidade ?? f.cidade, uf: e.uf ?? f.uf, codigo_ibge: e.codigo_ibge ?? '' };
+}
+
+/** Status HTTP de um erro da API ou da demo. */
+const statusDe = (e: unknown) => (e instanceof ErroApi ? e.status : (e as { status?: number } | null)?.status ?? 0);
+
 export function corpo(f: Form): NovaPessoa {
   const consentimento: NovaPessoa['consentimento'] = {};
   if (f.whatsapp) consentimento.whatsapp = f.whatsapp === 'sim';
@@ -68,7 +82,7 @@ export function corpo(f: Form): NovaPessoa {
     papeis: [...(f.cliente ? ['cliente' as const] : []), ...(f.fornecedor ? ['fornecedor' as const] : [])],
     telefone: ou(f.telefone), email: ou(f.email), email_nfe: ou(f.email_nfe),
     cep: ou(f.cep), logradouro: ou(f.logradouro), numero: ou(f.numero), complemento: ou(f.complemento),
-    bairro: ou(f.bairro), cidade: ou(f.cidade), uf: f.uf || null, codigo_ibge: null,
+    bairro: ou(f.bairro), cidade: ou(f.cidade), uf: f.uf || null, codigo_ibge: ou(f.codigo_ibge),
     prazo_padrao_dias: f.prazo.trim() ? Number(f.prazo.trim()) : null,
     consentimento,
   };
@@ -82,11 +96,29 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
   const [passo, setPasso] = useState<Passo>('dados');
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const i = PASSOS.findIndex((p) => p.id === passo);
   const ultimo = i === PASSOS.length - 1;
   const mudar = <K extends keyof Form>(k: K, v: Form[K], campoApi: string = k) => {
-    setF((o) => ({ ...o, [k]: v }));
+    // codigo_ibge só vale para o CEP/cidade/UF que vieram da busca.
+    setF((o) => ({ ...o, [k]: v, ...(k === 'cep' || k === 'cidade' || k === 'uf' ? { codigo_ibge: '' } : {}) }));
     setErros((o) => { const n = { ...o }; delete n[campoApi]; return n; });
+  };
+
+  const buscarCep = async () => {
+    if (f.cep.replace(/\D/g, '').length !== 8) { setErros((o) => ({ ...o, cep: 'O CEP tem 8 dígitos.' })); return; }
+    setBuscandoCep(true);
+    try {
+      const e = await api.cep(f.cep);
+      setF((o) => aplicarCep(o, e));
+      setErros((o) => { const n = { ...o }; for (const k of ['cep', 'logradouro', 'bairro', 'cidade', 'uf']) delete n[k]; return n; });
+    } catch (err) {
+      const st = statusDe(err);
+      if (st === 404) setErros((o) => ({ ...o, cep: 'CEP não encontrado. Preencha o endereço abaixo.' }));
+      else if (st === 422) setErros((o) => ({ ...o, cep: 'O CEP tem 8 dígitos.' }));
+      else if (st === 429) avisar('Muitas buscas seguidas. Tente de novo em um minuto.', 'warn');
+      else avisar(err instanceof Error ? err.message : 'Não foi possível buscar o CEP.', 'erro');
+    } finally { setBuscandoCep(false); }
   };
 
   const avancar = async () => {
@@ -191,7 +223,11 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
           )}
           {passo === 'endereco' && (
             <>
-              {campo('cep', 'CEP', { inputMode: 'numeric', autoComplete: 'postal-code' })}
+              <div className="np-cep">
+                {campo('cep', 'CEP', { inputMode: 'numeric', autoComplete: 'postal-code', enterKeyHint: 'search',
+                  onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarCep(); } } })}
+                <button className="oi-btn" disabled={buscandoCep || salvando} onClick={buscarCep}>{buscandoCep ? 'Buscando…' : 'Buscar'}</button>
+              </div>
               {campo('logradouro', 'Logradouro', { autoComplete: 'address-line1', placeholder: 'Rua, avenida…' })}
               <div className="np-linha2 num">
                 {campo('numero', 'Número', { inputMode: 'numeric' })}
