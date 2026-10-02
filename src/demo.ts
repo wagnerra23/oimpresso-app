@@ -13,6 +13,13 @@ const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
+// Tela 39 · Marcações fora do geofence (nomes e números do protótipo). `min` = minutos atrás.
+const VALIDACAO = [
+  { id: 1, colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'Obra Mercado União · Palhoça/SC', min: 95, nsr: 348821, gps_precisao_m: 38, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
+  { id: 2, colaborador_nome: 'Marcos Teixeira', tipo: 'SAIDA', local_texto: 'Obra Mercado União · Palhoça/SC', min: 960, nsr: 348809, gps_precisao_m: 44, dispositivo: 'Android', hash_curto: '27d9d853', estado: 'pendente' },
+  { id: 3, colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'Acme Comércio (visita)', min: 1500, nsr: 348715, gps_precisao_m: 412, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
+  { id: 4, colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: 'Posto BR · fachada', min: 2800, nsr: 348690, gps_precisao_m: 22, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
+];
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -324,7 +331,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -358,6 +365,24 @@ export const demo = {
         comentarios: [{ quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Carla', texto: 'pediu letra maior ao fornecedor', detalhe: null },
           { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
         concluida: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/ponto/aprovacoes')) {
+      // Hora calculada aqui, nunca no topo do módulo.
+      const est = (caminho.match(/estado=(\w+)/) || [])[1] || 'pendente';
+      const itens = VALIDACAO.filter((x) => est === 'todas' || x.estado === est)
+        .map(({ min, ...x }) => ({ ...x, marcada_em: new Date(Date.now() - min * 60000).toISOString() }));
+      const conta = (e: string) => VALIDACAO.filter((x) => x.estado === e).length;
+      return r({ itens, contadores: { pendente: conta('pendente'), validada: conta('validada'), recusada: conta('recusada'), todas: VALIDACAO.length } });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/ponto\/aprovacoes\/\d+\/(validar|recusar)$/.test(caminho)) {
+      const partes = caminho.split('/');
+      const m = VALIDACAO.find((x) => x.id === Number(partes[5]));
+      if (!m) throw Object.assign(new Error('Marcação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      if (m.estado !== 'pendente') throw Object.assign(new Error('Esta marcação já foi revisada.'), { status: 409, codigo: 'ja_revisada' });
+      // Demo: só muda o estado da fila. No ERP a recusa grava uma anulação nova; a marcação não é tocada.
+      if (partes[6] === 'validar') { m.estado = 'validada'; return r({ estado: 'validada' }); }
+      m.estado = 'recusada'; nsr += 1;
+      return r({ estado: 'recusada', nsr_anulacao: nsr });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

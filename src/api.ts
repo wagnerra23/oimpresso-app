@@ -205,7 +205,24 @@ export interface ListaEstoque {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'ponto_gestor' | 'mais';
+
+/** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
+ *  justificativas da tela 38 ficam para outra tela). FORMATO PROPOSTO, ainda sem rota no ERP.
+ *  Validar aceita a marcação; Recusar grava uma ANULAÇÃO — a marcação original nunca muda (Portaria 671). */
+export type EstadoValidacao = 'pendente' | 'validada' | 'recusada';
+export type FiltroValidacao = EstadoValidacao | 'todas';
+export interface MarcacaoAValidar {
+  id: number; colaborador_nome: string; tipo: string;
+  /** Endereço ou nome do local, como o ERP descreve. */
+  local_texto: string | null;
+  /** ISO com hora. */
+  marcada_em: string; nsr: number;
+  /** Precisão do GPS em metros (acima de 500 o servidor recusa e nem chega aqui). */
+  gps_precisao_m: number;
+  dispositivo: string | null; hash_curto: string; estado: EstadoValidacao;
+}
+export interface ListaValidacao { itens: MarcacaoAValidar[]; contadores: Record<FiltroValidacao, number> }
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -408,6 +425,11 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  /** Tela 39 (proposta, sem rota no ERP ainda). */
+  marcacoesAValidar: (estado: FiltroValidacao) => chamar<ListaValidacao>('GET', `/api/app/ponto/aprovacoes?estado=${estado}`),
+  validarMarcacao: (id: number) => chamar<{ estado: 'validada' }>('POST', `/api/app/ponto/aprovacoes/${id}/validar`),
+  /** Grava a anulação no servidor. Nada de UPDATE/DELETE na marcação: ela continua imutável. */
+  recusarMarcacao: (id: number) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${id}/recusar`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
