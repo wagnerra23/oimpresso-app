@@ -203,6 +203,28 @@ export interface ListaEstoque {
   itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
 }
 
+/** Tela 29 · Movimentações, SÓ LEITURA (Onda B). Contrato §9.3 (ERP #8581): 30 por página, do mais novo ao mais
+ *  velho, o mesmo histórico da tela web. A tela só sai da demo quando o #8581 estiver em produção (DETALHE_ESTOQUE). A escrita (registrar movimento) espera decisão do Wagner: no ERP cada
+ *  tipo é uma transação contábil (entrada = compra; saída/perda = ajuste com FIFO). */
+export interface Movimento {
+  id: number;
+  /** Tipo da transação no ERP (purchase, sell, stock_adjustment, opening_stock, transferência…). */
+  tipo: string;
+  /** O mesmo texto da tela web ("Compra", "Venda", "Ajuste"…). */
+  rotulo: string;
+  /** "nº · fornecedor ou cliente" (só o nome), ou null. */
+  referencia: string | null;
+  /** ISO com hora. */
+  quando: string;
+  /** Com sinal: entrou +, saiu −. */
+  qtd: number;
+  /** Saldo acumulado depois deste movimento (calculado pelo ERP). */
+  saldo: number;
+}
+export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
+/** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
+export const DETALHE_ESTOQUE = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'ponto_gestor' | 'mais';
@@ -416,6 +438,10 @@ export const api = {
   /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
   estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
     chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 29 · saldo e histórico de uma linha do estoque (contrato §9.3). 403 sem_permissao · 404 linha de outra empresa ou de loja não permitida. */
+  estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
+    ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
