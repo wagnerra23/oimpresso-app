@@ -56,7 +56,9 @@ const PEDIDOS = [
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
-const PRODUTOS = [
+const UNIDADES = [{ id: 1, nome: 'Metro quadrado', curta: 'm²' }, { id: 2, nome: 'Unidade', curta: 'un' }, { id: 3, nome: 'Milheiro', curta: 'mil' }];
+interface ProdutoDemo { id: number; nome: string; codigo: string; cat: number | null; unidade: string; preco: number | null; variacoes: number | null; qtd: number | null; baixo: boolean }
+const PRODUTOS: ProdutoDemo[] = [
   { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
   { id: 202, nome: 'Caneca personalizada', codigo: 'BRD-CAN', cat: 5, unidade: 'un', preco: 29, variacoes: 3, qtd: 46, baixo: false },
   { id: 203, nome: 'Cartão de visita 4×4', codigo: 'CRT-500', cat: 3, unidade: 'mil', preco: 145, variacoes: null, qtd: null, baixo: false },
@@ -332,6 +334,35 @@ export const demo = {
       return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
         pagina: 1, tem_mais: false });
     }
+    // Tela 20 (contrato §9.4). A demo faz o papel do ERP: produto nasce sem preço.
+    if (metodo === 'GET' && caminho === '/api/app/produtos/opcoes') {
+      return r({ categorias: CATEGORIAS, unidades: UNIDADES });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/produtos') {
+      const n = (corpo ?? {}) as { nome?: string; codigo?: string | null; categoria_id?: number | null; unidade_id?: number;
+        estoque?: { controla?: boolean; minimo?: number | null }; fiscal?: Record<string, string | null> };
+      const campos: Record<string, string> = {};
+      if (!String(n.nome ?? '').trim()) campos.nome = 'Informe o nome do produto.';
+      const unidade = UNIDADES.find((u) => u.id === n.unidade_id);
+      if (!unidade) campos.unidade_id = 'Unidade inválida.';
+      if (n.categoria_id != null && !CATEGORIAS.some((c) => c.id === n.categoria_id)) campos.categoria_id = 'Categoria inválida.';
+      if (n.codigo && PRODUTOS.some((x) => x.codigo.toLowerCase() === String(n.codigo).toLowerCase())) campos.codigo = 'Este código já está em uso.';
+      if (n.estoque?.minimo != null && n.estoque.minimo < 0) campos['estoque.minimo'] = 'O estoque mínimo não pode ser negativo.';
+      const tam: Record<string, number> = { ncm: 8, cest: 7, cfop_interno: 4, cfop_externo: 4 };
+      for (const [k, t] of Object.entries(tam)) {
+        const v = n.fiscal?.[k];
+        if (v && (v.length !== t || /[^0-9]/.test(v))) campos['fiscal.' + k] = 'Informe ' + t + ' dígitos.';
+      }
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const id = 1 + Math.max(...PRODUTOS.map((x) => x.id));
+      const codigo = n.codigo || 'PRD-' + id;
+      PRODUTOS.push({ id, nome: String(n.nome).trim(), codigo, cat: n.categoria_id ?? null, unidade: unidade!.curta, preco: null,
+        variacoes: null, qtd: n.estoque?.controla === false ? null : 0,
+        // Regra do alerta da web: saldo ≤ mínimo. Nasce com saldo 0.
+        baixo: n.estoque?.controla !== false && n.estoque?.minimo != null && 0 <= n.estoque.minimo });
+      PRODUTOS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return r({ id, codigo });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
       const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
@@ -370,7 +401,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -456,6 +487,28 @@ export const demo = {
       return r({ itens: docs.filter((d) => st === 'todos' || d.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: docs.length, rascunho: conta('rascunho'), processando: conta('processando'), autorizado: conta('autorizado'),
           cancelado: conta('cancelado'), rejeitado: conta('rejeitado') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/relatorios')) {
+      const periodo = (caminho.match(/periodo=(\w+)/) || [])[1] || 'mes';
+      const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'dre';
+      // Números fictícios do protótipo, escalados pelo período. Datas calculadas aqui (o build de produção descarta o demo).
+      const f = periodo === 'ano' ? 11.4 : periodo === 'trimestre' ? 2.9 : 1;
+      const v = (x: number) => Math.round(x * f * 100) / 100;
+      const rec = v(148230), desp = v(96410);
+      const parte = (total: number, l: Array<[string, number]>) => l.map(([nome, p]) => ({ nome, valor: Math.round(total * p * 100) / 100 }));
+      const de = periodo === 'mes' ? diaRel(0).slice(0, 8) + '01' : diaRel(periodo === 'ano' ? -365 : -90);
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo === 'producao');
+      const etapas = [...new Set(ativos.map((x) => x.etapa.rotulo))].map((rotulo) => ({ rotulo, total: ativos.filter((x) => x.etapa.rotulo === rotulo).length }));
+      return r({ periodo: { de, ate: diaRel(0) },
+        kpis: { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
+        dre: aba !== 'dre' ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
+          despesas_por_categoria: parte(desp, [['Insumos', 0.46], ['Folha', 0.31], ['Aluguel e energia', 0.14], ['Outros', 0.09]]) },
+        vendas: aba !== 'vendas' ? null : {
+          receita_por_dia: [4.2, 5.1, 3.8, 6.4, 7.2, 2.1, 1.4, 5.8, 6.1, 4.9, 7.8, 8.4, 3.2, 8.42].map((x, i) => ({ data: diaRel(i - 13), valor: x * 1000 })),
+          top_clientes: parte(v(61000), [['Papelaria Sol', 0.3], ['Clínica Vita', 0.25], ['Restaurante 88', 0.19], ['Bistrô do Forno', 0.16], ['Marília Costa', 0.1]]) },
+        producao: aba !== 'producao' ? null : { por_etapa: etapas },
+        estoque: aba !== 'estoque' ? null : { baixo: [{ nome: 'Lona 440 g', quantidade: 2, minimo: 5, unidade: 'un' },
+          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
