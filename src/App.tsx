@@ -17,6 +17,7 @@ import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
+import { Relatorios } from './telas/Relatorios';
 import { Assistente } from './telas/Assistente';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
@@ -130,10 +131,11 @@ export function App() {
         {nav && aba === 'mais' && subMais === null && <Mais abrir={(s) => { setEstoqueFiltro('todos'); setSubMais(s); }} modulos={n.modulosMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
-        {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'estoque' && <Estoque filtroInicial={estoqueFiltro} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'produtos' && <Produtos avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'financeiro' && <Financeiro voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'fiscal' && <Fiscal voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'relatorios' && <Relatorios voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'assistente' && <Assistente online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
