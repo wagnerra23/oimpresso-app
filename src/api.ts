@@ -67,6 +67,27 @@ export interface PessoaResumo {
 export interface ListaPessoas {
   itens: PessoaResumo[]; contadores: Record<FiltroPessoas, number>; pagina: number; tem_mais: boolean;
 }
+/** Resposta 200 de GET /api/app/cep/{cep}. codigo_ibge pode vir null para CEP que já estava em cache. */
+export interface EnderecoCep {
+  cep: string; logradouro: string | null; complemento: string | null; bairro: string | null;
+  cidade: string | null; uf: string | null; codigo_ibge: string | null;
+}
+
+/** Corpo do POST /api/app/pessoas (tela 09, contrato §4.2 · ERP #8559). Obrigatórios: tipo, nome, papeis.
+ *  Papel "funcionario", limite de crédito e classificação não se cadastram pelo app. */
+export interface NovaPessoa {
+  tipo: 'PF' | 'PJ'; nome: string; nome_fantasia: string | null; documento: string | null;
+  /** 1 contribuinte · 2 isento · 9 não contribuinte. */
+  indicador_ie: 1 | 2 | 9 | null;
+  papeis: Array<'cliente' | 'fornecedor'>;
+  telefone: string | null; email: string | null; email_nfe: string | null;
+  cep: string | null; logradouro: string | null; numero: string | null; complemento: string | null;
+  bairro: string | null; cidade: string | null; uf: string | null; codigo_ibge: string | null;
+  prazo_padrao_dias: number | null;
+  /** Chave ausente não muda nada no ERP. */
+  consentimento: { whatsapp?: boolean; email_nfe?: boolean };
+}
+
 export interface PessoaDetalhe {
   id: number; nome: string; tipo: 'PF' | 'PJ' | null;
   /** Só vem com a permissão de ver contato completo (contrato §4); null caso contrário. */
@@ -149,8 +170,13 @@ export interface Espelho {
 
 /** Erro com a mensagem que o servidor devolveu (em PT-BR), pronta para a tela. */
 export class ErroApi extends Error {
-  constructor(public status: number, public codigo: string, mensagem: string) { super(mensagem); }
+  /** Erros por campo de um 422 ({ erro: "validacao", campos: { campo: "mensagem" } }). */
+  constructor(public status: number, public codigo: string, mensagem: string, public campos?: Record<string, string>) { super(mensagem); }
 }
+
+/** Erros por campo de qualquer erro (da API ou da demo). */
+export const camposDoErro = (e: unknown): Record<string, string> =>
+  ((e as { campos?: Record<string, string> } | null)?.campos) ?? {};
 
 let token: string | null = null;
 /** Diferença relógio do aparelho − servidor, em segundos, medida pelo header Date. */
@@ -228,8 +254,9 @@ async function chamar<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknow
     const d = (r.data ?? {}) as Record<string, unknown>;
     const errosCampo = d.errors as Record<string, string[]> | undefined;
     const primeiro = errosCampo ? Object.values(errosCampo)[0]?.[0] : undefined;
-    const msg = (primeiro ?? d.mensagem ?? d.message ?? 'Algo deu errado. Tente de novo.') as string;
-    throw new ErroApi(r.status, String(d.erro ?? 'erro'), msg);
+    const campos = d.campos && typeof d.campos === 'object' ? (d.campos as Record<string, string>) : undefined;
+    const msg = (primeiro ?? d.mensagem ?? d.message ?? (campos ? Object.values(campos)[0] : undefined) ?? 'Algo deu errado. Tente de novo.') as string;
+    throw new ErroApi(r.status, String(d.erro ?? 'erro'), msg, campos);
   }
   return r.data as T;
 }
@@ -254,6 +281,12 @@ export const api = {
   pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
+  /** Tela 09 · Nova pessoa. 201 { id } · 422 { erro: "validacao", campos } · 403 sem permissão para o papel. */
+  criarPessoa: (p: NovaPessoa) => chamar<{ id: number }>('POST', '/api/app/pessoas', p),
+  /** "Buscar" do CEP na tela 09 (contrato §4.3, ERP #8560): proxy com cache do ERP, 60 buscas/min.
+   *  404 nao_encontrado (CEP inexistente ou serviço fora) · 422 validacao (não tem 8 dígitos) ·
+   *  429 é o throttle padrão do Laravel ({ message: "Too Many Attempts." } + Retry-After), tratado pelo status. */
+  cep: (cep: string) => chamar<EnderecoCep>('GET', `/api/app/cep/${cep.replace(/\D/g, '')}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
