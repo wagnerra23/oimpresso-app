@@ -451,3 +451,8 @@ a.p4-link { text-decoration: none; }
 .fn-lanc-v { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
 .fn-lanc-v span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fn-lanc-v small { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; }
+
+
+/* ── Fiscal (tela 14) ── */
+.fs-chave { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--text-dim); word-break: break-all; }
+.fs-erro { font-size: 12px; line-height: 1.4; color: var(--danger); border: 1px solid var(--danger); border-radius: 8px; padding: 8px 10px; }
