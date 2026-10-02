@@ -38,12 +38,22 @@ const VAR = {
   info: '--info', danger: '--danger', warn: '--warn', ok: '--ok',
 };
 
-function css(seletor, pal, marca) {
+/** Pares de cor dos chips de origem (OS, CRM, FIN, PNT, MFG, OFI) aninhados em `origin: { … }` da paleta. */
+function origens(objeto) {
+  const out = {};
+  for (const m of objeto.matchAll(/([A-Z]{2,4}):\s*\{\s*bg:\s*"(#[0-9a-fA-F]{3,8})",\s*fg:\s*"(#[0-9a-fA-F]{3,8})"\s*\}/g)) out[m[1]] = { bg: m[2], fg: m[3] };
+  const faltam = ['OS', 'CRM', 'FIN', 'PNT', 'MFG', 'OFI'].filter((k) => !out[k]);
+  if (faltam.length) throw new Error(`origem ausente na paleta: ${faltam.join(', ')}`);
+  return out;
+}
+
+function css(seletor, pal, marca, orig) {
   const linhas = Object.entries(VAR).map(([k, v]) => {
     if (!pal[k]) throw new Error(`token ${k} ausente em ${seletor}`);
     return `  ${v}: ${pal[k]};`;
   });
   for (const [k, v] of Object.entries(marca)) linhas.push(`  --brand-${k}: ${v};`);
+  for (const [k, v] of Object.entries(orig)) linhas.push(`  --origin-${k.toLowerCase()}-bg: ${v.bg};`, `  --origin-${k.toLowerCase()}-fg: ${v.fg};`);
   return `${seletor} {\n${linhas.join('\n')}\n}\n`;
 }
 
@@ -54,8 +64,8 @@ const marcaEscura = cores(bloco('darkPalette').slice(bloco('darkPalette').indexO
 
 const saida = `/* GERADO por scripts/tokens-v4.mjs a partir de design/oi-theme.v4.ts — não editar à mão.
    design-v4: neutros e destaque vêm do DS do oimpresso (roxo 295), ação em verde. */
-${css('.oi', claro, marca)}
-${css('.oi[data-theme="dark"]', escuro, marcaEscura)}`;
+${css('.oi', claro, marca, origens(bloco('lightPalette')))}
+${css('.oi[data-theme="dark"]', escuro, marcaEscura, origens(bloco('darkPalette')))}`;
 
 writeFileSync(new URL('../src/styles/oi-v4.css', import.meta.url), saida);
 console.log(`oi-v4.css: ${Object.keys(claro).length} cores claras, ${Object.keys(escuro).length} escuras`);
