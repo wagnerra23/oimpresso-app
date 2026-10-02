@@ -48,7 +48,9 @@ const PEDIDOS = [
 ];
 
 // Pessoas de demonstração (API-CONTRATO-v1 §4). Telefones e documentos fictícios.
-const PESSOAS = [
+interface PessoaDemo { id: number; nome: string; tipo: string; documento: string | null; papeis: string[]; saldo_aberto: number;
+  telefone: string | null; email: string | null; cidade: string | null }
+const PESSOAS: PessoaDemo[] = [
   { id: 15, nome: 'Ângela Ramos', tipo: 'PF', documento: null, papeis: ['funcionario'], saldo_aberto: 0, telefone: '(48) 90000-0006', email: null, cidade: 'Tubarão' },
   { id: 9, nome: 'Bistrô do Forno', tipo: 'PJ', documento: '00.000.000/0001-00', papeis: ['cliente'], saldo_aberto: 0, telefone: '(48) 90000-0001', email: 'contato@bistro.exemplo', cidade: 'Tubarão' },
   { id: 10, nome: 'Clínica Vita', tipo: 'PJ', documento: '00.000.000/0002-00', papeis: ['cliente'], saldo_aberto: 612, telefone: '(48) 90000-0002', email: null, cidade: 'Laguna' },
@@ -159,6 +161,38 @@ export const demo = {
         itens: PEDIDOS.filter((x) => x.etapa.chave === id).map(({ itens, ...x }) => ({ ...x, resumo: itens[0]?.produto ?? null }))
           .sort((a, b) => (a.prazo ?? '9').localeCompare(b.prazo ?? '9')) }));
       return r({ colunas });
+    }
+    if (metodo === 'GET' && /^\/api\/app\/pessoas\/\d+\/cadastro$/.test(caminho)) {
+      const p = PESSOAS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pessoa não encontrada.'), { status: 404 });
+      const pj = p.tipo === 'PJ';
+      return r({ id: p.id, nome: p.nome, tipo: p.tipo,
+        identificacao: { razao_social: pj ? p.nome + ' Ltda' : p.nome, documento: p.documento, indicador_ie: pj ? 'Contribuinte' : 'Não contribuinte', papeis: p.papeis },
+        endereco_fiscal: { cidade: p.cidade, uf: 'SC', cep: '88700-000', codigo_ibge: '4218707', email_nfe: p.email },
+        comercial: { classificacao: null, limite_credito: pj ? 5000 : null, prazo_padrao_dias: pj ? 28 : null },
+        consentimento: { whatsapp: p.telefone ? true : null, email_nfe: p.email ? true : null, sms: null, registrado_em: '2026-03-12T14:22:00-03:00' } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/cep/')) {
+      const cep = caminho.slice('/api/app/cep/'.length).replace(/\D/g, '');
+      if (cep.length !== 8) throw Object.assign(new Error('O CEP tem 8 dígitos.'), { status: 422, codigo: 'validacao' });
+      // Só um CEP conhecido na demo; o resto responde como CEP inexistente.
+      if (cep !== '88701000') throw Object.assign(new Error('CEP não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      return r({ cep, logradouro: 'Rua da Demonstração', complemento: null, bairro: 'Centro', cidade: 'Tubarão', uf: 'SC', codigo_ibge: '4218707' });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/pessoas') {
+      const n = (corpo ?? {}) as Record<string, unknown>;
+      const campos: Record<string, string> = {};
+      if (!String(n.nome ?? '').trim()) campos.nome = 'Informe o nome.';
+      const doc = String(n.documento ?? '').replace(/\D/g, '');
+      if (doc && doc.length !== (n.tipo === 'PJ' ? 14 : 11)) campos.documento = n.tipo === 'PJ' ? 'CNPJ inválido.' : 'CPF inválido.';
+      for (const k of ['email', 'email_nfe']) if (n[k] && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(n[k]))) campos[k] = 'E-mail inválido.';
+      if (!Array.isArray(n.papeis) || !n.papeis.length) campos.papeis = 'Escolha ao menos um papel.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const id = 1 + Math.max(...PESSOAS.map((x) => x.id));
+      PESSOAS.push({ id, nome: String(n.nome).trim(), tipo: n.tipo === 'PJ' ? 'PJ' : 'PF', documento: doc ? String(n.documento) : null,
+        papeis: (n.papeis as string[]).slice(), saldo_aberto: 0, telefone: (n.telefone as string) || null, email: (n.email as string) || null, cidade: (n.cidade as string) || null });
+      PESSOAS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return r({ id });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pessoas')) {
       const det = caminho.match(/^\/api\/app\/pessoas\/(\d+)/);

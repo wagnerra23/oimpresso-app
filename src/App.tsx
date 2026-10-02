@@ -112,7 +112,7 @@ export function App() {
         {nav && aba === 'producao' && <Producao />}
         {nav && aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
         {nav && aba === 'mais' && subMais === null && <Mais abrir={setSubMais} modulos={n.modulosMais} />}
-        {aba === 'mais' && subMais === 'pessoas' && <Pessoas voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>
