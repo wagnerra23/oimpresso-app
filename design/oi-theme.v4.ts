@@ -69,7 +69,7 @@ export const lightPalette: OiPalette = {
   border2: "#e9e8e5", // --border-2
   text: "#1d1a15", // --text
   textDim: "#66635d", // --text-dim
-  textMute: "#6e6b65", // --text-mute
+  textMute: "#76726d", // --text-mute — DS oklch(0.555 0.01 80), tokens v1.6.0 (AA sobre --bg/--surface, [W] opção B)
   accent: "#795bbf", // --accent
   accent2: "#8e71d6", // --accent-2
   accentSoft: "#f0eaff", // --accent-soft
@@ -81,7 +81,7 @@ export const lightPalette: OiPalette = {
   actionFg: "#ffffff",
   info: "#2ea7ff",
   danger: "#c53637", // --neg
-  warn: "#a76c12", // --warn
+  warn: "#a06604", // --warn — DS oklch(0.56 0.12 70), tokens v1.7.0
   ok: "#21763c", // --pos
   brand,
   origin: {
@@ -103,7 +103,7 @@ export const darkPalette: OiPalette = {
   border2: "#2d3134",
   text: "#ecebe7",
   textDim: "#a6a4a1",
-  textMute: "#9c9b98",
+  textMute: "#969592", // DS oklch(0.67 0.005 90), tokens v1.6.0
   accent: "#795bbf",
   accent2: "#8e71d6",
   accentSoft: "#3a2a5e",
