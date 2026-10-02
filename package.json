@@ -6,7 +6,8 @@
     "build": "vite build",
     "build:demo": "vite build --mode demo",
     "typecheck": "tsc --noEmit",
-    "cap:sync": "npm run build && cap sync"
+    "cap:sync": "npm run build && cap sync",
+    "tokens": "node scripts/tokens-v4.mjs"
   },
   "license": "UNLICENSED",
   "type": "module",

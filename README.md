@@ -13,6 +13,14 @@ Mobile mesmo"*). A 1ª versão traz o **ponto**: Início · Ponto (Bater ponto, 
 | Android | AGP 8.13.0 · Gradle 8.14.3 · JDK 21 · compile/target SDK 36 · minSdk 24 |
 | iOS | SPM (abrir `ios/App/App.xcodeproj`, scheme `App`) · só iPhone · build no CI macOS (sessão iOS) |
 
+## Desenho
+
+Fonte: `mobile/ref/design-v4/` no repo do ERP (telas 00 Login, 01 Início, 36 Bater ponto, 37 Meu espelho,
+38 Justificar). Os tokens de cor saem de `design/oi-theme.v4.ts` (gerado do DS do oimpresso pelo projeto
+de design) por `npm run tokens` → `src/styles/oi-v4.css` — não editar o CSS à mão. Toque ≥ 44 px em toda
+área tocável. Divergência consciente: os motivos de justificativa são os 8 que o ERP aceita
+(`StoreIntercorrenciaRequest`), não os 5 do v4 — o servidor recusa os do v4.
+
 ## Como o app fala com o ERP
 
 - **Pacote local**, não o site: o Vite gera `www/` e o Capacitor empacota. Sem `server.url`.

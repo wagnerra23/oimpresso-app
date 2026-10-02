@@ -1,8 +1,13 @@
 // Regras do ponto que a tela precisa saber ANTES de enviar. O servidor confere
 // tudo de novo (MobileMarcacaoService) — isto só evita mandar o que vai voltar 422.
 
-/** MobileMarcacaoService::GPS_ACCURACY_MAX_METROS e ::TIMESTAMP_DRIFT_MAX_SEG. */
+/** MobileMarcacaoService::GPS_ACCURACY_MAX_METROS e ::TIMESTAMP_DRIFT_MAX_SEG.
+ *  Valores de partida; o GET /ponto/api/me traz os do servidor e sobrescreve (aplicarLimites). */
 export const LIMITES = { accuracy_max: 500, drift_max: 30 };
+export const aplicarLimites = (l: { accuracy_max: number; drift_max: number }) => {
+  LIMITES.accuracy_max = Number(l.accuracy_max) || LIMITES.accuracy_max;
+  LIMITES.drift_max = Number(l.drift_max) || LIMITES.drift_max;
+};
 
 export const TIPOS = [
   { id: 'ENTRADA', label: 'Entrada', hint: 'início da jornada' },
@@ -13,7 +18,8 @@ export const TIPOS = [
 
 export const rotuloTipo = (id: string) => TIPOS.find((t) => t.id === id)?.label ?? id;
 
-/** IntercorrenciaController::tiposDisponiveis() — os 8 que o StoreIntercorrenciaRequest aceita. */
+/** IntercorrenciaController::tiposDisponiveis() — os 8 que o StoreIntercorrenciaRequest aceita.
+ *  Só fallback: a tela usa GET /ponto/api/intercorrencias/tipos quando existe. */
 export const MOTIVOS: Array<{ value: string; label: string }> = [
   { value: 'CONSULTA_MEDICA', label: 'Consulta médica' },
   { value: 'ATESTADO_MEDICO', label: 'Atestado médico' },
