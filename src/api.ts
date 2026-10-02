@@ -58,6 +58,26 @@ export interface PedidoDetalhe extends PedidoResumo {
 /** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
 
+// ── Pessoas (API-CONTRATO-v1 §4, ERP #8497). Papéis vêm das flags is_customer/is_supplier/is_employee. ──
+export type FiltroPessoas = 'todos' | 'clientes' | 'fornecedores' | 'funcionarios' | 'em_debito';
+export type PapelPessoa = 'cliente' | 'fornecedor' | 'funcionario';
+export interface PessoaResumo {
+  id: number; nome: string; tipo: 'PF' | 'PJ' | null; papeis: PapelPessoa[]; saldo_aberto: number; ativo: boolean;
+}
+export interface ListaPessoas {
+  itens: PessoaResumo[]; contadores: Record<FiltroPessoas, number>; pagina: number; tem_mais: boolean;
+}
+export interface PessoaDetalhe {
+  id: number; nome: string; tipo: 'PF' | 'PJ' | null;
+  /** Só vem com a permissão de ver contato completo (contrato §4); null caso contrário. */
+  documento: string | null;
+  papeis: PapelPessoa[]; ativo: boolean;
+  contato: { telefone: string | null; email: string | null };
+  endereco: { cidade: string | null; uf: string | null };
+  kpis: { pedidos: number; ticket_medio: number; saldo_aberto: number };
+  pedidos_recentes: Array<{ id: number; numero: string; data: string; valor: number }>;
+}
+
 // ── Tarefas (API-CONTRATO-v1 §3): ToDo do usuário + justificativas do Ponto. ──
 export type OrigemTarefa = 'todo' | 'ponto';
 export type FiltroTarefas = 'todas' | OrigemTarefa;
@@ -184,6 +204,9 @@ export const api = {
   pedidos: (filtro: FiltroPedidos, pagina = 1, q = '') =>
     chamar<ListaPedidos>('GET', `/api/app/pedidos?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pedido: (id: number) => chamar<PedidoDetalheApi>('GET', `/api/app/pedidos/${id}`),
+  pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
+    chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),
