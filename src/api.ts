@@ -203,6 +203,26 @@ export interface ListaEstoque {
   itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
 }
 
+/** Tela 29 · Movimentações, SÓ LEITURA (Onda B). PROVISÓRIO: o formato do ERP ainda não fechou. Até lá a tela
+ *  só existe na demo (DETALHE_ESTOQUE). A escrita (registrar movimento) espera decisão do Wagner: no ERP cada
+ *  tipo é uma transação contábil (entrada = compra; saída/perda = ajuste com FIFO). */
+export interface Movimento {
+  id: number;
+  /** Tipo da transação no ERP (purchase, sell, stock_adjustment, opening_stock, transferência…). */
+  tipo: string;
+  /** Texto PT-BR para a tela ("Compra", "Venda", "Ajuste"…). */
+  rotulo: string;
+  /** Nº da NF ou do pedido e o nome da outra parte, quando houver. */
+  referencia: string | null;
+  /** ISO com hora. */
+  quando: string;
+  /** Com sinal: entrou +, saiu −. */
+  qtd: number;
+}
+export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
+/** Liga a tela 29. Só a demo, até o ERP fechar o formato da leitura. */
+export const DETALHE_ESTOQUE = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
@@ -399,6 +419,10 @@ export const api = {
   /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
   estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
     chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 29 · saldo e histórico de uma linha do estoque (variação × loja). PROVISÓRIO, só demo. */
+  estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
+    ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */

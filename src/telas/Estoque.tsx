@@ -1,9 +1,12 @@
 // Estoque — desenho v4 (tela 05), dados pelo contrato API-CONTRATO-v1 §9.2 (ERP #8577). Só leitura.
-// Uma linha por variação × loja, só de produto que controla estoque. Fora de propósito: "+ Item",
-// "+ Entrada" e "Movimentações" (tela 29, Onda B escrita) e a barra de abas própria do protótipo
+// Uma linha por variação × loja, só de produto que controla estoque. Tocar na linha abre as Movimentações
+// (tela 29, só leitura; por enquanto só na demo, DETALHE_ESTOQUE). Fora de propósito: "+ Item",
+// "+ Entrada" (escrita espera decisão do Wagner) e a barra de abas própria do protótipo
 // (no app, Estoque mora dentro de Mais). "Baixo" é a regra do alerta da web: qtd ≤ mínimo.
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type FiltroEstoque, type ItemEstoque, type ListaEstoque } from '../api';
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { api, DETALHE_ESTOQUE, ErroApi, type FiltroEstoque, type ItemEstoque, type ListaEstoque } from '../api';
+import { Movimentacoes } from './Movimentacoes';
+import { useVoltar } from '../voltar';
 
 const FILTROS: Array<{ id: FiltroEstoque; label: string }> = [{ id: 'todos', label: 'Todos' }, { id: 'baixo', label: 'Baixo estoque' }];
 const num = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -31,6 +34,20 @@ export function pctBarra(i: Pick<ItemEstoque, 'qtd' | 'minimo'>): number | null 
 export const textoOnde = (i: Pick<ItemEstoque, 'prateleira' | 'local'>) => [i.prateleira, i.local].filter(Boolean).join(' · ');
 
 export function Estoque({ voltar, filtroInicial = 'todos' }: { voltar?: ReactNode; filtroInicial?: FiltroEstoque }) {
+  const [aberto, setAberto] = useState<number | null>(null);
+  useVoltar(aberto !== null, () => setAberto(null));
+  // A lista fica montada (escondida) enquanto o item está aberto: o voltar devolve a mesma busca e rolagem.
+  return (
+    <>
+      {aberto !== null && <Movimentacoes id={aberto} aoVoltar={() => setAberto(null)} />}
+      <div style={{ display: aberto !== null ? 'none' : 'contents' }}>
+        <Lista voltar={voltar} filtroInicial={filtroInicial} aoAbrir={DETALHE_ESTOQUE ? setAberto : undefined} />
+      </div>
+    </>
+  );
+}
+
+function Lista({ voltar, filtroInicial, aoAbrir }: { voltar?: ReactNode; filtroInicial: FiltroEstoque; aoAbrir?: (id: number) => void }) {
   const [filtro, setFiltro] = useState<FiltroEstoque>(filtroInicial);
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
@@ -101,8 +118,13 @@ export function Estoque({ voltar, filtroInicial = 'todos' }: { voltar?: ReactNod
             const tom = tomEstoque(i);
             const pct = pctBarra(i);
             const onde = textoOnde(i);
+            // Linha que abre a tela 29: div com papel de botão (o cartão tem blocos dentro, que <button> não aceita).
+            const abrir = aoAbrir ? {
+              role: 'button', tabIndex: 0, onClick: () => aoAbrir(i.id),
+              onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aoAbrir(i.id); } },
+            } : {};
             return (
-              <div key={i.id} className="est-card">
+              <div key={i.id} className={'est-card' + (aoAbrir ? ' abre' : '')} {...abrir}>
                 <div className="est-linha">
                   <b className="est-nome">{i.nome}</b>
                   {i.codigo && <span className="est-cod">{i.codigo}</span>}
