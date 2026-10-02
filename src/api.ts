@@ -182,7 +182,7 @@ export interface ListaProdutos {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'relatorios' | 'produtos' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -233,6 +233,22 @@ export interface Notificacao {
   destino: { tipo: DestinoNotificacao | null; id: number | string | null };
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
+
+/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). `kpis` vêm sempre;
+ *  só o bloco da aba pedida vem preenchido (os outros null). Exportar PDF/Excel fica no computador. */
+export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
+export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
+export interface Relatorios {
+  periodo: { de: string; ate: string };
+  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null };
+  dre: { receitas_por_categoria: Array<{ nome: string; valor: number }>; despesas_por_categoria: Array<{ nome: string; valor: number }> } | null;
+  /** `receita_por_dia`: últimos 14 dias; `top_clientes`: até 5. */
+  vendas: { receita_por_dia: Array<{ data: string; valor: number }>; top_clientes: Array<{ nome: string; valor: number }> } | null;
+  /** Mesma fila da Produção (§5), agora. */
+  producao: { por_etapa: Array<{ rotulo: string; total: number }> } | null;
+  /** Só com stock_report.view. */
+  estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
+}
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -382,6 +398,7 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
