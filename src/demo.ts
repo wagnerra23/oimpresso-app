@@ -407,12 +407,12 @@ export const demo = {
     if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
       const { modulos } = (corpo ?? {}) as { modulos?: string[] };
       const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'mais'];
-      // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos em lista.
+      // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
       const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
         : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
         : new Set(modulos).size !== modulos.length ? 'Módulo repetido.'
         : modulos.some((m) => !liberados.includes(m) || m === 'inicio' || m === 'mais') ? 'Há módulo que seu usuário não pode usar.' : null;
-      if (erro) throw Object.assign(new Error(erro), { status: 422, codigo: 'validacao', campos: { modulos: [erro] } });
+      if (erro) throw Object.assign(new Error(erro), { status: 422, codigo: 'validacao', campos: { modulos: erro } });
       await espera(400);
       barraDemo = modulos!.length ? [...modulos!] : null;
       return r({ modulos: barraDemo ?? [], barra: barraDemo ?? BARRA_PADRAO_DEMO });

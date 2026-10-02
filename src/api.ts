@@ -527,7 +527,7 @@ export const api = {
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
-   *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: [msg] } } (mais de 3, repetido, fora das áreas).
+   *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */
   salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>

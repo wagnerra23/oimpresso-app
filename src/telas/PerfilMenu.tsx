@@ -48,6 +48,7 @@ export function PerfilMenu({ disponiveis, atual, aoSalvar, avisar, online, volta
     setSalvando(true); setErro(null);
     try { await aoSalvar(modulos); avisar(ok); }
     catch (e) {
+      // O ERP manda texto por campo (como CEP e Nova pessoa); lista também é aceita, por segurança.
       const campo = camposDoErro(e).modulos as unknown;
       const doCampo = Array.isArray(campo) ? String(campo[0] ?? '') : campo ? String(campo) : '';
       setErro(doCampo || (e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não pode mudar o menu.' : e instanceof Error ? e.message : 'Não foi possível salvar.'));
