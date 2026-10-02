@@ -297,7 +297,8 @@ export interface Notificacao {
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
-/** Tela 06 · Financeiro (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente).
+/** Tela 06 · Financeiro (D16, Onda C) — só leitura. Contrato §10.1 (ERP #8584). 20 por página; receber/pagar = em aberto
+ *  (aberto + parcial, valor = valor em aberto) por vencimento; extrato = quitados com última baixa no mês (valor = baixas).
  *  `resumo` e `contas` não mudam com a aba; só `itens` e a paginação. Valor sempre positivo: o sinal vem de `tipo`. */
 export type AbaFinanceiro = 'receber' | 'pagar' | 'extrato';
 export type StatusLancamento = 'aberto' | 'vencido' | 'liquidado';
