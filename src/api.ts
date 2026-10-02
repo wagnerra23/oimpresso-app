@@ -97,6 +97,20 @@ export interface Tarefa {
 }
 export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
 
+// ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
+export interface PainelInicio {
+  usuario: string; empresa: string;
+  /** Só com dashboard.data. */
+  faturado_hoje: { valor: number; ontem: number; variacao_pct: number | null } | null;
+  /** Meta mensal da Jana ÷ dias úteis do mês; sempre derivada. Só com dashboard.data. */
+  meta_dia: { valor: number; derivada: true } | null;
+  kpis: { pedidos_ativos: number | null; pedidos_atrasados: number | null; estoque_baixo: number | null };
+  /** Só com acesso ao Financeiro. */
+  financeiro: { a_receber: number; a_pagar: number } | null;
+  /** Até 3, mesmo item de /tarefas. */
+  proximas_tarefas: Tarefa[];
+}
+
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
 
@@ -217,6 +231,7 @@ export const api = {
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
+  inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),
