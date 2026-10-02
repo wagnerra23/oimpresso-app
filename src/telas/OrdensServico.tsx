@@ -1,7 +1,7 @@
 // Ordens de serviço — desenho v4 (tela 07), Onda D. Só leitura. Mora dentro de Mais (área `oficina`).
-// Rota PROVISÓRIA GET /api/app/os: o formato foi pedido ao ERP e ainda não tem contrato fechado; por
-// enquanto só a demo responde. As etapas (chips, rótulo e barra de progresso) vêm do pipeline do ERP:
-// o app não conhece a lista de etapas. Fora desta tela de propósito: "+ Nova OS", "→ próxima etapa" e
+// Rota GET /api/app/os (formato fechado pela sessão ERP da Onda D): a mesma lista da web
+// /oficina-auto/ordens-servico — só OS ativas. As etapas (chips, rótulo e barra de progresso) vêm do
+// pipeline do ERP: o app não conhece a lista de etapas. Fora desta tela de propósito: "+ Nova OS", "→ próxima etapa" e
 // "Link" (são escritas, cada uma num PR próprio) e "Abrir" (o detalhe é a tela 03, PR seguinte).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type ListaOs, type OsResumo } from '../api';
@@ -88,13 +88,13 @@ export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
             return (
               <div key={o.id} className="pd-card os-card" style={{ borderLeftColor: tinta }}>
                 <span className="pd-card-l1">
-                  <span className="pd-num">OS #{o.numero}</span>
+                  <span className="pd-num">{o.numero}</span>
                   <span className="pd-status" style={{ color: tinta }}><i style={{ background: tinta }} />{o.etapa.rotulo}{o.travada && <span className="sr-only"> (travada)</span>}</span>
                 </span>
                 <span className="os-linha">
                   {o.placa && <span className="os-placa" aria-label={`Placa ${o.placa}`}>{o.placa}</span>}
                   <span className="os-texto">
-                    <b>{o.veiculo ?? 'Sem veículo'}</b>
+                    <b>{o.veiculo ?? (o.placa ? 'Veículo' : 'Sem veículo')}</b>
                     <small>{o.cliente}</small>
                   </span>
                   <span className="pd-valor">{valorOs(o.valor)}</span>
