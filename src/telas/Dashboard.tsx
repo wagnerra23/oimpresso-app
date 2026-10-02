@@ -64,14 +64,19 @@ export function Dashboard({ voltar, irParaPedidos, irParaProducao }: { voltar?: 
               </div>
             </section>
           )}
-          {k && (
+          {k && (k.pedidos_ativos !== null || k.producao_em_curso !== null || k.a_receber !== null) && (
             <div className="db-kpis">
-              <button className="in-kpi db-kpi" onClick={irParaPedidos} aria-label={`Pedidos: ${k.pedidos_ativos} ativos, ${k.pedidos_novos} novos. Abrir pedidos`}>
-                <span>Pedidos</span><b>{k.pedidos_ativos}</b><small>{k.pedidos_novos} {k.pedidos_novos === 1 ? 'novo' : 'novos'}</small>
-              </button>
-              <button className="in-kpi db-kpi" onClick={irParaProducao} aria-label={`Produção: ${k.producao_em_curso} em curso. Abrir produção`}>
-                <span>Produção</span><b>{k.producao_em_curso}</b><small>em curso</small>
-              </button>
+              {k.pedidos_ativos !== null && (
+                <button className="in-kpi db-kpi" onClick={irParaPedidos}
+                  aria-label={`Pedidos: ${k.pedidos_ativos} ativos${k.pedidos_novos !== null ? `, ${k.pedidos_novos} hoje` : ''}. Abrir pedidos`}>
+                  <span>Pedidos</span><b>{k.pedidos_ativos}</b>{k.pedidos_novos !== null && <small>{k.pedidos_novos} hoje</small>}
+                </button>
+              )}
+              {k.producao_em_curso !== null && (
+                <button className="in-kpi db-kpi" onClick={irParaProducao} aria-label={`Produção: ${k.producao_em_curso} em produção. Abrir produção`}>
+                  <span>Produção</span><b>{k.producao_em_curso}</b><small>em produção</small>
+                </button>
+              )}
               {k.a_receber !== null && (
                 <div className="in-kpi db-kpi db-largo">
                   <span>A receber</span><b className="db-valor">{reais(k.a_receber)}</b>
