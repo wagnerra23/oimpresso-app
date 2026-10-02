@@ -81,6 +81,16 @@ const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string
   306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
 };
 
+// Equipamentos da demo (tela 24, formato provisório). Placas, séries e clientes fictícios.
+const EQUIPAMENTOS = [
+  { id: 1, tipo: 'veiculo' as const, nome: 'Mercedes-Benz Atego 1719', apelido: 'Branca', categoria: 'Caminhão 3/4', dono: 'Transportes Vale Norte', placa: 'ABC1D23', serie: null, medida: 184523, unidade: 'km' as const, ano: 2019 },
+  { id: 2, tipo: 'veiculo' as const, nome: 'VW Constellation 24.280', apelido: null, categoria: 'Caminhão', dono: 'Transportes Vale Norte', placa: 'DEF2G34', serie: null, medida: 92010, unidade: 'km' as const, ano: 2021 },
+  { id: 3, tipo: 'veiculo' as const, nome: 'Iveco Daily 70C17', apelido: null, categoria: 'VUC', dono: 'Mercado Bom Preço', placa: 'JKL4M56', serie: null, medida: 245901, unidade: 'km' as const, ano: 2017 },
+  { id: 4, tipo: 'veiculo' as const, nome: 'Scania R 450', apelido: 'Vermelhão', categoria: 'Cavalo mecânico', dono: 'Auto Center Rota', placa: 'NOP5Q67', serie: null, medida: 312455, unidade: 'km' as const, ano: 2022 },
+  { id: 5, tipo: 'equipamento' as const, nome: 'Atlas Copco XAS 138', apelido: 'Compressor pátio', categoria: 'Compressor', dono: 'Mercado Bom Preço', placa: null, serie: 'ACX-0202-138', medida: 4521, unidade: 'h' as const, ano: 2020 },
+  { id: 6, tipo: 'equipamento' as const, nome: 'Caterpillar C9.3', apelido: 'Gerador', categoria: 'Grupo gerador', dono: 'Clínica Vida Plena', placa: null, serie: 'CAT-93-0091', medida: 12380, unidade: 'h' as const, ano: 2018 },
+];
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -353,7 +363,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'equipamentos', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -424,6 +434,12 @@ export const demo = {
       const i = TAREFAS.findIndex((x) => x.id === id);
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/equipamentos?')) {
+      const tipo = (caminho.match(/tipo=([a-z]+)/) || [])[1] || 'todos';
+      const contadores = { todos: EQUIPAMENTOS.length, veiculo: EQUIPAMENTOS.filter((e) => e.tipo === 'veiculo').length,
+        equipamento: EQUIPAMENTOS.filter((e) => e.tipo === 'equipamento').length };
+      return r({ itens: EQUIPAMENTOS.filter((e) => tipo === 'todos' || e.tipo === tipo), contadores, pagina: 1, tem_mais: false });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);

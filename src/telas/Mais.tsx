@@ -6,7 +6,7 @@ import { Browser } from '@capacitor/browser';
 import { Ic } from '../icones';
 import logo from '../assets/oimpresso-logo.png';
 
-export type SubMais = 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'ponto' | 'conta';
+export type SubMais = 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'equipamentos' | 'ponto' | 'conta';
 
 const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'pessoas', label: 'Pessoas', desc: 'Clientes, fornecedores e equipe', Icone: Ic.pessoas },
@@ -14,6 +14,7 @@ const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { ta
   { id: 'produtos', label: 'Produtos', desc: 'Catálogo, preço e estoque', Icone: Ic.pacote },
   { id: 'estoque', label: 'Estoque', desc: 'Saldo por loja e itens abaixo do mínimo', Icone: Ic.estoque },
   { id: 'financeiro', label: 'Financeiro', desc: 'Saldo, contas a receber e a pagar', Icone: Ic.dinheiro },
+  { id: 'equipamentos', label: 'Equipamentos', desc: 'Frota e máquinas dos clientes', Icone: Ic.caminhao },
   { id: 'ponto', label: 'Ponto', desc: 'Bater ponto, espelho e justificativas', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },
 ];

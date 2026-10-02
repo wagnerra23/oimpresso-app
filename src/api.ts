@@ -225,9 +225,30 @@ export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pag
 /** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
 export const DETALHE_ESTOQUE = DEMO;
 
+// ── Equipamentos (tela 24, Onda D). FORMATO PROVISÓRIO: pedido ao ERP, ainda sem contrato; só a demo responde.
+//    Equipamento = bem de um cliente que a oficina atende: veículo (placa + hodômetro) ou máquina (série + horímetro). ──
+export type TipoEquipamento = 'veiculo' | 'equipamento';
+export type FiltroEquipamentos = 'todos' | TipoEquipamento;
+export interface EquipamentoResumo {
+  id: number; tipo: TipoEquipamento;
+  nome: string; apelido: string | null;
+  /** Ex.: "Caminhão 3/4", "Compressor"; null quando não informado. */
+  categoria: string | null;
+  /** Cliente dono do equipamento. */
+  dono: string;
+  /** Veículo tem placa; máquina tem número de série. */
+  placa: string | null; serie: string | null;
+  /** Hodômetro (km) do veículo ou horímetro (h) da máquina; null quando não informado. */
+  medida: number | null; unidade: 'km' | 'h';
+  ano: number | null;
+}
+export interface ListaEquipamentos {
+  itens: EquipamentoResumo[]; contadores: Record<FiltroEquipamentos, number>; pagina: number; tem_mais: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'equipamentos' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -441,6 +462,9 @@ export const api = {
   estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
     ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
+  /** Tela 24 · Equipamentos. Rota PROVISÓRIA (pedida ao ERP). */
+  equipamentos: (tipo: FiltroEquipamentos, pagina = 1) =>
+    chamar<ListaEquipamentos>('GET', `/api/app/equipamentos?tipo=${tipo}&pagina=${pagina}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
