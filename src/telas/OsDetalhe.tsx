@@ -40,7 +40,7 @@ export function OsDetalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="p4-rotulo">{o?.local ? `Oficina · ${o.local}` : 'Oficina'}</div>
-          <div className="pd-dtitulo">OS #{o?.numero ?? '…'}</div>
+          <div className="pd-dtitulo">{o?.numero ?? 'OS …'}</div>
         </div>
         {o && <span className="pd-status" style={{ color: tinta, paddingRight: 8 }}><i style={{ background: tinta }} />{o.etapa.rotulo}</span>}
       </div>
