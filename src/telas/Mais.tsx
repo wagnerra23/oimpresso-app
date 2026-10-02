@@ -6,10 +6,11 @@ import { Browser } from '@capacitor/browser';
 import { Ic } from '../icones';
 import logo from '../assets/oimpresso-logo.png';
 
-export type SubMais = 'pessoas' | 'ponto' | 'conta';
+export type SubMais = 'pessoas' | 'orcamentos' | 'ponto' | 'conta';
 
 const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'pessoas', label: 'Pessoas', desc: 'Clientes, fornecedores e equipe', Icone: Ic.pessoas },
+  { id: 'orcamentos', label: 'Orçamentos', desc: 'Propostas enviadas e aprovadas', Icone: Ic.pedido },
   { id: 'ponto', label: 'Ponto', desc: 'Bater ponto, espelho e justificativas', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },
 ];

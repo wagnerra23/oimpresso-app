@@ -151,7 +151,24 @@ export interface TarefaDetalhe {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'ponto' | 'mais';
+
+/** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
+ *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
+export type StatusOrcamento = 'rascunho' | 'enviado' | 'aprovado' | 'convertido';
+export type FiltroOrcamentos = 'todos' | StatusOrcamento;
+export interface OrcamentoResumo {
+  id: number; numero: string;
+  /** Nome do 1º item (como o resumo do pedido); null se não tiver item. */
+  titulo: string | null;
+  cliente: string; validade: string | null; status: StatusOrcamento; valor: number;
+  /** Área total em m² (comunicação visual); null quando não se aplica. */
+  area_m2: number | null;
+  itens: number;
+}
+export interface ListaOrcamentos {
+  itens: OrcamentoResumo[]; contadores: Record<FiltroOrcamentos, number>; pagina: number; tem_mais: boolean;
+}
 export interface PainelInicio {
   /** D6: colaborador abre direto no ponto; quem tem o ERP vê as abas da v1. */
   perfil: 'erp' | 'colaborador';
@@ -304,6 +321,8 @@ export const api = {
   cep: (cep: string) => chamar<EnderecoCep>('GET', `/api/app/cep/${cep.replace(/\D/g, '')}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
+    chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
