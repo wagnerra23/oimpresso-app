@@ -6,6 +6,8 @@
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
 let logado = false;
+// Perfil da demo: usuário com "ponto" no nome (ex.: revisor.ponto) entra como colaborador (D6).
+let perfilDemo: 'erp' | 'colaborador' = 'erp';
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
@@ -75,6 +77,7 @@ export const demo = {
     await espera(400);
     if (!usuario.trim() || senha.length < 3) throw Object.assign(new Error('Usuário ou senha incorretos.'), { status: 401 });
     logado = true;
+    perfilDemo = /ponto/i.test(usuario) ? 'colaborador' : 'erp';
   },
   sair() { logado = false; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
@@ -180,7 +183,12 @@ export const demo = {
     }
     if (metodo === 'GET' && caminho === '/api/app/inicio') {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
-      return r({ usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
+      if (perfilDemo === 'colaborador') {
+        return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
+          faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
+      }
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'ponto', 'mais'],
+        usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
         financeiro: { a_receber: 8200, a_pagar: 3100 },

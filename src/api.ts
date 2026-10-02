@@ -98,7 +98,14 @@ export interface Tarefa {
 export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
+/** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'ponto' | 'mais';
 export interface PainelInicio {
+  /** D6: colaborador abre direto no ponto; quem tem o ERP vê as abas da v1. */
+  perfil: 'erp' | 'colaborador';
+  abre_em: 'inicio' | 'ponto' | 'mais';
+  /** Lista ordenada; "mais" sempre presente. */
+  areas: Area[];
   usuario: string; empresa: string;
   /** Só com dashboard.data. */
   faturado_hoje: { valor: number; ontem: number; variacao_pct: number | null } | null;
