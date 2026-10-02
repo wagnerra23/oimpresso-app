@@ -245,7 +245,7 @@ export const ESCRITA_PRODUTO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -342,6 +342,19 @@ export interface Relatorios {
   producao: { por_etapa: Array<{ rotulo: string; total: number }> } | null;
   /** Só com stock_report.view. */
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
+}
+
+/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Mesma permissão
+ *  `dashboard.data` do Início; `a_receber`/`vencido` saem do mesmo serviço da tela 06 (os números batem). */
+export interface Dashboard {
+  /** `serie_semanal`: 7 pontos, do mais antigo ao atual; `variacao_pct` null sem base de comparação. */
+  faturamento_30d: { valor: number; variacao_pct: number | null; serie_semanal: number[] };
+  kpis: { pedidos_ativos: number; pedidos_novos: number; producao_em_curso: number; a_receber: number | null; vencido: number | null };
+  /** Últimos 14 dias, do mais antigo para hoje. */
+  pedidos_por_dia: Array<{ data: string; total: number }>;
+  /** Meta mensal da Jana; null quando não há meta cadastrada. */
+  meta_mes: { valor: number; realizado_pct: number } | null;
+  producao_concluida: { concluidas: number; total: number };
 }
 
 /** GET /ponto/api/me (ERP #8481). */
@@ -514,6 +527,7 @@ export const api = {
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
+  dashboard: () => chamar<Dashboard>('GET', '/api/app/dashboard'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
