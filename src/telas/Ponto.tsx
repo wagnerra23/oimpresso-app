@@ -8,15 +8,10 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
 import { api, drift, ErroApi, type Espelho, type EscalaHoje, type Intercorrencia, type MarcacaoCriada,
   type MarcacaoHoje, type Me, type Saldo, type TipoMarcacao } from '../api';
-import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, aplicarLimites, fmtMin, hojeIso, rotuloTipo } from '../ponto-regras';
+import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, aplicarLimites, fmtMin, hojeIso, motivoBloqueio, rotuloTipo, type Gps } from '../ponto-regras';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 type Aba = 'bater' | 'espelho' | 'justificar';
-type Gps =
-  | { estado: 'buscando' }
-  | { estado: 'negado' }
-  | { estado: 'erro' }
-  | { estado: 'ok'; lat: number; lng: number; accuracy: number };
 
 const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -112,15 +107,7 @@ function BaterPonto({ avisar, online, aoSemCadastro }: { avisar: Aviso; online: 
   }, []);
   useEffect(() => { localizar(); }, [localizar]);
 
-  const d = drift();
-  const bloqueio =
-    !online ? 'Sem conexão — a marcação precisa do servidor (NSR e hash vêm de lá).'
-    : gps.estado === 'buscando' ? 'Buscando sua localização…'
-    : gps.estado === 'negado' ? 'Sem permissão de localização. Libere em Ajustes › Apps › oimpresso › Localização.'
-    : gps.estado === 'erro' ? 'Não foi possível obter a localização. Ative o GPS e toque em Atualizar local.'
-    : gps.accuracy > LIMITES.accuracy_max ? 'Sinal de GPS fraco — aproxime-se de área aberta'
-    : d !== null && Math.abs(d) > LIMITES.drift_max ? `Relógio do aparelho fora de sincronia (${d} s) — ative a hora automática.`
-    : null;
+  const bloqueio = motivoBloqueio(online, gps, drift());
 
   const marcar = async () => {
     if (gps.estado !== 'ok' || bloqueio) return;

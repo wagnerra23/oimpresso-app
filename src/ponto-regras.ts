@@ -50,3 +50,22 @@ export const hojeIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+/** Estado do GPS como a tela de ponto o conhece. */
+export type Gps =
+  | { estado: 'buscando' }
+  | { estado: 'negado' }
+  | { estado: 'erro' }
+  | { estado: 'ok'; lat: number; lng: number; accuracy: number };
+
+/** Por que o botão "Bater ponto" está travado — ou null quando pode enviar.
+ *  A ordem importa: a primeira condição que falha é a mensagem mostrada. */
+export function motivoBloqueio(online: boolean, gps: Gps, drift: number | null): string | null {
+  if (!online) return 'Sem conexão — a marcação precisa do servidor (NSR e hash vêm de lá).';
+  if (gps.estado === 'buscando') return 'Buscando sua localização…';
+  if (gps.estado === 'negado') return 'Sem permissão de localização. Libere em Ajustes › Apps › oimpresso › Localização.';
+  if (gps.estado === 'erro') return 'Não foi possível obter a localização. Ative o GPS e toque em Atualizar local.';
+  if (gps.accuracy > LIMITES.accuracy_max) return 'Sinal de GPS fraco — aproxime-se de área aberta';
+  if (drift !== null && Math.abs(drift) > LIMITES.drift_max) return `Relógio do aparelho fora de sincronia (${drift} s) — ative a hora automática.`;
+  return null;
+}
