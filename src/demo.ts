@@ -126,6 +126,15 @@ const ORCAMENTOS = [
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
 
+// Links de pagamento de demonstração (tela 15), como o protótipo. Clientes fictícios; o link aponta para um domínio
+// de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
+const PAGAMENTOS = [
+  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 1260, dias: -7, metodo: 'boleto', status: 'vencido', pago: null },
+  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 2315, dias: 3, metodo: 'pix', status: 'pendente', pago: null },
+  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 3420, dias: -5, metodo: 'pix', status: 'pago', pago: -5 },
+  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 640, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null },
+];
+
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
   { id: 'todo:15', origem: 'todo' as const, titulo: 'Ligar para o fornecedor de lona', subtitulo: 'ToDo · Compras', prazo: diaRel(-1), atrasado: true, grupo: 'atrasadas' as const },
@@ -324,7 +333,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'pagamentos', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -364,6 +373,15 @@ export const demo = {
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';

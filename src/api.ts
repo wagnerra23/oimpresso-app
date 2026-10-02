@@ -205,7 +205,7 @@ export interface ListaEstoque {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'pagamentos' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -256,6 +256,21 @@ export interface Notificacao {
   destino: { tipo: DestinoNotificacao | null; id: number | string | null };
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
+
+/** Tela 15 · Pagamentos (D16, Onda C) — leitura. Links de cobrança do provedor (Asaas). Formato proposto ao ERP
+ *  (PR pendente). Gerar link, cancelar e consultar o provedor mexem em valor: PR de escrita, pela regra mestre. */
+export type StatusPagamento = 'pendente' | 'pago' | 'vencido' | 'cancelado';
+export type FiltroPagamentos = 'todos' | StatusPagamento;
+export type MetodoPagamento = 'qualquer' | 'pix' | 'boleto' | 'cartao';
+export interface LinkPagamento {
+  id: number;
+  /** Texto pronto, ex.: "Pedido #4807 · Mercado Bom Preço". */
+  descricao: string; valor: number; vencimento: string | null; metodo: MetodoPagamento; status: StatusPagamento;
+  pago_em: string | null;
+  /** URL pública da cobrança; null quando o provedor não devolveu (ex.: sem configuração). */
+  link: string | null;
+}
+export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -408,6 +423,7 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),

@@ -377,3 +377,8 @@ a.p4-link { text-decoration: none; }
 .est-barra { height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .est-barra i { display: block; height: 100%; background: var(--text-mute); }
 .est-barra i.danger { background: var(--danger); } .est-barra i.warn { background: var(--warn); } .est-barra i.ok { background: var(--ok); }
+
+/* Tela 15 · Pagamentos (prefixo pg-) */
+.pg-pago { font-size: 12px; color: var(--ok); font-weight: 600; }
+.pg-acoes { display: flex; gap: 8px; }
+.pg-acoes .oi-btn { min-height: 44px; }
