@@ -21,6 +21,7 @@ import { FilaGestor } from './telas/FilaGestor';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
 import { Financeiro } from './telas/Financeiro';
+import { Fiscal } from './telas/Fiscal';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -132,6 +133,7 @@ export function App() {
         {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'estoque' && <Estoque filtroInicial={estoqueFiltro} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'financeiro' && <Financeiro voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'fiscal' && <Fiscal voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto_gestor' && <FilaGestor avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
