@@ -1,12 +1,14 @@
 // Ponto — desenho v4 (mobile/ref/design-v4, telas 36 Bater ponto · 37 Meu espelho · 38 Justificar).
+// Sem "REP-P" nem citação da Portaria na tela: ressalva legal (ERP #8417, D9) — não anunciar REP-P
+// antes do registro no INPI e do certificado ICP-Brasil. O v4 mostra o selo; aqui ele sai de propósito.
 // Sem câmera, sem biometria (ADR 0383). Regras do servidor (MobileMarcacaoService) repetidas só
 // para não mandar o que vai voltar 422: GPS > 500 m e relógio > 30 s travam o botão.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
 import { api, drift, ErroApi, type Espelho, type EscalaHoje, type Intercorrencia, type MarcacaoCriada,
-  type MarcacaoHoje, type Saldo, type TipoMarcacao } from '../api';
-import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, fmtMin, hojeIso, rotuloTipo } from '../ponto-regras';
+  type MarcacaoHoje, type Me, type Saldo, type TipoMarcacao } from '../api';
+import { LIMITES, MOTIVOS, TIPOS, agoraIsoLocal, aplicarLimites, fmtMin, hojeIso, rotuloTipo } from '../ponto-regras';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 type Aba = 'bater' | 'espelho' | 'justificar';
@@ -21,10 +23,16 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 const dataLonga = (d: Date) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()} · ${DIAS[d.getDay()]}`;
 const semColaborador = (e: unknown) => e instanceof ErroApi && e.codigo === 'sem_colaborador';
 
-export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
+export function Ponto({ avisar, online, voltar }: { avisar: Aviso; online: boolean; voltar?: ReactNode }) {
   const [aba, setAba] = useState<Aba>('bater');
   const [diaJustificar, setDiaJustificar] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+
+  // GET /ponto/api/me: nome e matrícula no cabeçalho e os limites do servidor. Sem a rota (404), segue sem.
+  useEffect(() => {
+    api.me().then((m) => { setMe(m); aplicarLimites(m.limites); }).catch((e) => { if (semColaborador(e)) setBloqueado(true); });
+  }, []);
 
   const titulo = aba === 'bater' ? 'Ponto' : aba === 'espelho' ? 'Meu espelho' : 'Justificar';
   const justificarDia = (data: string) => { setDiaJustificar(data); setAba('justificar'); };
@@ -33,11 +41,11 @@ export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
     <>
       <div className="p4-head">
         <div className="p4-head-row">
+          {voltar}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="p4-titulo">{titulo}</div>
-            <div className="p4-sub">REP-P · Portaria MTP 671/2021</div>
+            <div className="p4-sub">{me ? `${me.nome}${me.matricula ? ` · matrícula ${me.matricula}` : ''}` : 'Registro de ponto'}</div>
           </div>
-          <span className="p4-selo">REP-P</span>
         </div>
         {!bloqueado && (
           <div className="p4-abas" role="tablist" aria-label="Telas do ponto">
@@ -196,7 +204,7 @@ function BaterPonto({ avisar, online, aoSemCadastro }: { avisar: Aviso; online: 
           );
         })}
       </div>
-      <p className="p4-legal">Marcação imutável (Portaria MTP 671/2021). Correção só por intercorrência. Sem selfie nem biometria.</p>
+      <p className="p4-legal">Marcação imutável: correção só por justificativa, que o gestor aprova. Sem selfie nem biometria.</p>
     </div>
   );
 }
@@ -304,7 +312,10 @@ function Justificar({ avisar, diaInicial }: { avisar: Aviso; diaInicial: string 
   const vazio = { tipo: '', data: diaInicial ?? hojeIso(), dia_todo: false, ini: '', fim: '', just: '' };
   const [f, setF] = useState(vazio);
   const [enviando, setEnviando] = useState(false);
+  const [motivos, setMotivos] = useState(MOTIVOS);
   useEffect(() => { if (diaInicial) setF((o) => ({ ...o, data: diaInicial })); }, [diaInicial]);
+  // Motivos vêm do ERP (GET /ponto/api/intercorrencias/tipos); a lista fixa é só fallback.
+  useEffect(() => { api.tipos().then((t) => { if (Array.isArray(t) && t.length) setMotivos(t); }).catch(() => {}); }, []);
 
   const erro = !f.tipo ? 'Escolha o motivo.'
     : !f.dia_todo && (!f.ini || !f.fim) ? 'Informe o horário (das/às) ou marque Dia todo — o gestor decide pela janela.'
@@ -330,7 +341,7 @@ function Justificar({ avisar, diaInicial }: { avisar: Aviso; diaInicial: string 
     <div className="p4-corpo">
       <div className="p4-rotulo">O que aconteceu</div>
       <div className="p4-motivos">
-        {MOTIVOS.map((m) => (
+        {motivos.map((m) => (
           <button key={m.value} aria-pressed={f.tipo === m.value} className={'p4-motivo' + (f.tipo === m.value ? ' on' : '')}
             onClick={() => setF((o) => ({ ...o, tipo: m.value }))}>{m.label}</button>
         ))}
