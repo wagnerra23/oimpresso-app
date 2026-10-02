@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aPartirDe, textoEstoque, textoMeta, textoPreco } from './Produtos';
+import { aPartirDe, rotuloProdutos, textoEstoque, textoMeta, textoPreco } from './Produtos';
 
 describe('tela 19 · Produtos — textos do cartão', () => {
   it('estoque controlado mostra quantidade e unidade, sem zeros sobrando', () => {
@@ -21,5 +21,10 @@ describe('tela 19 · Produtos — textos do cartão', () => {
   it('linha de baixo pula o que vier vazio e nomeia o sem categoria', () => {
     expect(textoMeta({ codigo: 'LON-440', categoria: 'Adesivos', calculo: 'por m²' })).toEqual(['LON-440', 'Adesivos', 'por m²']);
     expect(textoMeta({ codigo: '', categoria: null, calculo: null })).toEqual(['Sem categoria']);
+  });
+  it('rótulo do topo cabe ao lado do "+ Produto": contagem e quantos estão em baixa', () => {
+    expect(rotuloProdutos(6, 2)).toBe('6 produtos · 2 em baixa');
+    expect(rotuloProdutos(1, 0)).toBe('1 produto');
+    expect(rotuloProdutos(0, 0)).toBe('0 produtos');
   });
 });
