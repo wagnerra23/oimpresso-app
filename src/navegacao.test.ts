@@ -2,7 +2,7 @@
 // Os dois primeiros casos são as respostas que o teste do ERP (#8495) prova para revisor.ponto e para
 // um usuário de vendas; os demais são bordas da montagem.
 import { describe, expect, it } from 'vitest';
-import { montarNavegacao, NAV_PADRAO } from './navegacao';
+import { barraPadrao, escolhaValida, montarNavegacao, NAV_PADRAO } from './navegacao';
 
 describe('montarNavegacao', () => {
   it('colaborador (revisor.ponto): barra Ponto · Mais, abre no Ponto, Mais só com Conta', () => {
@@ -70,6 +70,42 @@ describe('montarNavegacao', () => {
     expect(montarNavegacao('erp', ['inicio', 'orcamentos', 'mais'], 'inicio').modulosMais).toEqual(['orcamentos', 'conta']);
     expect(montarNavegacao('erp', ['inicio', 'orcamentos', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
     expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
+  it('tela 30: a escolha salva vira a barra (Início e Mais fixos) e o resto vai para Mais', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'financeiro', 'ponto', 'mais'] as const;
+    const n = montarNavegacao('erp', [...areas], 'inicio', ['financeiro', 'tarefas']);
+    expect(n.abas).toEqual(['inicio', 'financeiro', 'tarefas', 'mais']);
+    expect(n.modulosMais).toEqual(['pedidos', 'producao', 'ponto', 'conta']);
+    expect(n.personalizada).toBe(true);
+    expect(n.modulosBarra).toEqual(['financeiro', 'tarefas']);
+  });
+
+  it('tela 30: Ponto escolhido para a barra sai de Mais', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'ponto', 'mais'], 'inicio', ['ponto']);
+    expect(n.pontoNaBarra).toBe(true);
+    expect(n.modulosMais).toEqual(['pedidos', 'conta']);
+  });
+
+  it('tela 30: módulo sem permissão, repetido, desconhecido ou acima de 3 nunca entra na barra', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'mais'] as const;
+    expect(escolhaValida(['financeiro', 'tarefas', 'tarefas', 'xyz', 'mais', 'pedidos', 'producao', 'pessoas'], [...areas])).toEqual(['tarefas', 'pedidos', 'producao']);
+  });
+
+  it('tela 30: escolha vazia ou toda inválida = padrão de sempre', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'mais'] as const;
+    expect(montarNavegacao('erp', [...areas], 'inicio', []).abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
+    expect(montarNavegacao('erp', [...areas], 'inicio', ['financeiro']).personalizada).toBe(false);
+  });
+
+  it('tela 30: colaborador ignora barra e não personaliza', () => {
+    const n = montarNavegacao('colaborador', ['ponto', 'mais'], 'ponto', ['ponto']);
+    expect(n.abas).toEqual(['ponto', 'mais']);
+    expect(n.personalizavel).toBe(false);
+  });
+
+  it('tela 30: o padrão para restaurar segue as áreas', () => {
+    expect(barraPadrao(['inicio', 'pedidos', 'producao', 'mais'])).toEqual(['pedidos', 'producao']);
   });
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {

@@ -13,6 +13,8 @@ const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
+// Tela 30 · escolha da barra guardada "no ERP" da demo (null = padrão).
+let barraDemo: string[] | null = null;
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -399,7 +401,18 @@ export const demo = {
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
         financeiro: { a_receber: 8200, a_pagar: 3100 },
-        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
+        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, barra: barraDemo });
+    }
+    if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
+      const { modulos } = (corpo ?? {}) as { modulos?: string[] };
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'mais'];
+      const erro = !Array.isArray(modulos) || modulos.length === 0 ? 'Escolha pelo menos 1 módulo.'
+        : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
+        : modulos.some((m) => !liberados.includes(m) || m === 'inicio' || m === 'mais') ? 'Há módulo que seu usuário não pode usar.' : null;
+      if (erro) throw Object.assign(new Error(erro), { status: 422, codigo: 'validacao', campos: { modulos: erro } });
+      await espera(400);
+      barraDemo = [...modulos!];
+      return r({ barra: barraDemo });
     }
     if (metodo === 'POST' && caminho === '/api/app/notificacoes/lidas') {
       const marcadas = NOTIFICACOES.filter((x) => !x.lida).length;
