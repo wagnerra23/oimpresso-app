@@ -44,18 +44,16 @@ export function Inicio({ irParaPonto }: { irParaPonto: () => void }) {
         <div className="oi-section">
           <button onClick={irParaPonto} className="oi-card" style={{ width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit',
             background: 'var(--accent-soft)', border: '1px solid color-mix(in oklch, var(--accent) 25%, transparent)', padding: 16, display: 'flex', flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-            <span style={{ color: 'var(--accent)' }}><Ic.relogio tamanho={30} /></span>
+            <span style={{ color: 'var(--accent-text)' }}><Ic.relogio tamanho={30} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)' }}>
                 {proxima ? 'Próxima marcação' : hoje ? 'Jornada de hoje' : 'Carregando…'}
               </span>
-              <b style={{ display: 'block', fontSize: 18 }}>
-                {proxima ? proxima.label : hoje ? 'Todas registradas' : '—'}
-                {horaPrevista ? <span className="oi-mono" style={{ fontWeight: 500, color: 'var(--text-dim)' }}> · prevista {horaPrevista.slice(0, 5)}</span> : null}
-              </b>
+              <b style={{ display: 'block', fontSize: 18 }}>{proxima ? proxima.label : hoje ? 'Todas registradas' : '—'}</b>
+              {horaPrevista && <span className="oi-mono" style={{ display: 'block', fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>prevista {horaPrevista.slice(0, 5)}</span>}
               {escala?.escala && <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)' }}>Escala {escala.escala.nome}</span>}
             </span>
-            <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 14 }}>Bater ›</span>
+            <span style={{ color: 'var(--accent-text)', fontWeight: 600, fontSize: 14 }}>Bater ›</span>
           </button>
         </div>
 

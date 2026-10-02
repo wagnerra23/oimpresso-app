@@ -1,5 +1,5 @@
 // Conta — lembrete de ponto (push), privacidade e sair.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { DEMO, sair } from '../api';
@@ -8,7 +8,7 @@ import logo from '../assets/oimpresso-logo.png';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 
-export function Conta({ aoSair, avisar }: { aoSair: () => void; avisar: Aviso }) {
+export function Conta({ aoSair, avisar, voltar }: { aoSair: () => void; avisar: Aviso; voltar?: ReactNode }) {
   const [ativando, setAtivando] = useState(false);
 
   const lembrete = async () => {
@@ -27,7 +27,7 @@ export function Conta({ aoSair, avisar }: { aoSair: () => void; avisar: Aviso })
 
   return (
     <>
-      <div className="oi-head"><div className="oi-head-row"><div className="oi-head-title">Conta</div></div></div>
+      <div className="oi-head"><div className="oi-head-row">{voltar}<div className="oi-head-title">Conta</div></div></div>
       <div className="oi-scroll">
         <div className="oi-section">
           <div className="oi-section-h">Lembrete de ponto</div>

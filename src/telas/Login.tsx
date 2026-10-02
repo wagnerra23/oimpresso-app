@@ -3,9 +3,11 @@
 // Fora do v4 de propósito: "Entrar com OAuth" e "Escolha a empresa" (sem seletor na v1 — [W]).
 import { useState, type FormEvent } from 'react';
 import { DEMO, entrar } from '../api';
+import { useTemaDoCelular } from '../tema';
 import logo from '../assets/oimpresso-logo.png';
 
 export function Login({ aoEntrar }: { aoEntrar: () => void }) {
+  const tema = useTemaDoCelular();
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrar, setMostrar] = useState(false);
@@ -27,7 +29,7 @@ export function Login({ aoEntrar }: { aoEntrar: () => void }) {
   };
 
   return (
-    <div className="oi oi-app l4" data-theme="light">
+    <div className="oi oi-app l4" data-theme={tema}>
       <form className="l4-corpo" onSubmit={enviar}>
         <div className="l4-marca">
           <div className="l4-logo"><img src={logo} alt="" /><span>oimpresso</span></div>
