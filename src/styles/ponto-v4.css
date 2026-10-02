@@ -345,3 +345,34 @@ a.p4-link { text-decoration: none; }
 .nt-ponto { width: 8px; height: 8px; margin-top: 6px; border-radius: 99px; flex-shrink: 0; }
 .nt-linha.nova .nt-ponto { background: var(--accent); }
 .nt-todas { min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12.5px; font-weight: 600; flex-shrink: 0; }
+
+/* ── Financeiro (tela 06) ── */
+.fn-saldo { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.fn-saldo-v { font-family: var(--font-mono); font-size: 30px; font-weight: 600; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; color: var(--ok); }
+.fn-saldo-v.neg { color: var(--danger); }
+.fn-linha { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.fn-linha > div { display: flex; flex-direction: column; min-width: 0; }
+.fn-linha small { font-size: 11px; color: var(--text-dim); }
+.fn-linha b { font-family: var(--font-mono); font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fn-div { height: 1px; background: var(--border); }
+.fn-linha.tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fn-linha.tres b { font-size: 12.5px; }
+.fn-saldo .pos, .fn-lanc .pos { color: var(--ok); }
+.fn-saldo .neg, .fn-lanc .neg { color: var(--danger); }
+.fn-saldo .ac { color: var(--accent-text); }
+.fn-saldo .warn { color: var(--warn); }
+.fn-contas { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+.fn-conta { flex-shrink: 0; width: 150px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 4px; }
+.fn-conta b { font-size: 13px; font-weight: 600; }
+.fn-conta small { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.fn-conta span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fn-abas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-2); flex-shrink: 0; }
+.fn-aba { min-height: 44px; border: 0; border-radius: 7px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12.5px; font-weight: 600; }
+.fn-aba span { font-family: var(--font-mono); font-size: 11px; opacity: .8; }
+.fn-aba.on { background: var(--surface); color: var(--text); }
+.fn-lanc { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+.fn-lanc b { display: block; font-size: 13.5px; font-weight: 600; }
+.fn-lanc small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.fn-lanc-v { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.fn-lanc-v span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fn-lanc-v small { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; }
