@@ -18,12 +18,25 @@ const GRUPOS: Array<{ id: GrupoTarefa; label: string }> = [
 ];
 const quando = (t: Tarefa) => (t.prazo ? t.prazo.slice(8, 10) + '/' + t.prazo.slice(5, 7) : '');
 
-export function Tarefas({ avisar, abrirPonto }: { avisar: Aviso; abrirPonto: () => void }) {
+/** id da tarefa ("todo:<n>") que chega de uma notificação e deve abrir direto no detalhe. */
+export const idDoTodo = (id: number | string | null): string | null => {
+  const m = /^todo:(\d+)$/.exec(String(id ?? ''));
+  return m ? m[1] : null;
+};
+
+interface Props {
+  avisar: Aviso; abrirPonto: () => void;
+  /** Tarefa a abrir assim que a tela monta (vinda do sino); a App limpa depois de entregue. */
+  abrir?: string | null; aoAbrir?: () => void;
+}
+
+export function Tarefas({ avisar, abrirPonto, abrir, aoAbrir }: Props) {
   const [filtro, setFiltro] = useState<FiltroTarefas>('todas');
   const [dados, setDados] = useState<ListaTarefas | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState<string | null>(null);
   useVoltar(aberta !== null, () => setAberta(null));
+  useEffect(() => { if (abrir) { setAberta(abrir); aoAbrir?.(); } }, [abrir, aoAbrir]);
 
   const carregar = useCallback(async (f: FiltroTarefas) => {
     setErro(null);
