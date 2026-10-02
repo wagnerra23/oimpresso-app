@@ -49,7 +49,9 @@ const PEDIDOS = [
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
-const PRODUTOS = [
+const UNIDADES = [{ id: 1, nome: 'Metro quadrado', curta: 'm²' }, { id: 2, nome: 'Unidade', curta: 'un' }, { id: 3, nome: 'Milheiro', curta: 'mil' }];
+interface ProdutoDemo { id: number; nome: string; codigo: string; cat: number | null; unidade: string; preco: number | null; variacoes: number | null; qtd: number | null; baixo: boolean }
+const PRODUTOS: ProdutoDemo[] = [
   { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
   { id: 202, nome: 'Caneca personalizada', codigo: 'BRD-CAN', cat: 5, unidade: 'un', preco: 29, variacoes: 3, qtd: 46, baixo: false },
   { id: 203, nome: 'Cartão de visita 4×4', codigo: 'CRT-500', cat: 3, unidade: 'mil', preco: 145, variacoes: null, qtd: null, baixo: false },
@@ -68,6 +70,18 @@ const ESTOQUE = [
   { id: 306, produto_id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', qtd: 9, minimo: 10, unidade: 'un', local: 'Filial Norte', prateleira: 'B · 2 · 4' },
   { id: 307, produto_id: 202, nome: 'Caneca personalizada · Azul', codigo: 'BRD-CAN-AZ', qtd: 46, minimo: null, unidade: 'un', local: 'Filial Norte', prateleira: null },
 ];
+
+// Histórico da tela 29 (só leitura), imitando o protótipo. Horário relativo a hoje para "hoje"/"ontem" funcionarem.
+const quandoRel = (dias: number, h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() + dias); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string; referencia: string | null; quando: string; qtd: number; saldo: number }>> = {
+  301: [
+    { id: 9001, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2318 · Mercado Bom Preço', quando: quandoRel(0, 8, 10), qtd: -3.6, saldo: 18 },
+    { id: 9002, tipo: 'purchase', rotulo: 'Compra', referencia: 'NF 88213 · Distribuidora Sul Mídia', quando: quandoRel(-1, 15, 40), qtd: 20, saldo: 21.6 },
+    { id: 9003, tipo: 'stock_adjustment', rotulo: 'Ajuste', referencia: 'Refilo · ajuste de cor', quando: quandoRel(-6, 11, 5), qtd: -1.2, saldo: 1.6 },
+    { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4, saldo: 2.8 },
+  ],
+  306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
+};
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
@@ -125,6 +139,27 @@ const ORCAMENTOS = [
   { id: 204, numero: 'ORC-0115', titulo: 'Cardápio A3 laminado — 20 un', cliente: 'Bistrô do Forno', validade: null, status: 'convertido', valor: 210, area_m2: null, itens: 1 },
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
+
+// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias` vira data dentro do handler.
+const LANCAMENTOS = [
+  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, valor: 7840, pago: false },
+  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, valor: 1260, pago: false },
+  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, valor: 2315, pago: false },
+  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, valor: 4380, pago: false },
+  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, valor: 1920, pago: false },
+  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, valor: 3420, pago: true },
+  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, valor: 2760, pago: true },
+] as const;
+
+// Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
+const FISCAIS = [
+  { id: 1287, tipo: 'NFe', numero: '1287', referencia: 'Pedido #0038 · Papelaria Sol', valor: 3420, status: 'autorizado',
+    chave: '0000 0000 0000 0000 0000 5500 1000 0012 8710 0000 0000', erro: null, dias: -5 },
+  { id: 342, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
+  { id: 9001, tipo: 'NFCe', numero: null, referencia: 'Venda balcão #V-0010', valor: 186, status: 'rejeitado', chave: null,
+    erro: 'Rejeição 539: duplicidade de NF-e com diferença na chave de acesso.', dias: -1 },
+  { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },
+] as const;
 
 // Links de pagamento de demonstração (tela 15), como o protótipo. Clientes fictícios; o link aponta para um domínio
 // de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
@@ -287,6 +322,12 @@ export const demo = {
       PESSOAS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       return r({ id });
     }
+    const detEstoque = caminho.match(/^\/api\/app\/estoque\/(\d+)/);
+    if (metodo === 'GET' && detEstoque) {
+      const item = ESTOQUE.find((x) => x.id === Number(detEstoque[1]));
+      if (!item) throw Object.assign(new Error('Item de estoque não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      return r({ item, historico: HISTORICO[item.id] ?? [], pagina: 1, tem_mais: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/estoque')) {
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'todos';
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
@@ -294,6 +335,35 @@ export const demo = {
       const busca = ESTOQUE.filter((x) => !q || x.nome.toLowerCase().includes(q) || x.codigo.toLowerCase().includes(q));
       return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
         pagina: 1, tem_mais: false });
+    }
+    // Tela 20 (contrato §9.4). A demo faz o papel do ERP: produto nasce sem preço.
+    if (metodo === 'GET' && caminho === '/api/app/produtos/opcoes') {
+      return r({ categorias: CATEGORIAS, unidades: UNIDADES });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/produtos') {
+      const n = (corpo ?? {}) as { nome?: string; codigo?: string | null; categoria_id?: number | null; unidade_id?: number;
+        estoque?: { controla?: boolean; minimo?: number | null }; fiscal?: Record<string, string | null> };
+      const campos: Record<string, string> = {};
+      if (!String(n.nome ?? '').trim()) campos.nome = 'Informe o nome do produto.';
+      const unidade = UNIDADES.find((u) => u.id === n.unidade_id);
+      if (!unidade) campos.unidade_id = 'Unidade inválida.';
+      if (n.categoria_id != null && !CATEGORIAS.some((c) => c.id === n.categoria_id)) campos.categoria_id = 'Categoria inválida.';
+      if (n.codigo && PRODUTOS.some((x) => x.codigo.toLowerCase() === String(n.codigo).toLowerCase())) campos.codigo = 'Este código já está em uso.';
+      if (n.estoque?.minimo != null && n.estoque.minimo < 0) campos['estoque.minimo'] = 'O estoque mínimo não pode ser negativo.';
+      const tam: Record<string, number> = { ncm: 8, cest: 7, cfop_interno: 4, cfop_externo: 4 };
+      for (const [k, t] of Object.entries(tam)) {
+        const v = n.fiscal?.[k];
+        if (v && (v.length !== t || /[^0-9]/.test(v))) campos['fiscal.' + k] = 'Informe ' + t + ' dígitos.';
+      }
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const id = 1 + Math.max(...PRODUTOS.map((x) => x.id));
+      const codigo = n.codigo || 'PRD-' + id;
+      PRODUTOS.push({ id, nome: String(n.nome).trim(), codigo, cat: n.categoria_id ?? null, unidade: unidade!.curta, preco: null,
+        variacoes: null, qtd: n.estoque?.controla === false ? null : 0,
+        // Regra do alerta da web: saldo ≤ mínimo. Nasce com saldo 0.
+        baixo: n.estoque?.controla !== false && n.estoque?.minimo != null && 0 <= n.estoque.minimo });
+      PRODUTOS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return r({ id, codigo });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
       const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';
@@ -333,7 +403,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'pagamentos', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'pagamentos', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -373,6 +443,65 @@ export const demo = {
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
+      const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const hoje = diaRel(0);
+      const todos = LANCAMENTOS.map(({ dias, pago, ...l }) => {
+        const data = diaRel(dias);
+        return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto' };
+      });
+      const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
+      const extrato = todos.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
+      const itens = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
+      const recebido = 148230, pago = 96410;
+      return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
+          a_receber: soma(abertos('receber')), vencido: soma(abertos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertos('pagar')) },
+        contas: [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
+          { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
+        itens, contadores: { receber: abertos('receber').length, pagar: abertos('pagar').length, extrato: extrato.length }, pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const docs = FISCAIS.map(({ dias, ...d }) => ({ ...d, emitido_em: diaRel(dias) + 'T10:00:00-03:00' }));
+      const conta = (s: string) => docs.filter((d) => d.status === s).length;
+      return r({ itens: docs.filter((d) => st === 'todos' || d.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: docs.length, rascunho: conta('rascunho'), processando: conta('processando'), autorizado: conta('autorizado'),
+          cancelado: conta('cancelado'), rejeitado: conta('rejeitado') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/relatorios')) {
+      const periodo = (caminho.match(/periodo=(\w+)/) || [])[1] || 'mes';
+      const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'dre';
+      // Números fictícios do protótipo, escalados pelo período. Datas calculadas aqui (o build de produção descarta o demo).
+      const f = periodo === 'ano' ? 11.4 : periodo === 'trimestre' ? 2.9 : 1;
+      const v = (x: number) => Math.round(x * f * 100) / 100;
+      const rec = v(148230), desp = v(96410);
+      const parte = (total: number, l: Array<[string, number]>) => l.map(([nome, p]) => ({ nome, valor: Math.round(total * p * 100) / 100 }));
+      const de = periodo === 'mes' ? diaRel(0).slice(0, 8) + '01' : diaRel(periodo === 'ano' ? -365 : -90);
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo === 'producao');
+      const etapas = [...new Set(ativos.map((x) => x.etapa.rotulo))].map((rotulo) => ({ rotulo, total: ativos.filter((x) => x.etapa.rotulo === rotulo).length }));
+      return r({ periodo: { de, ate: diaRel(0) },
+        kpis: { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
+        dre: aba !== 'dre' ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
+          despesas_por_categoria: parte(desp, [['Insumos', 0.46], ['Folha', 0.31], ['Aluguel e energia', 0.14], ['Outros', 0.09]]) },
+        vendas: aba !== 'vendas' ? null : {
+          receita_por_dia: [4.2, 5.1, 3.8, 6.4, 7.2, 2.1, 1.4, 5.8, 6.1, 4.9, 7.8, 8.4, 3.2, 8.42].map((x, i) => ({ data: diaRel(i - 13), valor: x * 1000 })),
+          top_clientes: parte(v(61000), [['Papelaria Sol', 0.3], ['Clínica Vita', 0.25], ['Restaurante 88', 0.19], ['Bistrô do Forno', 0.16], ['Marília Costa', 0.1]]) },
+        producao: aba !== 'producao' ? null : { por_etapa: etapas },
+        estoque: aba !== 'estoque' ? null : { baixo: [{ nome: 'Lona 440 g', quantidade: 2, minimo: 5, unidade: 'un' },
+          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] } });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/dashboard') {
+      // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
+      return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
+        kpis: { pedidos_ativos: ativos.length, pedidos_novos: PEDIDOS.filter((x) => x.etapa.grupo === 'orcamento').length,
+          producao_em_curso: PEDIDOS.filter((x) => x.etapa.grupo === 'producao').length, a_receber: 11415, vencido: 1260 },
+        pedidos_por_dia: [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, ativos.length].map((total, i) => ({ data: diaRel(i - 13), total })),
+        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: { concluidas: 7, total: 10 } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

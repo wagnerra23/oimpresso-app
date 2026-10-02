@@ -17,9 +17,13 @@ import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
+import { Relatorios } from './telas/Relatorios';
+import { Dashboard } from './telas/Dashboard';
 import { Pagamentos } from './telas/Pagamentos';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
+import { Financeiro } from './telas/Financeiro';
+import { Fiscal } from './telas/Fiscal';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -128,8 +132,13 @@ export function App() {
         {nav && aba === 'mais' && subMais === null && <Mais abrir={(s) => { setEstoqueFiltro('todos'); setSubMais(s); }} modulos={n.modulosMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
-        {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'estoque' && <Estoque filtroInicial={estoqueFiltro} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'produtos' && <Produtos avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'financeiro' && <Financeiro voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'fiscal' && <Fiscal voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'relatorios' && <Relatorios voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'dashboard' && <Dashboard irParaPedidos={() => irPara('pedidos')} irParaProducao={() => irPara('producao')}
+          voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'pagamentos' && <Pagamentos avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
