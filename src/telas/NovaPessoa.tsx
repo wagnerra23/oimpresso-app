@@ -4,7 +4,7 @@
 // número separado (o ERP só tem o telefone). "Buscar" do CEP: GET /api/app/cep/{cep} (§4.3, ERP #8560)
 // preenche o endereço e o codigo_ibge; se o CEP não existe ou o serviço falha, o endereço é digitado.
 import { useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, type EnderecoCep, type NovaPessoa } from '../api';
+import { api, camposDoErro, ErroApi, type EdicaoPessoa, type EnderecoCep, type NovaPessoa, type PessoaCadastro } from '../api';
 
 type Passo = 'dados' | 'contato' | 'endereco' | 'comercial' | 'lgpd';
 const PASSOS: Array<{ id: Passo; label: string }> = [
@@ -43,10 +43,11 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const raiz = (campo: string) => campo.split('.')[0];
 
 /** Conferência local só do que impede salvar; o resto quem decide é o servidor (422). */
-export function conferir(f: Form, passo: Passo): Record<string, string> {
+export function conferir(f: Form, passo: Passo, editando = false): Record<string, string> {
   const e: Record<string, string> = {};
   if (passo === 'dados') {
-    if (!f.cliente && !f.fornecedor) e.papeis = 'Escolha ao menos um papel.';
+    // Na edição o papel não muda pelo app (fica na web), então não se confere.
+    if (!editando && !f.cliente && !f.fornecedor) e.papeis = 'Escolha ao menos um papel.';
     if (!f.nome.trim()) e.nome = f.tipo === 'PJ' ? 'Informe a razão social.' : 'Informe o nome.';
     const d = f.documento.replace(/\D/g, '');
     if (d && d.length !== (f.tipo === 'PJ' ? 14 : 11)) e.documento = f.tipo === 'PJ' ? 'O CNPJ tem 14 dígitos.' : 'O CPF tem 11 dígitos.';
@@ -88,11 +89,46 @@ export function corpo(f: Form): NovaPessoa {
   };
 }
 
-export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
+const consentDe = (v: boolean | null): Sim => (v === null ? '' : v ? 'sim' : 'nao');
+
+/** Formulário preenchido com o cadastro atual (tela 34 → Editar). Campo que o GET não traz abre vazio. */
+export function formDoCadastro(c: PessoaCadastro): Form {
+  const id = c.identificacao, en = c.endereco_fiscal;
+  const ie = id.indicador_ie;
+  return { ...VAZIO,
+    tipo: c.tipo === 'PF' ? 'PF' : 'PJ', nome: id.razao_social ?? c.nome, nome_fantasia: id.nome_fantasia ?? '',
+    // O GET mascara o documento: o campo abre vazio (a máscara vira dica) e só é enviado se digitarem o número inteiro.
+    documento: id.documento && !id.documento.includes('*') ? id.documento : '', indicador_ie: ie === 1 || ie === 2 || ie === 9 ? (String(ie) as Form['indicador_ie']) : '',
+    cliente: id.papeis.includes('cliente'), fornecedor: id.papeis.includes('fornecedor'),
+    telefone: c.contato?.telefone ?? '', email: c.contato?.email ?? '', email_nfe: en.email_nfe ?? '',
+    cep: en.cep ?? '', logradouro: en.logradouro ?? '', numero: en.numero ?? '', complemento: en.complemento ?? '',
+    bairro: en.bairro ?? '', cidade: en.cidade ?? '', uf: en.uf ?? '', codigo_ibge: en.codigo_ibge ?? '',
+    prazo: c.comercial.prazo_padrao_dias !== null ? String(c.comercial.prazo_padrao_dias) : '',
+    whatsapp: consentDe(c.consentimento.whatsapp), nfe_email: consentDe(c.consentimento.email_nfe) };
+}
+
+const EDITAVEIS = ['nome', 'nome_fantasia', 'documento', 'indicador_ie', 'telefone', 'email', 'email_nfe', 'cep', 'logradouro', 'numero',
+  'complemento', 'bairro', 'cidade', 'uf', 'codigo_ibge', 'prazo_padrao_dias'] as const;
+
+/** Corpo do PATCH: só o que mudou. Campo esvaziado vai null (limpa). Consentimento só sai se virou Autorizado/Não autorizado. */
+export function diferencas(ini: Form, atual: Form): EdicaoPessoa {
+  const a = corpo(ini), b = corpo(atual);
+  const out: Record<string, unknown> = {};
+  for (const k of EDITAVEIS) if (a[k] !== b[k]) out[k] = b[k];
+  const cons: NonNullable<EdicaoPessoa['consentimento']> = {};
+  if (atual.whatsapp && atual.whatsapp !== ini.whatsapp) cons.whatsapp = atual.whatsapp === 'sim';
+  if (atual.nfe_email && atual.nfe_email !== ini.nfe_email) cons.email_nfe = atual.nfe_email === 'sim';
+  if (Object.keys(cons).length) out.consentimento = cons;
+  return out as EdicaoPessoa;
+}
+
+export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar, editar }: {
   aoCancelar: () => void; aoSalvar: (id: number) => void;
   avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
+  /** Modo edição (tela 34 → Editar): abre preenchido e salva com PATCH só do que mudou. */
+  editar?: { id: number; inicial: Form; documentoMascarado?: string | null };
 }) {
-  const [f, setF] = useState<Form>(VAZIO);
+  const [f, setF] = useState<Form>(editar?.inicial ?? VAZIO);
   const [passo, setPasso] = useState<Passo>('dados');
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
@@ -122,12 +158,20 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
   };
 
   const avancar = async () => {
-    const e = conferir(f, passo);
+    const e = conferir(f, passo, !!editar);
     setErros(e);
     if (Object.keys(e).length) return;
     if (!ultimo) { setPasso(PASSOS[i + 1].id); return; }
     setSalvando(true);
     try {
+      if (editar) {
+        const mudou = diferencas(editar.inicial, f);
+        if (!Object.keys(mudou).length) { avisar('Nenhuma alteração para salvar.', 'warn'); return; }
+        await api.editarPessoa(editar.id, mudou);
+        avisar('Cadastro atualizado.', 'ok');
+        aoSalvar(editar.id);
+        return;
+      }
       const { id } = await api.criarPessoa(corpo(f));
       avisar('Cadastro salvo.', 'ok');
       aoSalvar(id);
@@ -142,7 +186,9 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
         // Erro em campo que a tela não mostra: não deixa o toque sem resposta.
         if (!Object.keys(campos).some((c) => c in PASSO_DO_CAMPO)) avisar(Object.values(campos)[0], 'erro');
       } else if (err instanceof ErroApi && err.codigo === 'sem_permissao') {
-        avisar('Seu usuário não pode cadastrar pessoas.', 'erro');
+        avisar(editar ? 'Seu usuário não pode editar esta pessoa.' : 'Seu usuário não pode cadastrar pessoas.', 'erro');
+      } else if (editar && statusDe(err) === 404) {
+        avisar('Pessoa não encontrada.', 'erro');
       } else {
         avisar(err instanceof Error ? err.message : 'Não foi possível salvar.', 'erro');
       }
@@ -158,23 +204,28 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
       {erro(campoApi)}
     </div>
   );
-  const consentir = (k: 'whatsapp' | 'nfe_email', rotulo: string, ajuda: string) => (
+  // Na edição, "Sem registro" só aparece se ainda não havia registro: o PATCH não apaga consentimento já dado.
+  const consentir = (k: 'whatsapp' | 'nfe_email', rotulo: string, ajuda: string) => {
+    const opcoes: Array<[Sim, string]> = [['sim', 'Autorizado'], ['nao', 'Não autorizado']];
+    if (!editar || editar.inicial[k] === '') opcoes.push(['', 'Sem registro']);
+    return (
     <div className="p4-campo">
       <label id={'np-l-' + k}>{rotulo}</label>
-      <div className="np-seg tres" role="radiogroup" aria-labelledby={'np-l-' + k}>
-        {([['sim', 'Autorizado'], ['nao', 'Não autorizado'], ['', 'Sem registro']] as Array<[Sim, string]>).map(([v, l]) => (
+      <div className={'np-seg' + (opcoes.length === 3 ? ' tres' : '')} role="radiogroup" aria-labelledby={'np-l-' + k}>
+        {opcoes.map(([v, l]) => (
           <button key={v || 'nada'} role="radio" aria-checked={f[k] === v} className={f[k] === v ? 'on' : ''} onClick={() => mudar(k, v, 'consentimento')}>{l}</button>
         ))}
       </div>
       <span className="np-ajuda">{ajuda}</span>
     </div>
-  );
+    );
+  };
 
   return (
     <>
       <div className="pd-head">
-        <div className="p4-rotulo">Pessoas · passo {i + 1} de {PASSOS.length}</div>
-        <div className="pd-titulo">Nova pessoa</div>
+        <div className="p4-rotulo">{editar ? 'Dados cadastrais' : 'Pessoas'} · passo {i + 1} de {PASSOS.length}</div>
+        <div className="pd-titulo">{editar ? 'Editar cadastro' : 'Nova pessoa'}</div>
       </div>
       <div className="np-passos" role="list" aria-label="Passos do cadastro">
         {PASSOS.map((p, n) => (
@@ -188,21 +239,25 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
         <div className="pd-corpo np-form">
           {passo === 'dados' && (
             <>
-              <div className="p4-campo">
+              {/* Papel e tipo não mudam pelo app na edição (ficam na web). */}
+              {!editar && <div className="p4-campo">
                 <label id="np-l-papeis">Papel</label>
                 <div className="np-papeis" role="group" aria-labelledby="np-l-papeis">
                   <button className={'pd-chip' + (f.cliente ? ' on' : '')} aria-pressed={f.cliente} onClick={() => mudar('cliente', !f.cliente, 'papeis')}>Cliente</button>
                   <button className={'pd-chip' + (f.fornecedor ? ' on' : '')} aria-pressed={f.fornecedor} onClick={() => mudar('fornecedor', !f.fornecedor, 'papeis')}>Fornecedor</button>
                 </div>
                 {erro('papeis')}
-              </div>
-              <div className="np-seg" role="radiogroup" aria-label="Tipo de pessoa">
+              </div>}
+              {!editar && <div className="np-seg" role="radiogroup" aria-label="Tipo de pessoa">
                 <button role="radio" aria-checked={f.tipo === 'PJ'} className={f.tipo === 'PJ' ? 'on' : ''} onClick={() => mudar('tipo', 'PJ')}>Empresa (CNPJ)</button>
                 <button role="radio" aria-checked={f.tipo === 'PF'} className={f.tipo === 'PF' ? 'on' : ''} onClick={() => mudar('tipo', 'PF')}>Pessoa física (CPF)</button>
-              </div>
+              </div>}
               {campo('nome', f.tipo === 'PJ' ? 'Razão social' : 'Nome completo', { autoComplete: f.tipo === 'PJ' ? 'organization' : 'name' })}
               {f.tipo === 'PJ' && campo('nome_fantasia', 'Nome fantasia (opcional)')}
-              {campo('documento', f.tipo === 'PJ' ? 'CNPJ (opcional)' : 'CPF (opcional)', { inputMode: 'numeric' })}
+              {editar?.documentoMascarado
+                ? campo('documento', f.tipo === 'PJ' ? 'CNPJ (digite o número inteiro só para trocar)' : 'CPF (digite o número inteiro só para trocar)',
+                  { inputMode: 'numeric', placeholder: editar.documentoMascarado })
+                : campo('documento', f.tipo === 'PJ' ? 'CNPJ (opcional)' : 'CPF (opcional)', { inputMode: 'numeric' })}
               <div className="p4-campo">
                 <label htmlFor="np-ie">Indicador de IE</label>
                 <select id="np-ie" className="np-select" value={f.indicador_ie} onChange={(e) => mudar('indicador_ie', e.target.value as Form['indicador_ie'])}>
@@ -267,7 +322,7 @@ export function NovaPessoaTela({ aoCancelar, aoSalvar, avisar }: {
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando}
           onClick={() => (i === 0 ? aoCancelar() : setPasso(PASSOS[i - 1].id))}>{i === 0 ? 'Cancelar' : 'Voltar'}</button>
         <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando} onClick={avancar}>
-          {salvando ? 'Salvando…' : ultimo ? 'Salvar cadastro' : 'Continuar'}
+          {salvando ? 'Salvando…' : ultimo ? (editar ? 'Salvar alterações' : 'Salvar cadastro') : 'Continuar'}
         </button>
       </div>
     </>

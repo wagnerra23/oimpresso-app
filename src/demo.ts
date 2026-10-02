@@ -47,6 +47,32 @@ const PEDIDOS = [
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
 
+// Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
+const EDICOES: Record<number, Record<string, unknown>> = {};
+
+/** Como a API: só os últimos dígitos do documento aparecem. */
+const mascarar = (d: string | null) => (d ? d.replace(/\d(?=(?:\D*\d){4})/g, '*') : null);
+
+/** GET /pessoas/{id}/cadastro da demo: valores de exemplo, sobrepostos pelo que o PATCH gravou. */
+function cadastroDemo(p: PessoaDemo) {
+  const pj = p.tipo === 'PJ';
+  const e = EDICOES[p.id] ?? {};
+  const v = <T,>(k: string, padrao: T): T => (k in e ? (e[k] as T) : padrao);
+  const ie = v<number | null>('indicador_ie', pj ? 1 : 9);
+  const cons = (e.consentimento ?? {}) as { whatsapp?: boolean; email_nfe?: boolean };
+  return { id: p.id, nome: p.nome, tipo: p.tipo,
+    identificacao: { razao_social: v('nome', pj ? p.nome + ' Ltda' : p.nome), documento: mascarar(p.documento),
+      indicador_ie: ie, papeis: p.papeis,
+      nome_fantasia: pj ? v<string | null>('nome_fantasia', p.nome) : null },
+    contato: { telefone: p.telefone, email: p.email },
+    endereco_fiscal: { cidade: p.cidade, uf: v('uf', 'SC'), cep: v<string | null>('cep', '88700-000'), codigo_ibge: v<string | null>('codigo_ibge', '4218707'),
+      email_nfe: v<string | null>('email_nfe', p.email), logradouro: v<string | null>('logradouro', 'Rua da Demonstração'),
+      numero: v<string | null>('numero', '100'), complemento: v<string | null>('complemento', null), bairro: v<string | null>('bairro', 'Centro') },
+    comercial: { classificacao: null, limite_credito: pj ? 5000 : null, prazo_padrao_dias: v<number | null>('prazo_padrao_dias', pj ? 28 : null) },
+    consentimento: { whatsapp: cons.whatsapp ?? (p.telefone ? true : null), email_nfe: cons.email_nfe ?? (p.email ? true : null), sms: null,
+      registrado_em: '2026-03-12T14:22:00-03:00' } };
+}
+
 // Pessoas de demonstração (API-CONTRATO-v1 §4). Telefones e documentos fictícios.
 interface PessoaDemo { id: number; nome: string; tipo: string; documento: string | null; papeis: string[]; saldo_aberto: number;
   telefone: string | null; email: string | null; cidade: string | null }
@@ -183,12 +209,30 @@ export const demo = {
     if (metodo === 'GET' && /^\/api\/app\/pessoas\/\d+\/cadastro$/.test(caminho)) {
       const p = PESSOAS.find((x) => x.id === Number(caminho.split('/')[4]));
       if (!p) throw Object.assign(new Error('Pessoa não encontrada.'), { status: 404 });
-      const pj = p.tipo === 'PJ';
-      return r({ id: p.id, nome: p.nome, tipo: p.tipo,
-        identificacao: { razao_social: pj ? p.nome + ' Ltda' : p.nome, documento: p.documento, indicador_ie: pj ? 'Contribuinte' : 'Não contribuinte', papeis: p.papeis },
-        endereco_fiscal: { cidade: p.cidade, uf: 'SC', cep: '88700-000', codigo_ibge: '4218707', email_nfe: p.email },
-        comercial: { classificacao: null, limite_credito: pj ? 5000 : null, prazo_padrao_dias: pj ? 28 : null },
-        consentimento: { whatsapp: p.telefone ? true : null, email_nfe: p.email ? true : null, sms: null, registrado_em: '2026-03-12T14:22:00-03:00' } });
+      return r(cadastroDemo(p));
+    }
+    if (metodo === 'PATCH' && /^\/api\/app\/pessoas\/\d+$/.test(caminho)) {
+      const p = PESSOAS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pessoa não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      const n = (corpo ?? {}) as Record<string, unknown>;
+      const campos: Record<string, string> = {};
+      if ('nome' in n && !String(n.nome ?? '').trim()) campos.nome = 'Informe o nome.';
+      const doc = String(n.documento ?? '').replace(/\D/g, '');
+      if (doc && doc.length !== (p.tipo === 'PJ' ? 14 : 11)) campos.documento = p.tipo === 'PJ' ? 'CNPJ inválido.' : 'CPF inválido.';
+      for (const k of ['email', 'email_nfe']) if (n[k] && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(n[k]))) campos[k] = 'E-mail inválido.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const c = { ...(EDICOES[p.id] ?? {}) };
+      for (const [k, v] of Object.entries(n)) {
+        if (k === 'consentimento') c.consentimento = { ...((c.consentimento as object | undefined) ?? {}), ...(v as object) };
+        else c[k] = v;
+      }
+      EDICOES[p.id] = c;
+      if ('nome' in n) p.nome = String(n.nome).trim();
+      if ('documento' in n) p.documento = (n.documento as string) || null;
+      if ('telefone' in n) p.telefone = (n.telefone as string) || null;
+      if ('email' in n) p.email = (n.email as string) || null;
+      if ('cidade' in n) p.cidade = (n.cidade as string) || null;
+      return r({ id: p.id });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/cep/')) {
       const cep = caminho.slice('/api/app/cep/'.length).replace(/\D/g, '');

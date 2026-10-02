@@ -30,7 +30,7 @@ export function Pessoas({ voltar, avisar }: { voltar?: ReactNode; avisar: (texto
     return <NovaPessoaTela avisar={avisar} aoCancelar={() => setNova(false)}
       aoSalvar={(id) => { setNova(false); setCadastro(false); setAberto(id); }} />;
   }
-  if (aberto !== null && cadastro) return <Cadastro id={aberto} aoVoltar={() => setCadastro(false)} />;
+  if (aberto !== null && cadastro) return <Cadastro id={aberto} avisar={avisar} aoVoltar={() => setCadastro(false)} />;
   return aberto !== null
     ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} aoAbrirCadastro={() => setCadastro(true)} />
     : <Lista aoAbrir={(id) => { setCadastro(false); setAberto(id); }} aoNova={() => setNova(true)} voltar={voltar} />;
