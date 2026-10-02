@@ -157,9 +157,32 @@ export interface TarefaDetalhe {
   concluida: boolean;
 }
 
+// ── Produtos (tela 19, Onda B). Contrato §9.1 (ERP #8574), 30 por página, por nome. Só leitura. ──
+export interface ProdutoResumo {
+  id: number; nome: string; codigo: string;
+  /** Nome da categoria; null = sem categoria. */
+  categoria: string | null;
+  /** "por " + unidade curta ("por m²"); null sem unidade. */
+  calculo: string | null;
+  /** Preço de venda com imposto; com variação é o menor. null = sem preço cadastrado. */
+  preco: number | null;
+  /** Quantas variações; null quando o produto é simples. */
+  variacoes: number | null;
+  /** qtd = soma nos locais que o usuário vê; null quando não controla estoque ("sob demanda"). */
+  estoque: { controla: boolean; qtd: number | null; unidade: string | null };
+  /** Regra do alerta da web: alguma variação × local com qtd ≤ alert_quantity. */
+  baixo: boolean;
+}
+export interface ListaProdutos {
+  itens: ProdutoResumo[];
+  /** Respeitam a busca, não o filtro de categoria. */
+  categorias: Array<{ id: number; nome: string; total: number }>;
+  total: number; baixo_estoque: number; pagina: number; tem_mais: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -347,6 +370,9 @@ export const api = {
    *  429 é o throttle padrão do Laravel ({ message: "Too Many Attempts." } + Retry-After), tratado pelo status. */
   cep: (cep: string) => chamar<EnderecoCep>('GET', `/api/app/cep/${cep.replace(/\D/g, '')}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
+  /** Tela 19 · Produtos (contrato §9.1). Sem product.view → 403 sem_permissao. */
+  produtos: (categoria: number | 'todas', pagina = 1, q = '') =>
+    chamar<ListaProdutos>('GET', `/api/app/produtos?categoria=${categoria}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
