@@ -372,8 +372,8 @@ export interface LinkPagamento {
   /** PDF do boleto; null em PIX (e quando o provedor não devolveu). Bolepix sai com `metodo` "qualquer". */
   link: string | null;
 }
-/** Documento que pode virar link de pagamento (GET /api/app/pagamentos/referencias). `valor` é só para exibir:
- *  o POST não manda valor — o ERP tira do documento. */
+/** Documento que pode virar link de pagamento (GET /api/app/pagamentos/referencias). `valor` = SALDO EM ABERTO do
+ *  documento (decisão [W], 2026-10-02) e é só para exibir: o POST não manda valor — o ERP calcula o mesmo saldo. */
 export interface ReferenciaCobranca { tipo: TipoReferencia; id: number; rotulo: string; cliente: string; valor: number }
 export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
 

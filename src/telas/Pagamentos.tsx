@@ -162,7 +162,8 @@ export function Pagamentos({ voltar, avisar }: { voltar?: ReactNode; avisar: (te
   );
 }
 
-/** Folha "Novo link de pagamento": escolhe o documento, o método e o prazo. O valor mostrado vem do ERP. */
+/** Folha "Novo link de pagamento": escolhe o documento, o método e o prazo. O valor mostrado é o saldo em aberto que o ERP
+ *  calcula (o link sai com esse valor). */
 function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
   fechar: () => void; aoGerar: (l: LinkPagamento) => void; ocupado: boolean; setOcupado: (v: 'novo' | null) => void;
 }) {
@@ -203,7 +204,7 @@ function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
                 const on = sel?.tipo === r.tipo && sel.id === r.id;
                 return (
                   <button key={r.tipo + r.id} role="radio" aria-checked={on} className={'pg-ref' + (on ? ' on' : '')} onClick={() => setSel(r)}>
-                    <span><b>{r.rotulo}</b><small>{r.cliente}</small></span><span className="pg-ref-v">{reais(r.valor)}</span>
+                    <span><b>{r.rotulo}</b><small>{r.cliente}</small></span><span className="pg-ref-v">{reais(r.valor)}<small>em aberto</small></span>
                   </button>
                 );
               })}

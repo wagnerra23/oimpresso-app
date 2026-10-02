@@ -445,7 +445,7 @@ export const demo = {
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
     }
     if (metodo === 'GET' && caminho === '/api/app/pagamentos/referencias') {
-      // Pedidos não concluídos e orçamentos enviados/aprovados, com o valor do próprio documento.
+      // Pedidos não concluídos e orçamentos enviados/aprovados. `valor` = saldo em aberto (na demo nada foi pago em parte, então é o total).
       const itens = [
         ...PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido').map((x) => ({ tipo: 'pedido', id: x.id, rotulo: 'Pedido #' + x.numero, cliente: x.cliente, valor: x.valor })),
         ...ORCAMENTOS.filter((x) => x.status === 'enviado' || x.status === 'aprovado').map((x) => ({ tipo: 'orcamento', id: x.id, rotulo: 'Orçamento ' + x.numero, cliente: x.cliente, valor: x.valor })),
