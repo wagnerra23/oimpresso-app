@@ -3,7 +3,7 @@
 // antes do registro no INPI e do certificado ICP-Brasil. O v4 mostra o selo; aqui ele sai de propósito.
 // Sem câmera, sem biometria (ADR 0383). Regras do servidor (MobileMarcacaoService) repetidas só
 // para não mandar o que vai voltar 422: GPS > 500 m e relógio > 30 s travam o botão.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
 import { api, drift, ErroApi, type Espelho, type EscalaHoje, type Intercorrencia, type MarcacaoCriada,
@@ -23,7 +23,7 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 const dataLonga = (d: Date) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()} · ${DIAS[d.getDay()]}`;
 const semColaborador = (e: unknown) => e instanceof ErroApi && e.codigo === 'sem_colaborador';
 
-export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
+export function Ponto({ avisar, online, voltar }: { avisar: Aviso; online: boolean; voltar?: ReactNode }) {
   const [aba, setAba] = useState<Aba>('bater');
   const [diaJustificar, setDiaJustificar] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
@@ -41,6 +41,7 @@ export function Ponto({ avisar, online }: { avisar: Aviso; online: boolean }) {
     <>
       <div className="p4-head">
         <div className="p4-head-row">
+          {voltar}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="p4-titulo">{titulo}</div>
             <div className="p4-sub">{me ? `${me.nome}${me.matricula ? ` · matrícula ${me.matricula}` : ''}` : 'Registro de ponto'}</div>
