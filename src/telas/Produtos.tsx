@@ -28,21 +28,20 @@ export function textoMeta(p: Pick<ProdutoResumo, 'codigo' | 'categoria' | 'calcu
 }
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
-type Categoria = { id: number; nome: string };
 
 export function Produtos({ voltar, avisar }: { voltar?: ReactNode; avisar: Aviso }) {
-  const [novo, setNovo] = useState<Categoria[] | null>(null);
+  const [novo, setNovo] = useState(false);
   // Muda depois de um cadastro: o catálogo volta recarregado, com o produto novo.
   const [versao, setVersao] = useState(0);
-  useVoltar(novo !== null, () => setNovo(null));
+  useVoltar(novo, () => setNovo(false));
   if (novo) {
-    return <NovoProdutoTela categorias={novo} avisar={avisar} aoCancelar={() => setNovo(null)}
-      aoVerCatalogo={() => { setNovo(null); setVersao((v) => v + 1); }} />;
+    return <NovoProdutoTela avisar={avisar} aoCancelar={() => setNovo(false)}
+      aoVerCatalogo={() => { setNovo(false); setVersao((v) => v + 1); }} />;
   }
-  return <Catalogo key={versao} voltar={voltar} aoNovo={ESCRITA_PRODUTO ? setNovo : undefined} />;
+  return <Catalogo key={versao} voltar={voltar} aoNovo={ESCRITA_PRODUTO ? () => setNovo(true) : undefined} />;
 }
 
-function Catalogo({ voltar, aoNovo }: { voltar?: ReactNode; aoNovo?: (categorias: Categoria[]) => void }) {
+function Catalogo({ voltar, aoNovo }: { voltar?: ReactNode; aoNovo?: () => void }) {
   const [categoria, setCategoria] = useState<number | 'todas'>('todas');
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
@@ -87,7 +86,7 @@ function Catalogo({ voltar, aoNovo }: { voltar?: ReactNode; aoNovo?: (categorias
             <div className="p4-rotulo">{rotulo}</div>
             <div className="pd-titulo">Produtos</div>
           </div>
-          {aoNovo && <button className="np-nova" onClick={() => aoNovo(dados?.categorias.map(({ id, nome }) => ({ id, nome })) ?? [])}>+ Produto</button>}
+          {aoNovo && <button className="np-nova" onClick={aoNovo}>+ Produto</button>}
         </div>
       </div>
       <div className="oi-scroll">

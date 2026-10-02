@@ -203,21 +203,44 @@ export interface ListaEstoque {
   itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
 }
 
-/** Tela 20 · Novo produto (Onda B escrita). PROVISÓRIO: o formato do ERP ainda não fechou (a sessão do ERP mede
- *  ProductUtil antes). Até lá o envio só existe na demo; fora dela a tela nem é oferecida (ESCRITA_PRODUTO).
- *  Regra mestre: o app não calcula preço. Manda custo e margem e mostra o preço que o ERP devolve. */
-export type VendaProduto = 'm2' | 'un' | 'mil';
-export interface NovoProduto {
-  nome: string; codigo: string | null; categoria_id: number | null; venda: VendaProduto;
-  /** Dinheiro em número com 2 casas (contrato §0). */
-  custo: number | null;
-  /** Margem em %, até 2 casas. */
-  margem: number | null;
-  estoque: { controla: boolean; minimo: number | null; prateleira: { rack: string | null; fileira: string | null; posicao: string | null } };
-  fiscal: { ncm: string | null; cfop: string | null; origem: number | null };
+/** Tela 29 · Movimentações, SÓ LEITURA (Onda B). Contrato §9.3 (ERP #8581): 30 por página, do mais novo ao mais
+ *  velho, o mesmo histórico da tela web. A tela só sai da demo quando o #8581 estiver em produção (DETALHE_ESTOQUE). A escrita (registrar movimento) espera decisão do Wagner: no ERP cada
+ *  tipo é uma transação contábil (entrada = compra; saída/perda = ajuste com FIFO). */
+export interface Movimento {
+  id: number;
+  /** Tipo da transação no ERP (purchase, sell, stock_adjustment, opening_stock, transferência…). */
+  tipo: string;
+  /** O mesmo texto da tela web ("Compra", "Venda", "Ajuste"…). */
+  rotulo: string;
+  /** "nº · fornecedor ou cliente" (só o nome), ou null. */
+  referencia: string | null;
+  /** ISO com hora. */
+  quando: string;
+  /** Com sinal: entrou +, saiu −. */
+  qtd: number;
+  /** Saldo acumulado depois deste movimento (calculado pelo ERP). */
+  saldo: number;
 }
-export interface PreviaPreco { preco: number }
-/** Liga a escrita de produto. Só a demo, até o ERP fechar o formato. */
+export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
+/** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
+export const DETALHE_ESTOQUE = DEMO;
+
+/** Tela 20 · Novo produto (Onda B escrita), contrato §9.4 (ERP #8582). Decisão [W] 2026-10-02: sem preço — o
+ *  produto nasce com preço zerado e o preço se acerta na web, então a tela não grava valor. Só tipo simples. */
+export interface OpcoesProduto {
+  categorias: Array<{ id: number; nome: string }>;
+  /** Unidades do business ("Metro quadrado" / "m²"). Não há m²/un/milheiro fixos. */
+  unidades: Array<{ id: number; nome: string; curta: string }>;
+}
+export interface NovoProduto {
+  nome: string; codigo: string | null; categoria_id: number | null; unidade_id: number;
+  /** minimo vai como número JSON (ponto decimal): o ERP não passa pelo num_uf. */
+  estoque: { controla: boolean; minimo: number | null };
+  /** Vai para a loja padrão do usuário (a primeira permitida). */
+  prateleira: { rack: string | null; fileira: string | null; posicao: string | null } | null;
+  fiscal: { ncm: string | null; cest: string | null; cfop_interno: string | null; cfop_externo: string | null };
+}
+/** Liga a tela 20. Só a demo, até o #8582 estar em produção. */
 export const ESCRITA_PRODUTO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
@@ -379,10 +402,10 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corp
   return r.data as T;
 }
 
-/** Escrita de produto fora da demo não sai do aparelho: o formato do ERP não fechou. */
-function escritaProduto<T>(caminho: string, corpo: unknown): Promise<T> {
+/** Cadastro de produto fora da demo não sai do aparelho até o #8582 estar em produção. */
+function escritaProduto<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
   if (!ESCRITA_PRODUTO) return Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastro de produto pelo app ainda não está disponível.'));
-  return chamar<T>('POST', caminho, corpo);
+  return chamar<T>(metodo, caminho, corpo);
 }
 
 export const api = {
@@ -422,11 +445,16 @@ export const api = {
   /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
   estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
     chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
-  /** Tela 20 · prévia do preço que o ERP calcula (não grava). PROVISÓRIO, só demo. */
-  previaPrecoProduto: (custo: number, margem: number) =>
-    escritaProduto<PreviaPreco>('/api/app/produtos/preco-previa', { custo, margem }),
-  /** Tela 20 · Novo produto. PROVISÓRIO, só demo: 201 { id, preco } · 422 { erro: "validacao", campos } · 403 sem_permissao. */
-  criarProduto: (p: NovoProduto) => escritaProduto<{ id: number; preco: number | null }>('/api/app/produtos', p),
+  /** Tela 29 · saldo e histórico de uma linha do estoque (contrato §9.3). 403 sem_permissao · 404 linha de outra empresa ou de loja não permitida. */
+  estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
+    ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
+
+  /** Tela 20 · categorias e unidades do business (contrato §9.4). */
+  opcoesProduto: () => escritaProduto<OpcoesProduto>('GET', '/api/app/produtos/opcoes'),
+  /** Tela 20 · Novo produto. 201 { id, codigo } · 422 { erro: "validacao", campos } (chaves aninhadas, ex. "fiscal.ncm";
+   *  unidade ou categoria de outra empresa voltam em unidade_id / categoria_id) · 403 sem_permissao (product.create). */
+  criarProduto: (p: NovoProduto) => escritaProduto<{ id: number; codigo: string }>('POST', '/api/app/produtos', p),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */

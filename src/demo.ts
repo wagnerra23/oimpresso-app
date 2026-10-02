@@ -49,6 +49,7 @@ const PEDIDOS = [
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
+const UNIDADES = [{ id: 1, nome: 'Metro quadrado', curta: 'm²' }, { id: 2, nome: 'Unidade', curta: 'un' }, { id: 3, nome: 'Milheiro', curta: 'mil' }];
 interface ProdutoDemo { id: number; nome: string; codigo: string; cat: number | null; unidade: string; preco: number | null; variacoes: number | null; qtd: number | null; baixo: boolean }
 const PRODUTOS: ProdutoDemo[] = [
   { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
@@ -69,6 +70,18 @@ const ESTOQUE = [
   { id: 306, produto_id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', qtd: 9, minimo: 10, unidade: 'un', local: 'Filial Norte', prateleira: 'B · 2 · 4' },
   { id: 307, produto_id: 202, nome: 'Caneca personalizada · Azul', codigo: 'BRD-CAN-AZ', qtd: 46, minimo: null, unidade: 'un', local: 'Filial Norte', prateleira: null },
 ];
+
+// Histórico da tela 29 (só leitura), imitando o protótipo. Horário relativo a hoje para "hoje"/"ontem" funcionarem.
+const quandoRel = (dias: number, h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() + dias); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string; referencia: string | null; quando: string; qtd: number; saldo: number }>> = {
+  301: [
+    { id: 9001, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2318 · Mercado Bom Preço', quando: quandoRel(0, 8, 10), qtd: -3.6, saldo: 18 },
+    { id: 9002, tipo: 'purchase', rotulo: 'Compra', referencia: 'NF 88213 · Distribuidora Sul Mídia', quando: quandoRel(-1, 15, 40), qtd: 20, saldo: 21.6 },
+    { id: 9003, tipo: 'stock_adjustment', rotulo: 'Ajuste', referencia: 'Refilo · ajuste de cor', quando: quandoRel(-6, 11, 5), qtd: -1.2, saldo: 1.6 },
+    { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4, saldo: 2.8 },
+  ],
+  306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
+};
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
@@ -279,6 +292,12 @@ export const demo = {
       PESSOAS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       return r({ id });
     }
+    const detEstoque = caminho.match(/^\/api\/app\/estoque\/(\d+)/);
+    if (metodo === 'GET' && detEstoque) {
+      const item = ESTOQUE.find((x) => x.id === Number(detEstoque[1]));
+      if (!item) throw Object.assign(new Error('Item de estoque não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      return r({ item, historico: HISTORICO[item.id] ?? [], pagina: 1, tem_mais: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/estoque')) {
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'todos';
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
@@ -287,32 +306,34 @@ export const demo = {
       return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
         pagina: 1, tem_mais: false });
     }
-    // Tela 20 (PROVISÓRIO até o ERP fechar o formato). A demo faz o papel do ERP: o preço sai daqui, não da tela.
-    // Conta em centavos inteiros: preço = custo + custo × margem / 100, arredondado a 2 casas.
-    const precoDemo = (custo: number, margem: number) => Math.round(Math.round(custo * 100) * (10000 + Math.round(margem * 100)) / 10000) / 100;
-    if (metodo === 'POST' && caminho === '/api/app/produtos/preco-previa') {
-      const n = (corpo ?? {}) as { custo?: number; margem?: number };
-      return r({ preco: precoDemo(Number(n.custo), Number(n.margem)) });
+    // Tela 20 (contrato §9.4). A demo faz o papel do ERP: produto nasce sem preço.
+    if (metodo === 'GET' && caminho === '/api/app/produtos/opcoes') {
+      return r({ categorias: CATEGORIAS, unidades: UNIDADES });
     }
     if (metodo === 'POST' && caminho === '/api/app/produtos') {
-      const n = (corpo ?? {}) as { nome?: string; codigo?: string | null; categoria_id?: number | null; venda?: string; custo?: number | null; margem?: number | null;
-        estoque?: { controla?: boolean; minimo?: number | null }; fiscal?: { ncm?: string | null; cfop?: string | null } };
+      const n = (corpo ?? {}) as { nome?: string; codigo?: string | null; categoria_id?: number | null; unidade_id?: number;
+        estoque?: { controla?: boolean; minimo?: number | null }; fiscal?: Record<string, string | null> };
       const campos: Record<string, string> = {};
       if (!String(n.nome ?? '').trim()) campos.nome = 'Informe o nome do produto.';
+      const unidade = UNIDADES.find((u) => u.id === n.unidade_id);
+      if (!unidade) campos.unidade_id = 'Unidade inválida.';
+      if (n.categoria_id != null && !CATEGORIAS.some((c) => c.id === n.categoria_id)) campos.categoria_id = 'Categoria inválida.';
       if (n.codigo && PRODUTOS.some((x) => x.codigo.toLowerCase() === String(n.codigo).toLowerCase())) campos.codigo = 'Este código já está em uso.';
       if (n.estoque?.minimo != null && n.estoque.minimo < 0) campos['estoque.minimo'] = 'O estoque mínimo não pode ser negativo.';
-      if (n.fiscal?.ncm && !/^\d{8}$/.test(n.fiscal.ncm)) campos['fiscal.ncm'] = 'O NCM tem 8 dígitos.';
-      if (n.fiscal?.cfop && !/^\d{4}$/.test(n.fiscal.cfop)) campos['fiscal.cfop'] = 'O CFOP tem 4 dígitos.';
+      const tam: Record<string, number> = { ncm: 8, cest: 7, cfop_interno: 4, cfop_externo: 4 };
+      for (const [k, t] of Object.entries(tam)) {
+        const v = n.fiscal?.[k];
+        if (v && (v.length !== t || /[^0-9]/.test(v))) campos['fiscal.' + k] = 'Informe ' + t + ' dígitos.';
+      }
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
       const id = 1 + Math.max(...PRODUTOS.map((x) => x.id));
-      const preco = n.custo != null && n.margem != null ? precoDemo(n.custo, n.margem) : null;
-      const unidade = n.venda === 'un' ? 'un' : n.venda === 'mil' ? 'mil' : 'm²';
-      PRODUTOS.push({ id, nome: String(n.nome).trim(), codigo: n.codigo || 'PRD-' + id, cat: n.categoria_id ?? null, unidade, preco,
+      const codigo = n.codigo || 'PRD-' + id;
+      PRODUTOS.push({ id, nome: String(n.nome).trim(), codigo, cat: n.categoria_id ?? null, unidade: unidade!.curta, preco: null,
         variacoes: null, qtd: n.estoque?.controla === false ? null : 0,
         // Regra do alerta da web: saldo ≤ mínimo. Nasce com saldo 0.
         baixo: n.estoque?.controla !== false && n.estoque?.minimo != null && 0 <= n.estoque.minimo });
       PRODUTOS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-      return r({ id, preco });
+      return r({ id, codigo });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
       const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';
