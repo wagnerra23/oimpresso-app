@@ -20,6 +20,7 @@ export const Ic = {
   usuario: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></>),
   calendario: svg(<><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18" /><path d="M8 3v4" /><path d="M16 3v4" /></>),
   sair: svg(<><path d="M15 4h4v16h-4" /><path d="M10 8l-4 4 4 4" /><path d="M6 12h10" /></>),
+  dinheiro: svg(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5v5M18 9.5v5" /></>),
   chat: svg(<><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8" /><path d="M8 12h5" /></>),
   sino: svg(<><path d="M6 9a6 6 0 1112 0v4l2 3H4l2-3V9z" /><path d="M10 19a2 2 0 004 0" /></>),
 };

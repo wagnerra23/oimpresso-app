@@ -20,6 +20,7 @@ import { Orcamentos } from './telas/Orcamentos';
 import { Assistente } from './telas/Assistente';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
+import { Financeiro } from './telas/Financeiro';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
@@ -130,6 +131,7 @@ export function App() {
         {aba === 'mais' && subMais === 'orcamentos' && <Orcamentos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'produtos' && <Produtos voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'estoque' && <Estoque filtroInicial={estoqueFiltro} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'financeiro' && <Financeiro voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'assistente' && <Assistente online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
