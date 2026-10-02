@@ -222,8 +222,8 @@ export interface Movimento {
   saldo: number;
 }
 export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
-/** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
-export const DETALHE_ESTOQUE = DEMO;
+/** Tela 29 ligada no app de loja: o ERP #8581 está em produção (rota medida respondendo 401 sem token). */
+export const DETALHE_ESTOQUE = true;
 
 /** Tela 20 · Novo produto (Onda B escrita), contrato §9.4 (ERP #8582). Decisão [W] 2026-10-02: sem preço — o
  *  produto nasce com preço zerado e o preço se acerta na web, então a tela não grava valor. Só tipo simples. */
