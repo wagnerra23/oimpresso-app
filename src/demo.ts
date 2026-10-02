@@ -168,7 +168,7 @@ export const demo = {
         identificacao: { razao_social: pj ? p.nome + ' Ltda' : p.nome, documento: p.documento, indicador_ie: pj ? 'Contribuinte' : 'Não contribuinte', papeis: p.papeis },
         endereco_fiscal: { cidade: p.cidade, uf: 'SC', cep: '88700-000', codigo_ibge: '4218707', email_nfe: p.email },
         comercial: { classificacao: p.saldo_aberto > 0 ? 'C' : 'B', limite_credito: pj ? 5000 : null, prazo_padrao_dias: pj ? 28 : null },
-        consentimento: { whatsapp: p.telefone ? true : null, email_nfe: p.email ? true : null, sms: false, registrado_em: '2026-03-12T14:22:00-03:00' } });
+        consentimento: { whatsapp: p.telefone ? true : null, email_nfe: p.email ? true : null, sms: null, registrado_em: '2026-03-12T14:22:00-03:00' } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pessoas')) {
       const det = caminho.match(/^\/api\/app\/pessoas\/(\d+)/);

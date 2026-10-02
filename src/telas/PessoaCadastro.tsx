@@ -1,6 +1,6 @@
 // Dados cadastrais da pessoa — desenho v4 (tela 34 · Ficha cadastral), D16 Onda A. Só leitura: o
 // "Editar" do protótipo fica de fora até a escrita entrar num PR próprio. Abre a partir da ficha
-// (tela 18). Rota PROPOSTA pelo app (GET /api/app/pessoas/{id}/cadastro) — ver PessoaCadastro em api.ts.
+// (tela 18). Rota GET /api/app/pessoas/{id}/cadastro, contrato §4.1 (ERP #8552).
 import { useEffect, useState } from 'react';
 import { api, type PapelPessoa, type PessoaCadastro } from '../api';
 import { reais } from './Pedidos';
