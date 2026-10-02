@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPessoas, type ListaPessoas, type PapelPessoa, type PessoaDetalhe, type PessoaResumo } from '../api';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
+import { Cadastro } from './PessoaCadastro';
+import { Ic } from '../icones';
 
 const FILTROS: Array<{ id: FiltroPessoas; label: string }> = [
   { id: 'todos', label: 'Todos' }, { id: 'clientes', label: 'Clientes' }, { id: 'fornecedores', label: 'Fornecedores' },
@@ -17,8 +19,14 @@ const letra = (nome: string) => nome.normalize('NFD').replace(/[̀-ͯ]/g, '').ch
 
 export function Pessoas({ voltar }: { voltar?: ReactNode }) {
   const [aberto, setAberto] = useState<number | null>(null);
+  const [cadastro, setCadastro] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
-  return aberto !== null ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} /> : <Lista aoAbrir={setAberto} voltar={voltar} />;
+  // Registrado depois do da ficha: o voltar fecha os dados cadastrais primeiro.
+  useVoltar(aberto !== null && cadastro, () => setCadastro(false));
+  if (aberto !== null && cadastro) return <Cadastro id={aberto} aoVoltar={() => setCadastro(false)} />;
+  return aberto !== null
+    ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} aoAbrirCadastro={() => setCadastro(true)} />
+    : <Lista aoAbrir={(id) => { setCadastro(false); setAberto(id); }} voltar={voltar} />;
 }
 
 function Lista({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: ReactNode }) {
@@ -110,7 +118,7 @@ function Lista({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: Re
   );
 }
 
-function Ficha({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+function Ficha({ id, aoVoltar, aoAbrirCadastro }: { id: number; aoVoltar: () => void; aoAbrirCadastro: () => void }) {
   const [p, setP] = useState<PessoaDetalhe | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { api.pessoa(id).then(setP).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')); }, [id]);
@@ -150,6 +158,14 @@ function Ficha({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
               <div className="ps-kpi"><span>Pedidos</span><b>{p.kpis.pedidos}</b></div>
               <div className="ps-kpi"><span>Ticket</span><b>{p.kpis.pedidos ? reais(p.kpis.ticket_medio) : '—'}</b></div>
               <div className="ps-kpi"><span>Em aberto</span><b className={p.kpis.saldo_aberto > 0 ? 'debito' : ''}>{p.kpis.saldo_aberto > 0 ? reais(p.kpis.saldo_aberto) : '—'}</b></div>
+            </div>
+
+            <div className="p4-lista">
+              <button className="ms-linha" onClick={aoAbrirCadastro}>
+                <span className="ms-ico"><Ic.pedido tamanho={18} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}><b>Dados cadastrais</b><small>Documento, endereço fiscal, comercial e LGPD</small></span>
+                <span aria-hidden="true">›</span>
+              </button>
             </div>
 
             <div className="p4-rotulo">Contato</div>

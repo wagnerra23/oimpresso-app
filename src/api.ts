@@ -67,6 +67,17 @@ export interface PessoaResumo {
 export interface ListaPessoas {
   itens: PessoaResumo[]; contadores: Record<FiltroPessoas, number>; pagina: number; tem_mais: boolean;
 }
+/** Tela 34 · Dados cadastrais (D16, Onda A). Formato PROPOSTO pelo app — a rota ainda não existe no ERP;
+ *  a coordenação fecha o contrato. Campo que o ERP não tem vem null e a linha mostra "—". */
+export interface PessoaCadastro {
+  id: number; nome: string; tipo: 'PF' | 'PJ' | null;
+  identificacao: { razao_social: string | null; documento: string | null; indicador_ie: string | null; papeis: PapelPessoa[] };
+  endereco_fiscal: { cidade: string | null; uf: string | null; cep: string | null; codigo_ibge: string | null; email_nfe: string | null };
+  comercial: { classificacao: string | null; limite_credito: number | null; prazo_padrao_dias: number | null };
+  /** LGPD Art. 7º: true = autorizado, false = não autorizado, null = sem registro. */
+  consentimento: { whatsapp: boolean | null; email_nfe: boolean | null; sms: boolean | null; registrado_em: string | null };
+}
+
 export interface PessoaDetalhe {
   id: number; nome: string; tipo: 'PF' | 'PJ' | null;
   /** Só vem com a permissão de ver contato completo (contrato §4); null caso contrário. */
@@ -237,6 +248,7 @@ export const api = {
   pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
+  pessoaCadastro: (id: number) => chamar<PessoaCadastro>('GET', `/api/app/pessoas/${id}/cadastro`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),

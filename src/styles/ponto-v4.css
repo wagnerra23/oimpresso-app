@@ -267,3 +267,6 @@ a.p4-link { text-decoration: none; }
 .in-fin { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .in-ver { margin-left: auto; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); }
 .in-secao-h { display: flex; align-items: center; }
+
+/* Dados cadastrais — tela 34 do v4 (coluna de rótulo de 120px, como o protótipo) */
+.pc-dado span { width: 120px; }
