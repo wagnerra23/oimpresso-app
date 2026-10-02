@@ -227,7 +227,7 @@ export const DETALHE_ESTOQUE = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -294,6 +294,21 @@ export interface PainelFinanceiro {
   contas: Array<{ id: number; nome: string; detalhe: string | null; saldo: number | null }>;
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
 }
+
+/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Emitir, consultar a SEFAZ,
+ *  cancelar e abrir o DANFE ficam para o PR de escrita. */
+export type StatusFiscal = 'rascunho' | 'processando' | 'autorizado' | 'cancelado' | 'rejeitado';
+export type FiltroFiscal = 'todos' | StatusFiscal;
+export interface DocumentoFiscal {
+  id: number; tipo: 'NFe' | 'NFCe' | 'NFSe'; numero: string | null;
+  /** Texto pronto, ex.: "Pedido #4790 · Clínica Vita". */
+  referencia: string | null; valor: number; status: StatusFiscal;
+  /** Chave de acesso (só autorizado). */
+  chave: string | null;
+  /** Motivo da rejeição, em PT-BR. */
+  erro: string | null; emitido_em: string | null;
+}
+export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<FiltroFiscal, number>; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -451,6 +466,7 @@ export const api = {
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
+  fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
