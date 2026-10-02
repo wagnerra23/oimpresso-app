@@ -47,6 +47,40 @@ const PEDIDOS = [
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
 
+// Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
+const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
+const PRODUTOS = [
+  { id: 201, nome: 'Adesivo vinil impresso', codigo: 'ADS-VIN', cat: 2, unidade: 'm²', preco: 58, variacoes: null, qtd: 64, baixo: false },
+  { id: 202, nome: 'Caneca personalizada', codigo: 'BRD-CAN', cat: 5, unidade: 'un', preco: 29, variacoes: 3, qtd: 46, baixo: false },
+  { id: 203, nome: 'Cartão de visita 4×4', codigo: 'CRT-500', cat: 3, unidade: 'mil', preco: 145, variacoes: null, qtd: null, baixo: false },
+  { id: 204, nome: 'Letra caixa inox', codigo: 'LTC-INX', cat: null, unidade: 'un', preco: 190, variacoes: null, qtd: null, baixo: false },
+  { id: 205, nome: 'Lona front-light 440g', codigo: 'LON-440', cat: 1, unidade: 'm²', preco: 42, variacoes: null, qtd: 18, baixo: true },
+  { id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', cat: 4, unidade: 'un', preco: 38, variacoes: null, qtd: 9, baixo: true },
+];
+
+// Estoque da demo (contrato §9.2): uma linha por variação × loja, imitando o protótipo da tela 05.
+const ESTOQUE = [
+  { id: 301, produto_id: 205, nome: 'Lona front-light 440g', codigo: 'LON-440', qtd: 18, minimo: 50, unidade: 'm²', local: 'Loja Centro', prateleira: 'A · 1 · 2' },
+  { id: 302, produto_id: 201, nome: 'Vinil adesivo branco brilho', codigo: 'VIN-BR', qtd: 64, minimo: 40, unidade: 'm²', local: 'Loja Centro', prateleira: 'A · 3 · 1' },
+  { id: 303, produto_id: 207, nome: 'Chapa ACM 3 mm · Prata', codigo: 'ACM-3P', qtd: 3, minimo: 6, unidade: 'un', local: 'Loja Centro', prateleira: null },
+  { id: 304, produto_id: 208, nome: 'Tinta eco-solvente · Ciano', codigo: 'TNT-C', qtd: 2.5, minimo: 4, unidade: 'L', local: 'Loja Centro', prateleira: null },
+  { id: 305, produto_id: 209, nome: 'Ilhós latão 10 mm', codigo: 'ILH-10', qtd: 2400, minimo: 1000, unidade: 'un', local: 'Loja Centro', prateleira: 'G · 7 · 1' },
+  { id: 306, produto_id: 206, nome: 'Placa PS 2 mm', codigo: 'PS-2B', qtd: 9, minimo: 10, unidade: 'un', local: 'Filial Norte', prateleira: 'B · 2 · 4' },
+  { id: 307, produto_id: 202, nome: 'Caneca personalizada · Azul', codigo: 'BRD-CAN-AZ', qtd: 46, minimo: null, unidade: 'un', local: 'Filial Norte', prateleira: null },
+];
+
+// Histórico da tela 29 (só leitura), imitando o protótipo. Horário relativo a hoje para "hoje"/"ontem" funcionarem.
+const quandoRel = (dias: number, h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() + dias); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string; referencia: string | null; quando: string; qtd: number; saldo: number }>> = {
+  301: [
+    { id: 9001, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2318 · Mercado Bom Preço', quando: quandoRel(0, 8, 10), qtd: -3.6, saldo: 18 },
+    { id: 9002, tipo: 'purchase', rotulo: 'Compra', referencia: 'NF 88213 · Distribuidora Sul Mídia', quando: quandoRel(-1, 15, 40), qtd: 20, saldo: 21.6 },
+    { id: 9003, tipo: 'stock_adjustment', rotulo: 'Ajuste', referencia: 'Refilo · ajuste de cor', quando: quandoRel(-6, 11, 5), qtd: -1.2, saldo: 1.6 },
+    { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4, saldo: 2.8 },
+  ],
+  306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
+};
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -103,6 +137,17 @@ const ORCAMENTOS = [
   { id: 204, numero: 'ORC-0115', titulo: 'Cardápio A3 laminado — 20 un', cliente: 'Bistrô do Forno', validade: null, status: 'convertido', valor: 210, area_m2: null, itens: 1 },
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
+
+// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias` vira data dentro do handler.
+const LANCAMENTOS = [
+  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, valor: 7840, pago: false },
+  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, valor: 1260, pago: false },
+  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, valor: 2315, pago: false },
+  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, valor: 4380, pago: false },
+  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, valor: 1920, pago: false },
+  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, valor: 3420, pago: true },
+  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, valor: 2760, pago: true },
+] as const;
 
 // Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
 const FISCAIS = [
@@ -266,6 +311,31 @@ export const demo = {
       PESSOAS.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       return r({ id });
     }
+    const detEstoque = caminho.match(/^\/api\/app\/estoque\/(\d+)/);
+    if (metodo === 'GET' && detEstoque) {
+      const item = ESTOQUE.find((x) => x.id === Number(detEstoque[1]));
+      if (!item) throw Object.assign(new Error('Item de estoque não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      return r({ item, historico: HISTORICO[item.id] ?? [], pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/estoque')) {
+      const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'todos';
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const baixo = (x: (typeof ESTOQUE)[number]) => x.minimo !== null && x.qtd <= x.minimo;
+      const busca = ESTOQUE.filter((x) => !q || x.nome.toLowerCase().includes(q) || x.codigo.toLowerCase().includes(q));
+      return r({ itens: busca.filter((x) => filtro === 'todos' || baixo(x)), contadores: { todos: busca.length, baixo: busca.filter(baixo).length },
+        pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/produtos')) {
+      const cat = (caminho.match(/categoria=(\w+)/) || [])[1] || 'todas';
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const nomeCat = (id: number | null) => CATEGORIAS.find((c) => c.id === id)?.nome ?? null;
+      const busca = PRODUTOS.filter((x) => !q || [x.nome, x.codigo, nomeCat(x.cat) ?? ''].some((t) => t.toLowerCase().includes(q)));
+      const categorias = CATEGORIAS.map((c) => ({ ...c, total: busca.filter((x) => x.cat === c.id).length })).filter((c) => c.total > 0);
+      const itens = busca.filter((x) => cat === 'todas' || x.cat === Number(cat)).map((x) => ({
+        id: x.id, nome: x.nome, codigo: x.codigo, categoria: nomeCat(x.cat), calculo: 'por ' + x.unidade, preco: x.preco, variacoes: x.variacoes,
+        estoque: { controla: x.qtd !== null, qtd: x.qtd, unidade: x.qtd !== null ? x.unidade : 'un' }, baixo: x.baixo }));
+      return r({ itens, categorias, total: busca.length, baixo_estoque: busca.filter((x) => x.baixo).length, pagina: 1, tem_mais: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pessoas')) {
       const det = caminho.match(/^\/api\/app\/pessoas\/(\d+)/);
       if (det) {
@@ -293,7 +363,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'fiscal', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'ponto', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
@@ -333,6 +403,25 @@ export const demo = {
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
+      const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const hoje = diaRel(0);
+      const todos = LANCAMENTOS.map(({ dias, pago, ...l }) => {
+        const data = diaRel(dias);
+        return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto' };
+      });
+      const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
+      const extrato = todos.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
+      const itens = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
+      const recebido = 148230, pago = 96410;
+      return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
+          a_receber: soma(abertos('receber')), vencido: soma(abertos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertos('pagar')) },
+        contas: [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
+          { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
+        itens, contadores: { receber: abertos('receber').length, pagar: abertos('pagar').length, extrato: extrato.length }, pagina: 1, tem_mais: false });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

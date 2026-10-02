@@ -157,9 +157,77 @@ export interface TarefaDetalhe {
   concluida: boolean;
 }
 
+// ── Produtos (tela 19, Onda B). Contrato §9.1 (ERP #8574), 30 por página, por nome. Só leitura. ──
+export interface ProdutoResumo {
+  id: number; nome: string; codigo: string;
+  /** Nome da categoria; null = sem categoria. */
+  categoria: string | null;
+  /** "por " + unidade curta ("por m²"); null sem unidade. */
+  calculo: string | null;
+  /** Preço de venda com imposto; com variação é o menor. null = sem preço cadastrado. */
+  preco: number | null;
+  /** Quantas variações; null quando o produto é simples. */
+  variacoes: number | null;
+  /** qtd = soma nos locais que o usuário vê; null quando não controla estoque ("sob demanda"). */
+  estoque: { controla: boolean; qtd: number | null; unidade: string | null };
+  /** Regra do alerta da web: alguma variação × local com qtd ≤ alert_quantity. */
+  baixo: boolean;
+}
+export interface ListaProdutos {
+  itens: ProdutoResumo[];
+  /** Respeitam a busca, não o filtro de categoria. */
+  categorias: Array<{ id: number; nome: string; total: number }>;
+  total: number; baixo_estoque: number; pagina: number; tem_mais: boolean;
+}
+
+// ── Estoque (tela 05, Onda B). Contrato §9.2 (ERP #8577), 30 por página, por nome. Só leitura. ──
+export type FiltroEstoque = 'todos' | 'baixo';
+/** Uma linha por variação × loja; só produto que controla estoque e só lojas que o usuário vê. */
+export interface ItemEstoque {
+  /** variation_location_details.id (a linha), não o produto. */
+  id: number; produto_id: number;
+  /** Traz a variação quando o produto é variável ("Caneca · Azul"). */
+  nome: string;
+  /** SKU da variação ou do produto. */
+  codigo: string | null;
+  qtd: number;
+  /** alert_quantity; null = sem mínimo (nunca "baixo"). */
+  minimo: number | null;
+  unidade: string | null;
+  /** Nome da loja. */
+  local: string;
+  /** "rack · fileira · posição" (product_racks), ou null. */
+  prateleira: string | null;
+}
+export interface ListaEstoque {
+  itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
+}
+
+/** Tela 29 · Movimentações, SÓ LEITURA (Onda B). Contrato §9.3 (ERP #8581): 30 por página, do mais novo ao mais
+ *  velho, o mesmo histórico da tela web. A tela só sai da demo quando o #8581 estiver em produção (DETALHE_ESTOQUE). A escrita (registrar movimento) espera decisão do Wagner: no ERP cada
+ *  tipo é uma transação contábil (entrada = compra; saída/perda = ajuste com FIFO). */
+export interface Movimento {
+  id: number;
+  /** Tipo da transação no ERP (purchase, sell, stock_adjustment, opening_stock, transferência…). */
+  tipo: string;
+  /** O mesmo texto da tela web ("Compra", "Venda", "Ajuste"…). */
+  rotulo: string;
+  /** "nº · fornecedor ou cliente" (só o nome), ou null. */
+  referencia: string | null;
+  /** ISO com hora. */
+  quando: string;
+  /** Com sinal: entrou +, saiu −. */
+  qtd: number;
+  /** Saldo acumulado depois deste movimento (calculado pelo ERP). */
+  saldo: number;
+}
+export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
+/** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
+export const DETALHE_ESTOQUE = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'fiscal' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -210,6 +278,22 @@ export interface Notificacao {
   destino: { tipo: DestinoNotificacao | null; id: number | string | null };
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
+
+/** Tela 06 · Financeiro (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente).
+ *  `resumo` e `contas` não mudam com a aba; só `itens` e a paginação. Valor sempre positivo: o sinal vem de `tipo`. */
+export type AbaFinanceiro = 'receber' | 'pagar' | 'extrato';
+export type StatusLancamento = 'aberto' | 'vencido' | 'liquidado';
+export interface Lancamento {
+  id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null;
+  vencimento: string | null; pago_em: string | null; valor: number; status: StatusLancamento;
+}
+export interface PainelFinanceiro {
+  /** `vencido` = parte vencida do a receber (já contida em `a_receber`). */
+  resumo: { mes: string; recebido: number; pago: number; saldo: number; a_receber: number; vencido: number; a_pagar: number };
+  /** `saldo` null quando o ERP não sabe o saldo da conta; `detalhe` é texto pronto (banco · agência). */
+  contas: Array<{ id: number; nome: string; detalhe: string | null; saldo: number | null }>;
+  itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
+}
 
 /** Tela 14 · Fiscal (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
@@ -362,6 +446,16 @@ export const api = {
    *  429 é o throttle padrão do Laravel ({ message: "Too Many Attempts." } + Retry-After), tratado pelo status. */
   cep: (cep: string) => chamar<EnderecoCep>('GET', `/api/app/cep/${cep.replace(/\D/g, '')}`),
   producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
+  /** Tela 19 · Produtos (contrato §9.1). Sem product.view → 403 sem_permissao. */
+  produtos: (categoria: number | 'todas', pagina = 1, q = '') =>
+    chamar<ListaProdutos>('GET', `/api/app/produtos?categoria=${categoria}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
+  estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
+    chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 29 · saldo e histórico de uma linha do estoque (contrato §9.3). 403 sem_permissao · 404 linha de outra empresa ou de loja não permitida. */
+  estoqueDetalhe: (id: number, pagina = 1) => (DETALHE_ESTOQUE
+    ? chamar<DetalheEstoque>('GET', `/api/app/estoque/${id}?pagina=${pagina}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Movimentações pelo app ainda não estão disponíveis.'))),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
@@ -371,6 +465,7 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
