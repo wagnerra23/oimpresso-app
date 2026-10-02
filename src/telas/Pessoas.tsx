@@ -1,11 +1,13 @@
 // Pessoas — desenho v4 (telas 17 Pessoas · 18 Ficha do cliente), dados pelo contrato
-// API-CONTRATO-v1 §4 (ERP #8497). "+ Nova" abre a tela 09 (NovaPessoa.tsx). Fora do v4 de propósito "Editar",
-// "Dados cadastrais" (tela 34) e "Novo pedido" — não estão no contrato. Os chips seguem o contrato
+// API-CONTRATO-v1 §4 (ERP #8497). "+ Nova" abre a tela 09 (NovaPessoa.tsx) e "Dados cadastrais" a tela 34
+// (PessoaCadastro.tsx). Fora do v4 de propósito "Editar" e "Novo pedido" — não estão no contrato. Os chips seguem o contrato
 // (Todos/Clientes/Fornecedores/Funcionários/Em débito), não os do protótipo (PJ/PF).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPessoas, type ListaPessoas, type PapelPessoa, type PessoaDetalhe, type PessoaResumo } from '../api';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
+import { Cadastro } from './PessoaCadastro';
+import { Ic } from '../icones';
 import { NovaPessoaTela } from './NovaPessoa';
 
 const FILTROS: Array<{ id: FiltroPessoas; label: string }> = [
@@ -18,14 +20,20 @@ const letra = (nome: string) => nome.normalize('NFD').replace(/[̀-ͯ]/g, '').ch
 
 export function Pessoas({ voltar, avisar }: { voltar?: ReactNode; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aberto, setAberto] = useState<number | null>(null);
+  const [cadastro, setCadastro] = useState(false);
   const [nova, setNova] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
+  // Registrado depois do da ficha: o voltar fecha os dados cadastrais primeiro.
+  useVoltar(aberto !== null && cadastro, () => setCadastro(false));
   useVoltar(nova, () => setNova(false));
   if (nova) {
     return <NovaPessoaTela avisar={avisar} aoCancelar={() => setNova(false)}
-      aoSalvar={(id) => { setNova(false); setAberto(id); }} />;
+      aoSalvar={(id) => { setNova(false); setCadastro(false); setAberto(id); }} />;
   }
-  return aberto !== null ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} /> : <Lista aoAbrir={setAberto} aoNova={() => setNova(true)} voltar={voltar} />;
+  if (aberto !== null && cadastro) return <Cadastro id={aberto} aoVoltar={() => setCadastro(false)} />;
+  return aberto !== null
+    ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} aoAbrirCadastro={() => setCadastro(true)} />
+    : <Lista aoAbrir={(id) => { setCadastro(false); setAberto(id); }} aoNova={() => setNova(true)} voltar={voltar} />;
 }
 
 function Lista({ aoAbrir, aoNova, voltar }: { aoAbrir: (id: number) => void; aoNova: () => void; voltar?: ReactNode }) {
@@ -118,7 +126,7 @@ function Lista({ aoAbrir, aoNova, voltar }: { aoAbrir: (id: number) => void; aoN
   );
 }
 
-function Ficha({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+function Ficha({ id, aoVoltar, aoAbrirCadastro }: { id: number; aoVoltar: () => void; aoAbrirCadastro: () => void }) {
   const [p, setP] = useState<PessoaDetalhe | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { api.pessoa(id).then(setP).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')); }, [id]);
@@ -158,6 +166,14 @@ function Ficha({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
               <div className="ps-kpi"><span>Pedidos</span><b>{p.kpis.pedidos}</b></div>
               <div className="ps-kpi"><span>Ticket</span><b>{p.kpis.pedidos ? reais(p.kpis.ticket_medio) : '—'}</b></div>
               <div className="ps-kpi"><span>Em aberto</span><b className={p.kpis.saldo_aberto > 0 ? 'debito' : ''}>{p.kpis.saldo_aberto > 0 ? reais(p.kpis.saldo_aberto) : '—'}</b></div>
+            </div>
+
+            <div className="p4-lista">
+              <button className="ms-linha" onClick={aoAbrirCadastro}>
+                <span className="ms-ico"><Ic.pedido tamanho={18} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}><b>Dados cadastrais</b><small>Documento, endereço fiscal, comercial e LGPD</small></span>
+                <span aria-hidden="true">›</span>
+              </button>
             </div>
 
             <div className="p4-rotulo">Contato</div>

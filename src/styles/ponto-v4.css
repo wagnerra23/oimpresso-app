@@ -271,6 +271,9 @@ a.p4-link { text-decoration: none; }
 .in-ver { margin-left: auto; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); }
 .in-secao-h { display: flex; align-items: center; }
 
+/* Dados cadastrais — tela 34 do v4 (coluna de rótulo de 120px, como o protótipo) */
+.pc-dado span { width: 120px; }
+
 /* Orçamentos — tela 04 do v4 */
 .oc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .oc-l1 { display: flex; align-items: flex-start; gap: 10px; }
