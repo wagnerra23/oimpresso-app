@@ -174,7 +174,8 @@ function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
 
   useEffect(() => {
     let vivo = true;
-    api.referenciasCobranca().then((r) => { if (vivo) { setRefs(r.itens); setSel(r.itens[0] ?? null); } }).catch((e) => { if (vivo) setErro(msgErro(e)); });
+    // Sem documento pré-selecionado: quem gera a cobrança escolhe, e o botão só habilita depois disso.
+    api.referenciasCobranca().then((r) => { if (vivo) setRefs(r.itens); }).catch((e) => { if (vivo) setErro(msgErro(e)); });
     return () => { vivo = false; };
   }, []);
 
@@ -218,7 +219,7 @@ function NovoLink({ fechar, aoGerar, ocupado, setOcupado }: {
           </div>
           {erro && <p className="pg-erro" role="alert">{erro}</p>}
           <button className="oi-btn primary block pg-gerar" disabled={!sel || ocupado} onClick={gerar}>
-            {ocupado ? 'Gerando…' : sel ? `Gerar link de ${reais(sel.valor)}` : 'Gerar link'}
+            {ocupado ? 'Gerando…' : sel ? `Gerar link de ${reais(sel.valor)}` : 'Escolha o pedido ou orçamento'}
           </button>
         </div>
       </div>
