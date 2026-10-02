@@ -79,7 +79,9 @@ export const lightPalette: OiPalette = {
   action2: "#12773d",
   actionSoft: "#d3f5db",
   actionFg: "#ffffff",
-  info: "#2ea7ff",
+  // Só do app (o .cockpit do DS não tem --info). Era #2ea7ff (2,49:1 sobre --bg); escurecido mantendo
+  // o matiz até 4,5:1 sobre --bg e --surface — [W] 2026-10-02, mesma regra do --text-mute no DS.
+  info: "#0076cc",
   danger: "#c53637", // --neg
   warn: "#a76c12", // --warn
   ok: "#21763c", // --pos
