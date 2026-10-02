@@ -116,13 +116,16 @@ iOS (Mac): `npx cap open ios` e rodar pelo Xcode.
 
 ## Ícone e splash
 
+O gerador roda sob demanda (`npx`), fora das dependências: ele puxa o `sharp`, que não serve ao build e
+derrubava o `npm ci` do CI por timeout de rede.
+
 Coloque as artes (vêm da sessão de ativos) em `assets/`:
 
 - `assets/icon-only.png` (1024×1024), `assets/icon-foreground.png` + `assets/icon-background.png`
   (adaptativo Android), `assets/splash.png` e `assets/splash-dark.png` (2732×2732).
 
 ```bash
-npx capacitor-assets generate
+npx @capacitor/assets@3.0.5 generate --iconBackgroundColor '#795BBF' --splashBackgroundColor '#795BBF'
 ```
 
 ## Segredos — nunca no git
