@@ -22,9 +22,10 @@ interface Props {
   irParaPonto: () => void; irParaPedidos: () => void; irParaTarefas: () => void;
   /** Abre a área de destino de uma notificação (tela 16). */
   abrirDestino: (tipo: DestinoNotificacao, id: number | string | null) => void;
+  avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 }
 
-export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino }: Props) {
+export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino, avisar }: Props) {
   const [painel, setPainel] = useState<PainelInicio | null>(null);
   const [notif, setNotif] = useState(false);
   useVoltar(notif, () => setNotif(false));
@@ -47,7 +48,10 @@ export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino
   const k = painel?.kpis;
   const temKpi = !!k && (k.pedidos_ativos !== null || k.pedidos_atrasados !== null || k.estoque_baixo !== null);
 
-  if (notif) return <Notificacoes aoVoltar={() => setNotif(false)} abrirDestino={(tipo, id) => { setNotif(false); abrirDestino(tipo, id); }} />;
+  if (notif) {
+    return <Notificacoes aoVoltar={() => setNotif(false)} abrirDestino={(tipo, id) => { setNotif(false); abrirDestino(tipo, id); }}
+      avisar={avisar} aoMudarNaoLidas={(n) => setPainel((p) => (p ? { ...p, nao_lidas: n } : p))} />;
+  }
 
   return (
     <>
