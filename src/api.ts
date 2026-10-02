@@ -230,21 +230,26 @@ export const DETALHE_ESTOQUE = DEMO;
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'ponto' | 'ponto_gestor' | 'mais';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
- *  justificativas da tela 38 ficam para outra tela). FORMATO PROPOSTO, ainda sem rota no ERP.
+ *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
  *  Validar aceita a marcação; Recusar grava uma ANULAÇÃO — a marcação original nunca muda (Portaria 671). */
 export type EstadoValidacao = 'pendente' | 'validada' | 'recusada';
 export type FiltroValidacao = EstadoValidacao | 'todas';
 export interface MarcacaoAValidar {
-  id: number; colaborador_nome: string; tipo: string;
-  /** Endereço ou nome do local, como o ERP descreve. */
+  /** UUID da marcação (chave de ponto_marcacoes). */
+  id: string; colaborador_nome: string; tipo: string;
+  /** Distância até o centro do geofence ("A 84,2 km do local de trabalho"); null sem geofence na empresa. */
   local_texto: string | null;
   /** ISO com hora. */
   marcada_em: string; nsr: number;
-  /** Precisão do GPS em metros (acima de 500 o servidor recusa e nem chega aqui). */
-  gps_precisao_m: number;
+  /** Precisão do GPS em metros. Hoje sempre null: o REP-P não grava a precisão na marcação, só no log. */
+  gps_precisao_m: number | null;
   dispositivo: string | null; hash_curto: string; estado: EstadoValidacao;
 }
-export interface ListaValidacao { itens: MarcacaoAValidar[]; contadores: Record<FiltroValidacao, number> }
+export interface ListaValidacao {
+  itens: MarcacaoAValidar[]; contadores: Record<FiltroValidacao, number>;
+  /** Só quem tem ponto.aprovacoes.manage recusa (regra da web); sem isso recusar devolve 403. Validar é livre. */
+  pode_recusar: boolean;
+}
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -484,11 +489,11 @@ export const api = {
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
-  /** Tela 39 (proposta, sem rota no ERP ainda). */
+  /** Tela 39. Contrato §12.1 (ERP #8586). Erros: 403 sem_permissao · 404 nao_encontrado · 409 ja_revisada · 503 trilha_desligada. */
   marcacoesAValidar: (estado: FiltroValidacao) => chamar<ListaValidacao>('GET', `/api/app/ponto/aprovacoes?estado=${estado}`),
-  validarMarcacao: (id: number) => chamar<{ estado: 'validada' }>('POST', `/api/app/ponto/aprovacoes/${id}/validar`),
-  /** Grava a anulação no servidor. Nada de UPDATE/DELETE na marcação: ela continua imutável. */
-  recusarMarcacao: (id: number) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${id}/recusar`),
+  validarMarcacao: (id: string) => chamar<{ estado: 'validada' }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/validar`),
+  /** Grava a anulação no servidor (motivo fixo no ERP). Nada de UPDATE/DELETE na marcação: ela continua imutável. */
+  recusarMarcacao: (id: string) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/recusar`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),

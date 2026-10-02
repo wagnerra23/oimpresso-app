@@ -15,10 +15,10 @@ const marcacoes: MarcacaoDemo[] = [
 const intercorrencias: Array<Record<string, unknown>> = [];
 // Tela 39 · Marcações fora do geofence (nomes e números do protótipo). `min` = minutos atrás.
 const VALIDACAO = [
-  { id: 1, colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'Obra Mercado União · Palhoça/SC', min: 95, nsr: 348821, gps_precisao_m: 38, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
-  { id: 2, colaborador_nome: 'Marcos Teixeira', tipo: 'SAIDA', local_texto: 'Obra Mercado União · Palhoça/SC', min: 960, nsr: 348809, gps_precisao_m: 44, dispositivo: 'Android', hash_curto: '27d9d853', estado: 'pendente' },
-  { id: 3, colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'Acme Comércio (visita)', min: 1500, nsr: 348715, gps_precisao_m: 412, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
-  { id: 4, colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: 'Posto BR · fachada', min: 2800, nsr: 348690, gps_precisao_m: 22, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
+  { id: 'd39a1000-0000-4000-8000-000000000001', colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'A 84,2 km do local de trabalho', min: 95, nsr: 348821, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
+  { id: 'd39a2000-0000-4000-8000-000000000002', colaborador_nome: 'Marcos Teixeira', tipo: 'SAIDA', local_texto: 'A 84,2 km do local de trabalho', min: 960, nsr: 348809, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '27d9d853', estado: 'pendente' },
+  { id: 'd39a3000-0000-4000-8000-000000000003', colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'A 3,7 km do local de trabalho', min: 1500, nsr: 348715, gps_precisao_m: null, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
+  { id: 'd39a4000-0000-4000-8000-000000000004', colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: null, min: 2800, nsr: 348690, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
 ];
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
@@ -411,11 +411,11 @@ export const demo = {
       const itens = VALIDACAO.filter((x) => est === 'todas' || x.estado === est)
         .map(({ min, ...x }) => ({ ...x, marcada_em: new Date(Date.now() - min * 60000).toISOString() }));
       const conta = (e: string) => VALIDACAO.filter((x) => x.estado === e).length;
-      return r({ itens, contadores: { pendente: conta('pendente'), validada: conta('validada'), recusada: conta('recusada'), todas: VALIDACAO.length } });
+      return r({ itens, contadores: { pendente: conta('pendente'), validada: conta('validada'), recusada: conta('recusada'), todas: VALIDACAO.length }, pode_recusar: true });
     }
-    if (metodo === 'POST' && /^\/api\/app\/ponto\/aprovacoes\/\d+\/(validar|recusar)$/.test(caminho)) {
+    if (metodo === 'POST' && /^\/api\/app\/ponto\/aprovacoes\/[^/]+\/(validar|recusar)$/.test(caminho)) {
       const partes = caminho.split('/');
-      const m = VALIDACAO.find((x) => x.id === Number(partes[5]));
+      const m = VALIDACAO.find((x) => x.id === decodeURIComponent(partes[5]));
       if (!m) throw Object.assign(new Error('Marcação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
       if (m.estado !== 'pendente') throw Object.assign(new Error('Esta marcação já foi revisada.'), { status: 409, codigo: 'ja_revisada' });
       // Demo: só muda o estado da fila. No ERP a recusa grava uma anulação nova; a marcação não é tocada.

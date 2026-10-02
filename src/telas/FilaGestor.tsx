@@ -3,7 +3,8 @@
 // Portaria 671/2021: a marcação é append-only. "Validar" aceita; "Recusar" pede ao servidor que grave uma
 // ANULAÇÃO nova — o app nunca edita nem apaga marcação. Recusar é irreversível, então pede confirmação
 // (o protótipo recusa no primeiro toque; o segundo toque é proteção contra toque acidental).
-// Rotas /api/app/ponto/aprovacoes: FORMATO PROPOSTO, ainda sem PR no ERP — ver ListaValidacao em api.ts.
+// Rotas /api/app/ponto/aprovacoes: contrato §12.1 (ERP #8586). Recusar só aparece com `pode_recusar`
+// (ponto.aprovacoes.manage, regra da web); validar é livre para quem vê a fila.
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type EstadoValidacao, type FiltroValidacao, type ListaValidacao } from '../api';
 import { rotuloTipo } from '../ponto-regras';
@@ -28,20 +29,20 @@ const quando = (iso: string) => {
 
 /** Aplica a decisão que o servidor confirmou: muda o estado, acerta os contadores e tira o item do filtro
  *  que não o mostra mais. Item desconhecido ou já decidido: devolve a mesma lista. */
-export function aplicarDecisao(l: ListaValidacao, id: number, novo: Exclude<EstadoValidacao, 'pendente'>, filtro: FiltroValidacao): ListaValidacao {
+export function aplicarDecisao(l: ListaValidacao, id: string, novo: Exclude<EstadoValidacao, 'pendente'>, filtro: FiltroValidacao): ListaValidacao {
   const item = l.itens.find((x) => x.id === id);
   if (!item || item.estado !== 'pendente') return l;
   const itens = l.itens.map((x) => (x.id === id ? { ...x, estado: novo } : x)).filter((x) => filtro === 'todas' || x.estado === filtro);
   const contadores = { ...l.contadores, pendente: l.contadores.pendente - 1, [novo]: l.contadores[novo] + 1 };
-  return { itens, contadores };
+  return { ...l, itens, contadores };
 }
 
 export function FilaGestor({ avisar, voltar }: { avisar: Aviso; voltar?: ReactNode }) {
   const [filtro, setFiltro] = useState<FiltroValidacao>('pendente');
   const [dados, setDados] = useState<ListaValidacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [confirmar, setConfirmar] = useState<number | null>(null);
-  const [enviando, setEnviando] = useState<number | null>(null);
+  const [confirmar, setConfirmar] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
 
   const carregar = useCallback(async (f: FiltroValidacao) => {
     setDados(null); setErro(null); setConfirmar(null);
@@ -53,7 +54,7 @@ export function FilaGestor({ avisar, voltar }: { avisar: Aviso; voltar?: ReactNo
   // Voltar do Android com a confirmação aberta só fecha a confirmação.
   useVoltar(confirmar !== null, () => setConfirmar(null));
 
-  const decidir = async (id: number, nsr: number, acao: 'validar' | 'recusar') => {
+  const decidir = async (id: string, nsr: number, acao: 'validar' | 'recusar') => {
     if (enviando !== null) return;
     setEnviando(id);
     try {
@@ -112,7 +113,7 @@ export function FilaGestor({ avisar, voltar }: { avisar: Aviso; voltar?: ReactNo
               <span>{filtro === 'pendente' ? 'Todas as marcações fora da área foram revisadas.' : 'Troque o filtro para ver outras marcações.'}</span>
             </div>
           )}
-          {dados?.itens.map((m) => {
+          {dados && dados.itens.map((m) => {
             const e = ESTADO[m.estado];
             const ocupado = enviando === m.id;
             return (
@@ -126,17 +127,17 @@ export function FilaGestor({ avisar, voltar }: { avisar: Aviso; voltar?: ReactNo
                 </div>
                 <div className="fg-meta">
                   <span>{quando(m.marcada_em)}</span><span>NSR {m.nsr}</span>
-                  <span className={m.gps_precisao_m > 300 ? 'fg-gps ruim' : 'fg-gps'}>GPS ±{m.gps_precisao_m}m</span>
+                  {m.gps_precisao_m !== null && <span className={m.gps_precisao_m > 300 ? 'fg-gps ruim' : 'fg-gps'}>GPS ±{m.gps_precisao_m}m</span>}
                   {m.dispositivo && <span>{m.dispositivo}</span>}<span>#{m.hash_curto}</span>
                 </div>
                 {m.estado === 'recusada' && <p className="fg-anulada">Anulação gravada. A marcação original continua no registro.</p>}
                 {m.estado === 'pendente' && confirmar !== m.id && (
-                  <div className="fg-acoes">
-                    <button className="fg-recusar" disabled={ocupado} onClick={() => setConfirmar(m.id)}>Recusar</button>
+                  <div className={'fg-acoes' + (dados.pode_recusar ? '' : ' so-validar')}>
+                    {dados.pode_recusar && <button className="fg-recusar" disabled={ocupado} onClick={() => setConfirmar(m.id)}>Recusar</button>}
                     <button className="oi-btn primary" disabled={ocupado} onClick={() => decidir(m.id, m.nsr, 'validar')}>{ocupado ? 'Salvando…' : 'Validar'}</button>
                   </div>
                 )}
-                {m.estado === 'pendente' && confirmar === m.id && (
+                {m.estado === 'pendente' && dados.pode_recusar && confirmar === m.id && (
                   <div className="fg-confirma" role="alertdialog" aria-label="Confirmar recusa">
                     <span>Recusar grava uma anulação da marcação NSR {m.nsr}. Não dá para desfazer pelo app.</span>
                     <div className="fg-acoes">
