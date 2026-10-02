@@ -1,6 +1,6 @@
 // Pessoas — desenho v4 (telas 17 Pessoas · 18 Ficha do cliente), dados pelo contrato
-// API-CONTRATO-v1 §4 (ERP #8497). Só leitura na v1: fora do v4 de propósito "+ Nova", "Editar",
-// "Dados cadastrais" (tela 34) e "Novo pedido" — não estão no contrato. Os chips seguem o contrato
+// API-CONTRATO-v1 §4 (ERP #8497). "+ Nova" abre a tela 09 (NovaPessoa.tsx) e "Dados cadastrais" a tela 34
+// (PessoaCadastro.tsx). Fora do v4 de propósito "Editar" e "Novo pedido" — não estão no contrato. Os chips seguem o contrato
 // (Todos/Clientes/Fornecedores/Funcionários/Em débito), não os do protótipo (PJ/PF).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPessoas, type ListaPessoas, type PapelPessoa, type PessoaDetalhe, type PessoaResumo } from '../api';
@@ -8,6 +8,7 @@ import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { Cadastro } from './PessoaCadastro';
 import { Ic } from '../icones';
+import { NovaPessoaTela } from './NovaPessoa';
 
 const FILTROS: Array<{ id: FiltroPessoas; label: string }> = [
   { id: 'todos', label: 'Todos' }, { id: 'clientes', label: 'Clientes' }, { id: 'fornecedores', label: 'Fornecedores' },
@@ -17,19 +18,25 @@ const PAPEL: Record<PapelPessoa, string> = { cliente: 'Cliente', fornecedor: 'Fo
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 const letra = (nome: string) => nome.normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase() || '#';
 
-export function Pessoas({ voltar }: { voltar?: ReactNode }) {
+export function Pessoas({ voltar, avisar }: { voltar?: ReactNode; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aberto, setAberto] = useState<number | null>(null);
   const [cadastro, setCadastro] = useState(false);
+  const [nova, setNova] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
   // Registrado depois do da ficha: o voltar fecha os dados cadastrais primeiro.
   useVoltar(aberto !== null && cadastro, () => setCadastro(false));
+  useVoltar(nova, () => setNova(false));
+  if (nova) {
+    return <NovaPessoaTela avisar={avisar} aoCancelar={() => setNova(false)}
+      aoSalvar={(id) => { setNova(false); setCadastro(false); setAberto(id); }} />;
+  }
   if (aberto !== null && cadastro) return <Cadastro id={aberto} aoVoltar={() => setCadastro(false)} />;
   return aberto !== null
     ? <Ficha id={aberto} aoVoltar={() => setAberto(null)} aoAbrirCadastro={() => setCadastro(true)} />
-    : <Lista aoAbrir={(id) => { setCadastro(false); setAberto(id); }} voltar={voltar} />;
+    : <Lista aoAbrir={(id) => { setCadastro(false); setAberto(id); }} aoNova={() => setNova(true)} voltar={voltar} />;
 }
 
-function Lista({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: ReactNode }) {
+function Lista({ aoAbrir, aoNova, voltar }: { aoAbrir: (id: number) => void; aoNova: () => void; voltar?: ReactNode }) {
   const [filtro, setFiltro] = useState<FiltroPessoas>('todos');
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
@@ -73,6 +80,7 @@ function Lista({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: Re
             <div className="p4-rotulo">{c ? `${c.todos} ${c.todos === 1 ? 'cadastrada' : 'cadastradas'}` : 'Pessoas'}</div>
             <div className="pd-titulo">Pessoas</div>
           </div>
+          <button className="np-nova" onClick={aoNova}>+ Nova</button>
         </div>
       </div>
       <div className="oi-scroll">
@@ -185,7 +193,7 @@ function Ficha({ id, aoVoltar, aoAbrirCadastro }: { id: number; aoVoltar: () => 
                 </div>
               ))}
             </div>
-            <p className="p4-legal">Cadastrar e editar pessoas continua no computador.</p>
+            <p className="p4-legal">Editar o cadastro continua no computador.</p>
           </div>
         )}
       </div>
