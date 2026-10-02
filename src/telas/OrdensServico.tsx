@@ -27,6 +27,19 @@ export function rotuloOs(d: Pick<ListaOs, 'total' | 'travadas'> | null): string 
   return d.travadas ? `${os} · ${d.travadas} ${d.travadas === 1 ? 'travada' : 'travadas'}` : os;
 }
 
+/** Tela 23 · Manutenção, derivada da 07 (contrato §11.4): no pátio = OS ativas; aguardando peças e prontos =
+ *  contagem dessas etapas. Cada indicador leva ao filtro dele. Sem a etapa na resposta, o indicador some. */
+export function kpisPatio(d: Pick<ListaOs, 'total' | 'etapas'>): Array<{ chave: string; rotulo: string; valor: number; tom: 'neutro' | 'danger' | 'ok' }> {
+  const de = (chave: string) => d.etapas.find((e) => e.chave === chave)?.total;
+  const pecas = de('aguardando_pecas');
+  const prontos = de('pronto_retirada');
+  return [
+    { chave: 'todas', rotulo: 'No pátio', valor: d.total, tom: 'neutro' as const },
+    ...(pecas === undefined ? [] : [{ chave: 'aguardando_pecas', rotulo: 'Aguard. peças', valor: pecas, tom: 'danger' as const }]),
+    ...(prontos === undefined ? [] : [{ chave: 'pronto_retirada', rotulo: 'Prontos', valor: prontos, tom: 'ok' as const }]),
+  ];
+}
+
 /** Valor da OS; sem valor ainda (antes do orçamento), travessão. */
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
@@ -66,6 +79,15 @@ export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
+          {dados && (
+            <div className="man-kpis" aria-label="Pátio da oficina">
+              {kpisPatio(dados).map((k) => (
+                <button key={k.chave} className={'man-kpi ' + k.tom + (etapa === k.chave ? ' on' : '')} aria-pressed={etapa === k.chave} onClick={() => setEtapa(k.chave)}>
+                  <span>{k.rotulo}</span><b>{k.valor}</b>
+                </button>
+              ))}
+            </div>
+          )}
           {dados && (
             <div className="pd-chips" role="tablist" aria-label="Etapa da OS">
               <button role="tab" aria-selected={etapa === 'todas'} className={'pd-chip' + (etapa === 'todas' ? ' on' : '')} onClick={() => setEtapa('todas')}>
