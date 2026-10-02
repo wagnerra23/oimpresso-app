@@ -2,7 +2,7 @@
 // Os dois primeiros casos são as respostas que o teste do ERP (#8495) prova para revisor.ponto e para
 // um usuário de vendas; os demais são bordas da montagem.
 import { describe, expect, it } from 'vitest';
-import { barraPadrao, escolhaValida, montarNavegacao, NAV_PADRAO } from './navegacao';
+import { escolhaValida, montarNavegacao, NAV_PADRAO } from './navegacao';
 
 describe('montarNavegacao', () => {
   it('colaborador (revisor.ponto): barra Ponto · Mais, abre no Ponto, Mais só com Conta', () => {
@@ -77,7 +77,6 @@ describe('montarNavegacao', () => {
     const n = montarNavegacao('erp', [...areas], 'inicio', ['financeiro', 'tarefas']);
     expect(n.abas).toEqual(['inicio', 'financeiro', 'tarefas', 'mais']);
     expect(n.modulosMais).toEqual(['pedidos', 'producao', 'ponto', 'conta']);
-    expect(n.personalizada).toBe(true);
     expect(n.modulosBarra).toEqual(['financeiro', 'tarefas']);
   });
 
@@ -95,7 +94,7 @@ describe('montarNavegacao', () => {
   it('tela 30: escolha vazia ou toda inválida = padrão de sempre', () => {
     const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'mais'] as const;
     expect(montarNavegacao('erp', [...areas], 'inicio', []).abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(montarNavegacao('erp', [...areas], 'inicio', ['financeiro']).personalizada).toBe(false);
+    expect(montarNavegacao('erp', [...areas], 'inicio', ['financeiro']).abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
   });
 
   it('tela 30: colaborador ignora barra e não personaliza', () => {
@@ -104,8 +103,10 @@ describe('montarNavegacao', () => {
     expect(n.personalizavel).toBe(false);
   });
 
-  it('tela 30: o padrão para restaurar segue as áreas', () => {
-    expect(barraPadrao(['inicio', 'pedidos', 'producao', 'mais'])).toEqual(['pedidos', 'producao']);
+  it('tela 30: barra do ERP para quem não tem Tarefas (padrão completado pelo ERP) é seguida como veio', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'producao', 'financeiro', 'mais'], 'inicio', ['pedidos', 'producao', 'financeiro']);
+    expect(n.abas).toEqual(['inicio', 'pedidos', 'producao', 'financeiro', 'mais']);
+    expect(n.modulosMais).toEqual(['conta']);
   });
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {

@@ -269,8 +269,9 @@ export interface PainelInicio {
   abre_em: 'inicio' | 'ponto' | 'mais';
   /** Lista ordenada; "mais" sempre presente. */
   areas: Area[];
-  /** Tela 30: módulos que o usuário escolheu para a barra (≤3, em ordem), já cruzados com `areas`.
-   *  null/ausente = sem escolha (vale o padrão). PROPOSTA, ainda sem rota no ERP. */
+  /** Tela 30 (ERP #8592): módulos da barra entre Início e Mais, até 3, na ordem. Sempre = escolha salva ∩ areas;
+   *  sem escolha (ou se nada sobrar), o padrão do ERP (tarefas, pedidos, producao, completado com outras áreas).
+   *  Ausente/null = ERP sem a rota (versão antiga): o app usa o padrão dele. */
   barra?: Area[] | null;
   usuario: string; empresa: string;
   /** Só com dashboard.data. */
@@ -525,9 +526,10 @@ export const api = {
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
-  /** Tela 30 (proposta, sem rota no ERP ainda). Grava a escolha da barra no ERP; 422 { campos: { modulos } }
-   *  se vier vazia, com mais de 3 ou com módulo fora de `areas`. Devolve a barra que passa a valer. */
-  salvarBarra: (modulos: Area[]) => chamar<{ barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
+  /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
+   *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: [msg] } } (mais de 3, repetido, fora das áreas).
+   *  Devolve a escolha gravada e a barra que passa a valer. */
+  salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),

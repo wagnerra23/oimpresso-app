@@ -2,8 +2,8 @@
 // Barra de baixo (§7.1): Início · Tarefas · Pedidos · Produção · Mais, com Pessoas, Orçamentos, Produtos, Estoque, Ponto e Conta dentro
 // de Mais. Colaborador (sem ERP) abre direto no Ponto, que vira aba: Ponto · Mais.
 // Tela 30 (D16 Onda E, decisão [W] 2026-10-02): quem tem o ERP pode escolher até 3 módulos para a barra; a escolha
-// fica guardada NO ERP e volta em /api/app/inicio como `barra` (já cruzada com `areas`). Início e Mais são fixos; o
-// que não está na barra continua em Mais. Sem escolha, vale o padrão de sempre (§7.1).
+// fica guardada NO ERP (#8592) e volta em /api/app/inicio como `barra`, sempre preenchida (escolha ∩ areas, ou o padrão
+// do ERP). Início e Mais são fixos; o que não está na barra continua em Mais. Sem `barra` (ERP antigo), padrão do §7.1.
 // Arquivo sem dependência do Capacitor, para o teste de unidade rodar em Node.
 import type { Area } from './api';
 import type { SubMais } from './telas/Mais';
@@ -28,8 +28,6 @@ export interface Navegacao {
   personalizavel: boolean;
   /** Módulos entre Início e Mais (o que a tela 30 edita). */
   modulosBarra: Area[];
-  /** Os módulos da barra vêm de uma escolha salva, e não do padrão. */
-  personalizada: boolean;
 }
 
 /** Escolha da tela 30 que vale para estas áreas: sem repetidos, só módulos com tela e liberados, no máximo 3. */
@@ -44,9 +42,6 @@ export function escolhaValida(barra: readonly string[] | null | undefined, areas
 
 const BARRA: Aba[] = ['inicio', 'tarefas', 'pedidos', 'producao'];
 
-/** Padrão da barra (sem escolha salva) para estas áreas. É o que o "Restaurar" da tela 30 devolve. */
-export const barraPadrao = (areas: Area[]): Area[] => BARRA.filter((a) => a !== 'inicio' && areas.includes(a));
-
 export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], abreEm: 'inicio' | 'ponto' | 'mais',
   barra: readonly string[] | null = null): Navegacao {
   const escolha = perfil === 'erp' ? escolhaValida(barra, areas) : [];
@@ -54,7 +49,7 @@ export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], ab
     const abas: Aba[] = [...(areas.includes('inicio') ? (['inicio'] as Aba[]) : []), ...escolha, 'mais'];
     const modulosMais = [...MODULOS_BARRA.filter((a) => areas.includes(a) && !escolha.includes(a)) as SubMais[], 'conta' as SubMais];
     const casa: Aba = abas.includes(abreEm) ? abreEm : abas[0];
-    return { abas, modulosMais, casa, pontoNaBarra: escolha.includes('ponto'), personalizavel: true, modulosBarra: escolha, personalizada: true };
+    return { abas, modulosMais, casa, pontoNaBarra: escolha.includes('ponto'), personalizavel: true, modulosBarra: escolha };
   }
   const pontoNaBarra = perfil === 'colaborador' && areas.includes('ponto');
   const abas: Aba[] = [...BARRA.filter((a) => areas.includes(a)), ...(pontoNaBarra ? (['ponto'] as Aba[]) : []), 'mais'];
@@ -64,7 +59,7 @@ export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], ab
     'conta',
   ];
   const casa: Aba = abreEm === 'ponto' ? (pontoNaBarra ? 'ponto' : 'mais') : abas.includes(abreEm) ? abreEm : abas[0];
-  return { abas, modulosMais, casa, pontoNaBarra, personalizavel: perfil === 'erp', modulosBarra: abas.filter((a) => a !== 'inicio' && a !== 'mais'), personalizada: false };
+  return { abas, modulosMais, casa, pontoNaBarra, personalizavel: perfil === 'erp', modulosBarra: abas.filter((a) => a !== 'inicio' && a !== 'mais') };
 }
 
 /** Sem resposta do ERP (rota ainda não publicada, por exemplo): mostra tudo, como antes da D6. */

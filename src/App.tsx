@@ -15,7 +15,7 @@ import { Producao } from './telas/Producao';
 import { idDoTodo, Tarefas } from './telas/Tarefas';
 import { Mais, MODULOS, VoltarMais, type SubMais } from './telas/Mais';
 import { PerfilMenu } from './telas/PerfilMenu';
-import { barraPadrao, montarNavegacao, MODULOS_BARRA, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
+import { montarNavegacao, MODULOS_BARRA, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
 import { Relatorios } from './telas/Relatorios';
@@ -117,7 +117,7 @@ export function App() {
   // Notificação de tarefa (tela 16) abre o detalhe (tela 28); id fora do formato "todo:<n>" abre só a lista.
   const abrirTarefa = (id: number | string | null) => { setTarefaPendente(idDoTodo(id)); abrir('tarefas'); };
 
-  // Tela 30: grava no ERP e remonta a barra com o que o servidor devolveu. O usuário continua em Meu menu.
+  // Tela 30: grava no ERP (`[]` = padrão) e remonta a barra com o que o servidor devolveu. O usuário continua em Meu menu.
   const salvarBarra = async (modulos: Area[]) => {
     const r = await api.salvarBarra(modulos);
     const nv = montarNavegacao('erp', areas, 'inicio', r.barra);
@@ -143,7 +143,8 @@ export function App() {
       case 'menu': {
         const nv = navRef.current;
         const disponiveis = MODULOS_BARRA.filter((m) => nv.abas.includes(m) || nv.modulosMais.includes(m as SubMais));
-        return <PerfilMenu disponiveis={disponiveis} atual={nv.modulosBarra} padrao={barraPadrao(areas)}
+        // key: depois de salvar/restaurar a barra muda e a tela recomeça a partir dela.
+        return <PerfilMenu key={nv.modulosBarra.join(',')} disponiveis={disponiveis} atual={nv.modulosBarra}
           aoSalvar={salvarBarra} avisar={avisar} online={online} voltar={voltar} />;
       }
       default: return null;
