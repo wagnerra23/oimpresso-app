@@ -205,7 +205,13 @@ export interface ListaEstoque {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'assistente' | 'ponto' | 'mais';
+
+/** Tela 25 · Chat (D16, Onda E). Decisão [W] 2026-10-02: quem responde é a JANA (IA do ERP).
+ *  FORMATO PROPOSTO, ainda sem rota no ERP — muda quando a sessão ERP da Onda E fechar o contrato. */
+export interface MensagemChat { de: 'eu' | 'jana'; texto: string; /** ISO com hora. */ criada_em: string }
+export interface RespostaChat { conversa_id: string; resposta: MensagemChat }
+export interface ConversaChat { conversa_id: string; mensagens: MensagemChat[] }
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -408,6 +414,9 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  /** Tela 25 (proposta, sem rota no ERP ainda). Sem conversa_id, o ERP abre uma conversa nova. */
+  enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
+  conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
