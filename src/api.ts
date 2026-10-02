@@ -58,6 +58,16 @@ export interface PedidoDetalhe extends PedidoResumo {
 /** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
 
+// ── Tarefas (API-CONTRATO-v1 §3): ToDo do usuário + justificativas do Ponto. ──
+export type OrigemTarefa = 'todo' | 'ponto';
+export type FiltroTarefas = 'todas' | OrigemTarefa;
+export type GrupoTarefa = 'atrasadas' | 'hoje' | 'amanha' | 'semana' | 'depois';
+export interface Tarefa {
+  id: string; origem: OrigemTarefa; titulo: string; subtitulo: string | null;
+  prazo: string | null; atrasado: boolean; grupo: GrupoTarefa;
+}
+export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
+
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
 
@@ -174,6 +184,9 @@ export const api = {
   pedidos: (filtro: FiltroPedidos, pagina = 1, q = '') =>
     chamar<ListaPedidos>('GET', `/api/app/pedidos?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pedido: (id: number) => chamar<PedidoDetalheApi>('GET', `/api/app/pedidos/${id}`),
+  tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
+  /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
+  concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),

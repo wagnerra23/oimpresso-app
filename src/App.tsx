@@ -10,6 +10,7 @@ import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
 import { tratarVoltar } from './voltar';
 import { Pedidos } from './telas/Pedidos';
+import { Tarefas } from './telas/Tarefas';
 import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { useVoltar } from './voltar';
 import { Login } from './telas/Login';
@@ -17,11 +18,12 @@ import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
 
-type Aba = 'inicio' | 'pedidos' | 'mais';
+type Aba = 'inicio' | 'tarefas' | 'pedidos' | 'mais';
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
 const ABAS: Array<{ id: Aba; label: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'inicio', label: 'Início', Icone: Ic.inicio },
+  { id: 'tarefas', label: 'Tarefas', Icone: Ic.tarefa },
   { id: 'pedidos', label: 'Pedidos', Icone: Ic.pedido },
   { id: 'mais', label: 'Mais', Icone: Ic.mais },
 ];
@@ -80,6 +82,7 @@ export function App() {
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
       <div className="oi-screen">
         {aba === 'inicio' && <Inicio irParaPonto={() => irPara('mais', 'ponto')} />}
+        {aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={() => irPara('mais', 'ponto')} />}
         {aba === 'pedidos' && <Pedidos />}
         {aba === 'mais' && subMais === null && <Mais abrir={setSubMais} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}

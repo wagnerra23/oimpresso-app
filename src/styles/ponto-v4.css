@@ -178,3 +178,27 @@ a.p4-link { text-decoration: none; }
 .ms-marca { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 0 4px; color: var(--text-mute); font-size: 13px; font-weight: 600; }
 .ms-marca img { width: 28px; height: auto; }
 .ms-voltar { margin-left: -8px; }
+
+/* Tarefas — tela 12 do v4 */
+.tf-grupo { display: flex; flex-direction: column; gap: 6px; }
+.tf-rotulo-atraso { color: var(--danger); }
+.tf-linha { min-height: 64px; width: 100%; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border: 0;
+  border-bottom: 1px solid var(--border-2); background: transparent; font: inherit; color: var(--text); text-align: left; }
+.tf-linha:last-child { border-bottom: 0; }
+.tf-linha.atrasado { box-shadow: inset 3px 0 0 var(--danger); }
+.tf-ico { width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px; border: 1px solid var(--accent); color: var(--accent-text); display: grid; place-items: center; }
+.tf-ico.ponto { border-color: var(--warn); color: var(--warn); }
+.tf-texto { flex: 1; min-width: 0; }
+.tf-texto b { display: block; font-size: 14px; font-weight: 500; }
+.tf-texto small { display: block; font-size: 12px; color: var(--text-dim); }
+.tf-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.tf-origem { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--bg-2); color: var(--text-dim); }
+.tf-quando { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
+.tf-quando.atrasado { color: var(--danger); font-weight: 600; }
+.tf-chev { color: var(--text-mute); }
+.tf-feito { width: 56px; height: 56px; border-radius: 99px; background: color-mix(in oklch, var(--ok) 14%, transparent); color: var(--ok); display: grid; place-items: center; }
+.tf-folha-fundo { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.42); display: flex; align-items: flex-end; }
+.tf-folha { width: 100%; background: var(--surface); border-radius: 18px 18px 0 0; padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-pop); }
+.tf-alca { width: 36px; height: 4px; border-radius: 99px; background: var(--border); align-self: center; margin-bottom: 4px; }
+.tf-folha-titulo { font-size: 17px; font-weight: 600; }
