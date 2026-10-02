@@ -11,6 +11,7 @@ export const Ic = {
   relogio: svg(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>),
   pedido: svg(<><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h4" /></>),
   mais: svg(<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>),
+  pacote: svg(<><path d="M21 8l-9-5-9 5 9 5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></>),
   check: svg(<><path d="M5 12l5 5L20 7" /></>),
   producao: svg(<><path d="M3 21V10l5 3V10l5 3V7l8 4v10z" /><path d="M7 17h2M12 17h2M17 17h1" /></>),
   tarefa: svg(<><path d="M3 5h18v9h-6l-2 3h-2l-2-3H3z" /><path d="M3 14v5h18v-5" /></>),

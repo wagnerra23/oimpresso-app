@@ -46,6 +46,6 @@ describe('montarNavegacao', () => {
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'ponto', 'conta']);
   });
 });
