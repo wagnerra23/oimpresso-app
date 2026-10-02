@@ -68,7 +68,7 @@ export interface ListaPessoas {
   itens: PessoaResumo[]; contadores: Record<FiltroPessoas, number>; pagina: number; tem_mais: boolean;
 }
 /** Tela 34 · Dados cadastrais (D16, Onda A). Contrato §4.1 (ERP #8552). `sms` sai sempre null (o ERP não guarda SMS);
- *  a coordenação fecha o contrato. Campo que o ERP não tem vem null e a linha mostra "—". */
+ *  campo que o ERP não tem vem null e a linha mostra "—". Pessoa de outra empresa → 404. */
 export interface PessoaCadastro {
   id: number; nome: string; tipo: 'PF' | 'PJ' | null;
   identificacao: { razao_social: string | null; documento: string | null; indicador_ie: string | null; papeis: PapelPessoa[] };
