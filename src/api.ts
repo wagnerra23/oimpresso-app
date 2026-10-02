@@ -180,9 +180,32 @@ export interface ListaProdutos {
   total: number; baixo_estoque: number; pagina: number; tem_mais: boolean;
 }
 
+// ── Estoque (tela 05, Onda B). Contrato §9.2 (ERP #8577), 30 por página, por nome. Só leitura. ──
+export type FiltroEstoque = 'todos' | 'baixo';
+/** Uma linha por variação × loja; só produto que controla estoque e só lojas que o usuário vê. */
+export interface ItemEstoque {
+  /** variation_location_details.id (a linha), não o produto. */
+  id: number; produto_id: number;
+  /** Traz a variação quando o produto é variável ("Caneca · Azul"). */
+  nome: string;
+  /** SKU da variação ou do produto. */
+  codigo: string | null;
+  qtd: number;
+  /** alert_quantity; null = sem mínimo (nunca "baixo"). */
+  minimo: number | null;
+  unidade: string | null;
+  /** Nome da loja. */
+  local: string;
+  /** "rack · fileira · posição" (product_racks), ou null. */
+  prateleira: string | null;
+}
+export interface ListaEstoque {
+  itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -373,6 +396,9 @@ export const api = {
   /** Tela 19 · Produtos (contrato §9.1). Sem product.view → 403 sem_permissao. */
   produtos: (categoria: number | 'todas', pagina = 1, q = '') =>
     chamar<ListaProdutos>('GET', `/api/app/produtos?categoria=${categoria}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
+  estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
+    chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
