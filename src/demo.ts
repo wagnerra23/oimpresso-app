@@ -194,6 +194,19 @@ export const demo = {
         financeiro: { a_receber: 8200, a_pagar: 3100 },
         proximas_tarefas: TAREFAS.slice(0, 3) });
     }
+    if (metodo === 'GET' && /^\/api\/app\/tarefas\/todo\/\d+$/.test(caminho)) {
+      const id = Number(caminho.split('/')[5]);
+      const tf = TAREFAS.find((x) => x.id === 'todo:' + id);
+      if (!tf) throw Object.assign(new Error('Tarefa não encontrada.'), { status: 404 });
+      // Só a 1ª tarefa tem checklist pendente, para a demo mostrar o bloqueio de concluir.
+      const comCheck = id === 16;
+      return r({ id, titulo: tf.titulo, modulo: (tf.subtitulo ?? '').replace(/^ToDo · /, '') || null, responsavel: 'Colaborador Demonstração',
+        cliente: id === 16 ? 'Bistrô do Forno' : null, prazo: tf.prazo, atrasado: tf.atrasado, origem: id === 16 ? 'Pedido #0039' : null,
+        checklist: comCheck ? [{ texto: 'Conferir medidas', feito: true }, { texto: 'Revisar ortografia', feito: true }, { texto: 'Aprovação do cliente', feito: false }] : [],
+        comentarios: [{ quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null },
+          { quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Cliente', texto: 'pediu letra maior', detalhe: 'Aumentar para 30 cm de altura' }],
+        concluida: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
       const itens = TAREFAS.filter((x) => origem === 'todas' || x.origem === origem);

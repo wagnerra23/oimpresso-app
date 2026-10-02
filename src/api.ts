@@ -97,6 +97,21 @@ export interface Tarefa {
 }
 export interface ListaTarefas { itens: Tarefa[]; contadores: Record<FiltroTarefas, number> }
 
+/** Tela 28 · Detalhe da tarefa (D16, Onda A) — só ToDo. Formato PROPOSTO pelo app; rota ainda sem endpoint no ERP. */
+export interface TarefaDetalhe {
+  id: number; titulo: string;
+  /** Módulo de origem para o rótulo "Tarefa · <módulo>"; null quando não houver. */
+  modulo: string | null;
+  responsavel: string | null; cliente: string | null;
+  /** Data (YYYY-MM-DD) ou data-hora (ISO) do prazo. */
+  prazo: string | null; atrasado: boolean;
+  /** De onde a tarefa veio, ex.: "Orçamento #4812"; null quando não houver. */
+  origem: string | null;
+  checklist: Array<{ texto: string; feito: boolean }>;
+  comentarios: Array<{ quando: string; autor: string; texto: string; detalhe: string | null }>;
+  concluida: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'ponto' | 'mais';
@@ -241,6 +256,7 @@ export const api = {
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
+  tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
   concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>

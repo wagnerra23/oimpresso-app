@@ -1,10 +1,11 @@
 // Tarefas — desenho v4 (tela 12), dados pelo contrato API-CONTRATO-v1 §3: ToDo do usuário +
 // justificativas do Ponto (D11). Urgente = atrasado. A única escrita é concluir um ToDo do
-// próprio usuário; justificativas abrem o Ponto (aprovar é no computador).
+// próprio usuário; justificativas abrem o Ponto (aprovar é no computador). ToDo abre o detalhe (tela 28).
 import { useCallback, useEffect, useState } from 'react';
 import { api, ErroApi, type FiltroTarefas, type GrupoTarefa, type ListaTarefas, type Tarefa } from '../api';
 import { useVoltar } from '../voltar';
 import { Ic } from '../icones';
+import { TarefaDetalheTela } from './TarefaDetalhe';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 
@@ -21,9 +22,8 @@ export function Tarefas({ avisar, abrirPonto }: { avisar: Aviso; abrirPonto: () 
   const [filtro, setFiltro] = useState<FiltroTarefas>('todas');
   const [dados, setDados] = useState<ListaTarefas | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [confirmar, setConfirmar] = useState<Tarefa | null>(null);
-  const [concluindo, setConcluindo] = useState(false);
-  useVoltar(confirmar !== null, () => setConfirmar(null));
+  const [aberta, setAberta] = useState<string | null>(null);
+  useVoltar(aberta !== null, () => setAberta(null));
 
   const carregar = useCallback(async (f: FiltroTarefas) => {
     setErro(null);
@@ -32,22 +32,12 @@ export function Tarefas({ avisar, abrirPonto }: { avisar: Aviso; abrirPonto: () 
   }, []);
   useEffect(() => { setDados(null); carregar(filtro); }, [filtro, carregar]);
 
-  const tocar = (t: Tarefa) => (t.origem === 'todo' ? setConfirmar(t) : abrirPonto());
+  const tocar = (t: Tarefa) => (t.origem === 'todo' ? setAberta(t.id.replace(/^todo:/, '')) : abrirPonto());
 
-  const concluir = async () => {
-    if (!confirmar) return;
-    setConcluindo(true);
-    try {
-      await api.concluirTodo(confirmar.id.replace(/^todo:/, ''));
-      avisar('Tarefa concluída.', 'ok');
-      setConfirmar(null);
-      await carregar(filtro);
-    } catch (e) {
-      avisar(e instanceof Error ? e.message : 'Não foi possível concluir.', 'erro');
-    } finally {
-      setConcluindo(false);
-    }
-  };
+  if (aberta !== null) {
+    return <TarefaDetalheTela id={aberta} avisar={avisar} aoVoltar={() => setAberta(null)}
+      aoConcluir={() => { setAberta(null); carregar(filtro); }} />;
+  }
 
   const c = dados?.contadores;
   const atrasadas = dados?.itens.filter((t) => t.atrasado).length ?? 0;
@@ -97,18 +87,6 @@ export function Tarefas({ avisar, abrirPonto }: { avisar: Aviso; abrirPonto: () 
         </div>
       </div>
 
-      {confirmar && (
-        <div className="tf-folha-fundo" onClick={() => !concluindo && setConfirmar(null)}>
-          <div className="tf-folha" role="dialog" aria-modal="true" aria-labelledby="tf-folha-t" onClick={(e) => e.stopPropagation()}>
-            <span className="tf-alca" aria-hidden="true" />
-            <div className="p4-rotulo">{confirmar.subtitulo ?? 'ToDo'}</div>
-            <div id="tf-folha-t" className="tf-folha-titulo">{confirmar.titulo}</div>
-            {confirmar.prazo && <div className={'tf-quando' + (confirmar.atrasado ? ' atrasado' : '')}>Prazo {confirmar.prazo.split('-').reverse().join('/')}{confirmar.atrasado ? ' · atrasada' : ''}</div>}
-            <button className="p4-cta" disabled={concluindo} onClick={concluir}>{concluindo ? 'Concluindo…' : 'Concluir tarefa'}</button>
-            <button className="oi-btn block" style={{ minHeight: 44 }} disabled={concluindo} onClick={() => setConfirmar(null)}>Cancelar</button>
-          </div>
-        </div>
-      )}
     </>
   );
 }
