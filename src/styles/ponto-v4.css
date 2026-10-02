@@ -388,3 +388,26 @@ a.p4-link { text-decoration: none; }
 .eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .eq-status { font-size: 11px; font-weight: 500; }
+
+/* Tela 29 · Movimentações (prefixo mov-) */
+.est-card.abre { width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; min-height: 44px; }
+.est-card.abre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mov-rotulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-saldo { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mov-saldo > span { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.mov-saldo .est-qtd { font-size: 22px; }
+.mov-saldo small { margin-left: auto; font-size: 12px; color: var(--text-dim); }
+.mov-saldo small.baixo { color: var(--danger); font-weight: 600; }
+.mov-linha { min-height: 56px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2); }
+.mov-linha:last-child { border-bottom: 0; }
+.mov-texto { flex: 1; min-width: 0; }
+.mov-texto b { display: block; font-size: 14px; font-weight: 500; }
+.mov-texto small { display: flex; min-width: 0; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.mov-ref { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mov-quando { flex-shrink: 0; }
+.mov-valores { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.mov-valores small { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
+.mov-qtd { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; }
+.mov-qtd.pos { color: var(--ok); }
+.mov-qtd.neg { color: var(--danger); }
