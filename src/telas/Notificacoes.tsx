@@ -7,7 +7,7 @@ import { haQuanto } from '../tempo';
 
 const ORIGENS = ['OS', 'CRM', 'FIN', 'PNT', 'MFG', 'OFI'];
 
-interface Props { aoVoltar: () => void; abrirDestino: (tipo: DestinoNotificacao) => void }
+interface Props { aoVoltar: () => void; abrirDestino: (tipo: DestinoNotificacao, id: number | string | null) => void }
 
 export function Notificacoes({ aoVoltar, abrirDestino }: Props) {
   const [dados, setDados] = useState<ListaNotificacoes | null>(null);
@@ -67,7 +67,7 @@ export function Notificacoes({ aoVoltar, abrirDestino }: Props) {
                   </>
                 );
                 return tipo
-                  ? <button key={n.id} className={'nt-linha' + (n.lida ? '' : ' nova')} onClick={() => abrirDestino(tipo)}>{conteudo}</button>
+                  ? <button key={n.id} className={'nt-linha' + (n.lida ? '' : ' nova')} onClick={() => abrirDestino(tipo, n.destino.id)}>{conteudo}</button>
                   : <div key={n.id} className={'nt-linha' + (n.lida ? '' : ' nova')}>{conteudo}</div>;
               })}
             </div>

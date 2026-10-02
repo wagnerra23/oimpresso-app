@@ -21,7 +21,7 @@ const pct = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 
 interface Props {
   irParaPonto: () => void; irParaPedidos: () => void; irParaTarefas: () => void;
   /** Abre a área de destino de uma notificação (tela 16). */
-  abrirDestino: (tipo: DestinoNotificacao) => void;
+  abrirDestino: (tipo: DestinoNotificacao, id: number | string | null) => void;
 }
 
 export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino }: Props) {
@@ -47,7 +47,7 @@ export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, abrirDestino
   const k = painel?.kpis;
   const temKpi = !!k && (k.pedidos_ativos !== null || k.pedidos_atrasados !== null || k.estoque_baixo !== null);
 
-  if (notif) return <Notificacoes aoVoltar={() => setNotif(false)} abrirDestino={(tipo) => { setNotif(false); abrirDestino(tipo); }} />;
+  if (notif) return <Notificacoes aoVoltar={() => setNotif(false)} abrirDestino={(tipo, id) => { setNotif(false); abrirDestino(tipo, id); }} />;
 
   return (
     <>

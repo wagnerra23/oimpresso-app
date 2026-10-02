@@ -12,7 +12,7 @@ import { Ic } from './icones';
 import { tratarVoltar } from './voltar';
 import { Pedidos } from './telas/Pedidos';
 import { Producao } from './telas/Producao';
-import { Tarefas } from './telas/Tarefas';
+import { idDoTodo, Tarefas } from './telas/Tarefas';
 import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { montarNavegacao, NAV_PADRAO, type Aba, type Navegacao } from './navegacao';
 import { Pessoas } from './telas/Pessoas';
@@ -53,6 +53,9 @@ export function App() {
   const abrirPonto = useCallback(() => (navRef.current.pontoNaBarra ? irPara('ponto') : irPara('mais', 'ponto')), [irPara]);
   const [online, setOnline] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
+  // Tarefa a abrir no detalhe quando a aba Tarefas montar (vinda do sino).
+  const [tarefaPendente, setTarefaPendente] = useState<string | null>(null);
+  const limparTarefaPendente = useCallback(() => setTarefaPendente(null), []);
   const timer = useRef<number | undefined>(undefined);
   const abaAtual = useRef<Aba>('inicio');
   abaAtual.current = aba;
@@ -96,6 +99,9 @@ export function App() {
   // Ponto/Conta abertos a partir do Mais: o voltar do Android volta ao Mais.
   useVoltar(aba === 'mais' && subMais !== null, () => setSubMais(null));
 
+  // Notificação de tarefa (tela 16) abre o detalhe (tela 28); id fora do formato "todo:<n>" abre só a lista.
+  const abrirTarefa = (id: number | string | null) => { setTarefaPendente(idDoTodo(id)); irPara('tarefas'); };
+
   if (!pronto) return null;
   if (!logado) return <Login aoEntrar={() => setLogado(true)} />;
   const n = nav ?? NAV_PADRAO;
@@ -107,9 +113,9 @@ export function App() {
       <div className="oi-screen">
         {!nav && <div className="pd-corpo"><p className="p4-legal">Carregando…</p></div>}
         {nav && aba === 'inicio' && <Inicio irParaPonto={abrirPonto} irParaPedidos={() => irPara('pedidos')} irParaTarefas={() => irPara('tarefas')}
-          abrirDestino={(tipo) => (tipo === 'ponto' ? abrirPonto() : tipo === 'tarefa' ? irPara('tarefas') : tipo === 'producao' ? irPara('producao')
+          abrirDestino={(tipo, id) => (tipo === 'ponto' ? abrirPonto() : tipo === 'tarefa' ? abrirTarefa(id) : tipo === 'producao' ? irPara('producao')
             : tipo === 'pedido' ? irPara('pedidos') : irPara('mais'))} />}
-        {nav && aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={abrirPonto} />}
+        {nav && aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} />}
         {nav && aba === 'pedidos' && <Pedidos />}
         {nav && aba === 'producao' && <Producao />}
         {nav && aba === 'ponto' && <Ponto avisar={avisar} online={online} />}
