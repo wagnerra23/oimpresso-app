@@ -203,6 +203,23 @@ export interface ListaEstoque {
   itens: ItemEstoque[]; contadores: Record<FiltroEstoque, number>; pagina: number; tem_mais: boolean;
 }
 
+/** Tela 20 · Novo produto (Onda B escrita). PROVISÓRIO: o formato do ERP ainda não fechou (a sessão do ERP mede
+ *  ProductUtil antes). Até lá o envio só existe na demo; fora dela a tela nem é oferecida (ESCRITA_PRODUTO).
+ *  Regra mestre: o app não calcula preço. Manda custo e margem e mostra o preço que o ERP devolve. */
+export type VendaProduto = 'm2' | 'un' | 'mil';
+export interface NovoProduto {
+  nome: string; codigo: string | null; categoria_id: number | null; venda: VendaProduto;
+  /** Dinheiro em número com 2 casas (contrato §0). */
+  custo: number | null;
+  /** Margem em %, até 2 casas. */
+  margem: number | null;
+  estoque: { controla: boolean; minimo: number | null; prateleira: { rack: string | null; fileira: string | null; posicao: string | null } };
+  fiscal: { ncm: string | null; cfop: string | null; origem: number | null };
+}
+export interface PreviaPreco { preco: number }
+/** Liga a escrita de produto. Só a demo, até o ERP fechar o formato. */
+export const ESCRITA_PRODUTO = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'ponto' | 'mais';
@@ -362,6 +379,12 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corp
   return r.data as T;
 }
 
+/** Escrita de produto fora da demo não sai do aparelho: o formato do ERP não fechou. */
+function escritaProduto<T>(caminho: string, corpo: unknown): Promise<T> {
+  if (!ESCRITA_PRODUTO) return Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastro de produto pelo app ainda não está disponível.'));
+  return chamar<T>('POST', caminho, corpo);
+}
+
 export const api = {
   marcacoesHoje: () => chamar<{ data: string; marcacoes: MarcacaoHoje[] }>('GET', '/ponto/api/marcacoes/hoje'),
   kpis: () => chamar<Kpis>('GET', '/ponto/api/dashboard/kpis'),
@@ -399,6 +422,11 @@ export const api = {
   /** Tela 05 · Estoque (contrato §9.2). Sem product.view → 403 sem_permissao. */
   estoque: (filtro: FiltroEstoque, pagina = 1, q = '') =>
     chamar<ListaEstoque>('GET', `/api/app/estoque?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 20 · prévia do preço que o ERP calcula (não grava). PROVISÓRIO, só demo. */
+  previaPrecoProduto: (custo: number, margem: number) =>
+    escritaProduto<PreviaPreco>('/api/app/produtos/preco-previa', { custo, margem }),
+  /** Tela 20 · Novo produto. PROVISÓRIO, só demo: 201 { id, preco } · 422 { erro: "validacao", campos } · 403 sem_permissao. */
+  criarProduto: (p: NovoProduto) => escritaProduto<{ id: number; preco: number | null }>('/api/app/produtos', p),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */

@@ -377,3 +377,15 @@ a.p4-link { text-decoration: none; }
 .est-barra { height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .est-barra i { display: block; height: 100%; background: var(--text-mute); }
 .est-barra i.danger { background: var(--danger); } .est-barra i.warn { background: var(--warn); } .est-barra i.ok { background: var(--ok); }
+
+/* Tela 20 · Novo produto (prefixo npr-) */
+.np-linha2.npr-preco { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.npr-venda { min-height: 52px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border-radius: 10px; background: var(--accent-soft); border: 1px solid var(--border); }
+.npr-venda span { font-size: 13px; font-weight: 600; color: var(--text); }
+.npr-venda b { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--accent-text); }
+.npr-prateleira { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.npr-feito { padding-top: 64px; }
+.npr-ok { width: 56px; height: 56px; margin-bottom: 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text);
+  display: flex; align-items: center; justify-content: center; }
+.np-rodape.npr-rodape-fim { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
