@@ -135,10 +135,10 @@ const CATALOGO = [
   { id: 5, nome: 'Lona impressa (m²)', categoria: 'Comunicação visual', preco: 42, estoque: null as number | null },
   { id: 6, nome: 'Caneca personalizada', categoria: 'Brindes', preco: 29.9, estoque: 5 as number | null },
 ];
-const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito', debito: 'Débito', dinheiro: 'Dinheiro', boleto: 'Boleto' };
+const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito', debito: 'Débito', dinheiro: 'Dinheiro' };
 let numeroVenda = 4820;
-/** Idempotency-Key → venda já criada (a repetição devolve a mesma, sem baixar estoque de novo). */
-const VENDAS_POR_CHAVE: Record<string, Record<string, unknown>> = {};
+/** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
+const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
@@ -381,14 +381,19 @@ export const demo = {
       return r({ itens: itens.map((p) => ({ ...p })) });
     }
     if (metodo === 'POST' && caminho === '/api/app/vendas') {
+      // Como o ERP (sessão ERP da tela 11): sem chave → 422; mesma chave e mesmo corpo → a mesma venda; corpo diferente → 422.
       const chave = cabecalhos['Idempotency-Key'];
-      if (chave && VENDAS_POR_CHAVE[chave]) return r({ ...VENDAS_POR_CHAVE[chave] });
+      if (!chave) throw Object.assign(new Error('Falta a chave de idempotência.'), { status: 422, codigo: 'validacao', campos: { idempotency_key: 'Falta a chave de idempotência.' } });
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = VENDAS_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra venda.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r({ ...ja.venda });
       const n = (corpo ?? {}) as { metodo?: string; itens?: Array<Record<string, unknown>>; total_previsto?: unknown };
       const campos: Record<string, string> = {};
       if (!n.metodo || !ROTULO_METODO[n.metodo]) campos.metodo = 'Escolha a forma de pagamento.';
       const itens = Array.isArray(n.itens) ? n.itens : [];
       if (!itens.length) campos.itens = 'Adicione ao menos um produto.';
-      let totalC = 0, unidadesV = 0;
+      let totalC = 0;
       const baixas: Array<{ p: (typeof CATALOGO)[number]; q: number }> = [];
       itens.forEach((it, k) => {
         const p = CATALOGO.find((x) => x.id === it.variacao_id);
@@ -396,18 +401,19 @@ export const demo = {
         if (!p) { campos[`itens.${k}.variacao_id`] = 'Produto não encontrado.'; return; }
         if (qC === null || qC <= 0 || qC % 100 !== 0) { campos[`itens.${k}.quantidade`] = 'Quantidade inválida.'; return; }
         const q = qC / 100;
-        if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `${p.nome}: só há ${p.estoque} em estoque.`; return; }
+        if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque})`; return; }
         const precoC = Math.round(p.preco * 100);
-        if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço de ${p.nome} mudou. Busque o produto de novo.`; return; }
-        totalC += precoC * q; unidadesV += q; baixas.push({ p, q });
+        if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`; return; }
+        totalC += precoC * q; baixas.push({ p, q });
       });
       if (!Object.keys(campos).length && centavosDoTexto(n.total_previsto) !== totalC) campos.total_previsto = 'O total mudou. Revise o carrinho.';
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
       for (const b of baixas) if (b.p.estoque !== null) b.p.estoque -= b.q;
       numeroVenda += 1;
       const venda = { id: 9000 + numeroVenda, numero: 'V-' + numeroVenda, data: new Date().toISOString(), total: totalC / 100,
-        itens: unidadesV, metodo: ROTULO_METODO[n.metodo as string] };
-      if (chave) VENDAS_POR_CHAVE[chave] = venda;
+        itens: baixas.map((b) => ({ variacao_id: b.p.id, nome: b.p.nome, quantidade: b.q, preco_unitario: b.p.preco, subtotal: Math.round(b.p.preco * 100) * b.q / 100 })),
+        metodo: ROTULO_METODO[n.metodo as string] };
+      VENDAS_POR_CHAVE[chave] = { corpo: corpoTxt, venda };
       return r({ ...venda });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });

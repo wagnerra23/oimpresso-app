@@ -3,8 +3,8 @@
 // carrinho é só prévia, e a tela de conclusão mostra o total que o ERP gravou. Contra venda duplicada, o botão
 // trava enquanto envia e cada tentativa leva uma Idempotency-Key que só muda quando o carrinho ou o método mudam.
 // Fora de propósito: câmera e leitor de código de barras (ADR 0383); "Imprimir" e "Enviar no WhatsApp" do
-// recibo (não estão no contrato); escolher cliente (a venda sai no consumidor final do ERP).
-// Contrato da API PROVISÓRIO (ver api.ts) até a sessão ERP da tela 11 fechar o formato.
+// recibo (não estão no contrato); escolher cliente (a venda sai no consumidor final do ERP); Boleto (decisão [W]).
+// Contrato fechado com a sessão ERP da tela 11 (ver api.ts); o ERP recalcula preço e total e recusa (422) se divergir.
 import { useEffect, useRef, useState } from 'react';
 import { api, camposDoErro, type VendaCriada } from '../api';
 import { useVoltar } from '../voltar';
@@ -55,16 +55,22 @@ export function VendaRapida({ aoVoltar, avisar, online }: { aoVoltar: () => void
       chave.current = null;
       setFeita(v); setSheet(null); setItens([]); setErroItem({});
     } catch (e) {
-      const st = statusDe(e);
-      // Só falha de rede/servidor mantém a chave: o reenvio do mesmo carrinho não cria uma 2ª venda.
-      if (st >= 400 && st < 500) chave.current = null;
+      const st = statusDe(e), cod = codigoDe(e);
+      // Rede, 5xx e 409 (a mesma venda ainda processando) mantêm a chave: o reenvio não cria uma 2ª venda.
+      if (st >= 400 && st < 500 && st !== 409) chave.current = null;
       const campos = camposDoErro(e);
-      if (st === 422 && Object.keys(campos).length) {
+      if (st === 409 || cod === 'em_andamento') {
+        avisar('Esta venda ainda está sendo registrada. Aguarde um instante e toque em Confirmar de novo.', 'warn');
+      } else if (cod === 'idempotencia_conflito') {
+        avisar('O carrinho mudou durante o envio. Confira e toque em Confirmar de novo.', 'warn');
+      } else if (cod === 'sem_local') {
+        avisar('Seu usuário não tem local de venda liberado no ERP.', 'erro');
+      } else if (st === 422 && Object.keys(campos).length) {
         const porItem = errosPorItem(campos, itens);
         setErroItem(porItem);
         setSheet(null);
         avisar(Object.values(campos)[0], 'erro');
-      } else if (st === 403 || codigoDe(e) === 'sem_permissao') {
+      } else if (st === 403 || cod === 'sem_permissao') {
         avisar('Seu usuário não pode registrar vendas.', 'erro');
       } else if (st === 0 || st >= 500) {
         avisar('Não foi possível confirmar a venda. Toque em Confirmar de novo: ela não será registrada duas vezes.', 'erro');
@@ -93,7 +99,7 @@ export function VendaRapida({ aoVoltar, avisar, online }: { aoVoltar: () => void
             <div className="vr-ok" aria-hidden="true">✓</div>
             <span className="vr-feita-t">Venda registrada</span>
             <span className="vr-feita-v">{reais(feita.total)}</span>
-            <span className="vr-feita-s">{itensTxt(feita.itens)} · {feita.metodo}</span>
+            <span className="vr-feita-s">{itensTxt(feita.itens.reduce((a, i) => a + i.quantidade, 0))} · {feita.metodo}</span>
             <div className="vr-recibo">Recibo #{feita.numero.replace(/^#/, '')}{quando(feita.data) && ` · ${quando(feita.data)}`}</div>
             <button className="p4-cta" onClick={nova}>Nova venda</button>
           </div>

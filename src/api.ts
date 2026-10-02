@@ -235,20 +235,23 @@ export interface Notificacao {
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
-// ── Venda rápida (tela 11, D16 Onda A). FORMATO PROVISÓRIO: proposto pelo app em 2026-10-02, ainda não fechado
-//    pela sessão ERP da tela 11. Mexe em VALOR e ESTOQUE — trocar só com o contrato fechado e o PR do ERP. ──
-/** GET /api/app/venda/produtos?q=: busca por nome ou categoria, 20 no máximo. */
+// ── Venda rápida (tela 11, D16 Onda A). Formato fechado com a sessão ERP da tela 11 em 2026-10-02; PR do ERP ainda em
+//    rascunho. Mexe em VALOR e ESTOQUE (regra mestre Tier 0). A venda nasce pelo TransactionUtil como venda direta
+//    (status final, fora da FSM), no 1º local ativo do usuário, e baixa o estoque na criação. ──
+/** GET /api/app/venda/produtos?q=: até 20 itens; `id` é a variação; `estoque` null = o produto não controla estoque. */
 export interface ListaProdutosVenda { itens: ProdutoVenda[] }
-/** 201 do POST /api/app/vendas. Repetir a mesma Idempotency-Key devolve a MESMA venda (200), sem criar outra. */
+/** 201 do POST /api/app/vendas. Repetir a mesma Idempotency-Key com o mesmo corpo devolve 200 com a MESMA venda. */
 export interface VendaCriada {
   id: number;
-  /** Número do recibo/fatura do ERP (ex.: "V-4821"). */
+  /** invoice_no do ERP. */
   numero: string;
   /** ISO com hora, do servidor. */
   data: string;
-  /** Total gravado pelo ERP, em reais. É o valor que a tela mostra. */
+  /** Total recalculado e gravado pelo ERP, em reais. É o valor que a tela mostra. */
   total: number;
-  itens: number;
+  /** Linhas como o ERP gravou. */
+  itens: Array<{ variacao_id: number; nome: string; quantidade: number; preco_unitario: number; subtotal: number }>;
+  /** Rótulo da forma de pagamento no ERP (o do PIX é configurável por empresa). */
   metodo: string;
 }
 
@@ -399,10 +402,12 @@ export const api = {
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
-  /** Tela 11 · busca de produto (formato provisório). */
+  /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */
   produtosVenda: (q = '') => chamar<ListaProdutosVenda>('GET', `/api/app/venda/produtos${q ? `?q=${encodeURIComponent(q)}` : ''}`),
-  /** Tela 11 · cria a venda (formato provisório). 201 VendaCriada · 422 { erro: "validacao", campos } (ex.: "itens.0.quantidade"
-   *  sem estoque, "total_previsto" divergente) · 403 sem_permissao. `chave` = Idempotency-Key da tentativa. */
+  /** Tela 11 · cria a venda. 201 VendaCriada (200 na repetição da chave) · 422 { erro: "validacao", campos } com
+   *  "itens.N.quantidade" (estoque insuficiente), "itens.N.preco_unitario" (o preço mudou), "total_previsto" ou "cliente_id" ·
+   *  422 { erro: "idempotencia_conflito" } (mesma chave, corpo diferente) · 409 { erro: "em_andamento" } · 403 sem_permissao
+   *  ou sem_local. `chave` = Idempotency-Key da tentativa. */
   criarVenda: (corpo: CorpoVenda, chave: string) => chamar<VendaCriada>('POST', '/api/app/vendas', corpo, { 'Idempotency-Key': chave }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),

@@ -3,7 +3,8 @@
 // mostra o total que o ERP devolveu. A conta é feita em centavos inteiros para não acumular erro de float,
 // e o envio leva preço e quantidade como texto com 2 casas e ponto decimal (nunca float ambíguo).
 
-export type MetodoPagamento = 'pix' | 'credito' | 'debito' | 'dinheiro' | 'boleto';
+// Boleto fica fora da v1 (no ERP é venda a prazo, e a emissão de boleto está desligada em produção). Decisão [W].
+export type MetodoPagamento = 'pix' | 'credito' | 'debito' | 'dinheiro';
 
 /** Métodos do protótipo (s11), na ordem dele. */
 export const METODOS: Array<{ id: MetodoPagamento; rotulo: string; desc: string }> = [
@@ -11,7 +12,6 @@ export const METODOS: Array<{ id: MetodoPagamento; rotulo: string; desc: string 
   { id: 'credito', rotulo: 'Crédito', desc: '1× a 12×' },
   { id: 'debito', rotulo: 'Débito', desc: 'Visa / Master' },
   { id: 'dinheiro', rotulo: 'Dinheiro', desc: 'Sem comprovante' },
-  { id: 'boleto', rotulo: 'Boleto', desc: 'Cobrar em 7 dias' },
 ];
 
 /** Produto como a busca devolve. `id` é a variação (é ela que tem preço e estoque no ERP). */
