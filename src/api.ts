@@ -298,7 +298,7 @@ export interface VeiculoResumo {
   id: number; placa: string;
   /** Desenho da placa; null quando o ERP não sabe. */
   padrao_placa: 'mercosul' | 'antiga' | null;
-  /** Marca/modelo · ano. */
+  /** O ERP não guarda marca/modelo: hoje é o tipo do veículo (a confirmar no formato da 08). */
   modelo: string; cliente: string; km: number | null; cor: string | null;
 }
 export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }

@@ -104,7 +104,7 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
                     {h && h !== 'erro' && h.itens.length === 0 && <p className="p4-legal">Nenhuma OS para este veículo.</p>}
                     {h && h !== 'erro' && h.itens.map((x) => (
                       <button key={x.os_id} className="vei-os" onClick={() => aoAbrirOs(x.os_id)}>
-                        <span className="pd-num">#{x.numero}</span>
+                        <span className="pd-num">{x.numero}</span>
                         <span className="vei-os-t">{dataOs(x.data)} · {x.etapa_rotulo}</span>
                         <span className="vei-os-v">{x.valor === null ? '—' : reais(x.valor)}</span>
                       </button>

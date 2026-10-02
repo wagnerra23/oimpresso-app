@@ -145,14 +145,14 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
 
 // Veículos da demo (tela 08). Placas fictícias; o histórico sai das OS da demo pela placa.
 const VEICULOS = [
-  { id: 1, placa: 'RLV2E48', padrao_placa: 'mercosul' as const, modelo: 'Fiat Strada 1.3 · 2022', cliente: 'Transportes Vale Norte', km: 48312, cor: 'Branco' },
-  { id: 2, placa: 'RBA2H78', padrao_placa: 'mercosul' as const, modelo: 'VW Constellation 24.280', cliente: 'Transportes Vale Norte', km: 312040, cor: 'Prata' },
-  { id: 3, placa: 'MLK4C09', padrao_placa: 'antiga' as const, modelo: 'Renault Master · 2018', cliente: 'Mercado Bom Preço', km: 161880, cor: 'Branco' },
-  { id: 4, placa: 'QHX5B33', padrao_placa: 'mercosul' as const, modelo: 'Toyota Hilux · 2021', cliente: 'Studio Forma', km: 72415, cor: null },
+  { id: 1, placa: 'RLV2E48', padrao_placa: 'mercosul' as const, modelo: 'Picape', cliente: 'Transportes Vale Norte', km: 48312, cor: 'Branco' },
+  { id: 2, placa: 'RBA2H78', padrao_placa: 'mercosul' as const, modelo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', km: 312040, cor: 'Prata' },
+  { id: 3, placa: 'MLK4C09', padrao_placa: 'antiga' as const, modelo: 'Furgão', cliente: 'Mercado Bom Preço', km: 161880, cor: 'Branco' },
+  { id: 4, placa: 'QHX5B33', padrao_placa: 'mercosul' as const, modelo: 'Picape', cliente: 'Studio Forma', km: 72415, cor: null },
 ];
 const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string; valor: number | null }>> = {
-  RLV2E48: [{ os_id: 998, numero: '998', data: '2026-06-12', etapa_rotulo: 'Entregue', valor: 1240 }, { os_id: 941, numero: '941', data: '2026-02-03', etapa_rotulo: 'Entregue', valor: 460 }],
-  MLK4C09: [{ os_id: 902, numero: '902', data: '2025-11-18', etapa_rotulo: 'Entregue', valor: 2180 }],
+  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', valor: 1240 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: 'Entregue', valor: 460 }],
+  MLK4C09: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', valor: 2180 }],
 };
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
@@ -730,6 +730,9 @@ export const demo = {
         veiculo: veicAntigo.modelo as string | null, cliente: veicAntigo.cliente, valor: antiga.valor, etapa: 'entregue' } : undefined);
       if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
       const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
+      // OS terminal (entregue, aberta pelo histórico do veículo): indice null e terminal true, como o ERP fechou.
+      const etapaOs = pos >= 0 ? { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length }
+        : { chave: o.etapa, rotulo: 'Entregue', indice: null, total_etapas: ETAPAS_OS.length, terminal: true };
       const d = DETALHE_OS[o.id] ?? { local: null, km: null, observacoes: null, vistoria: null, fotos: 0,
         itens: o.valor ? [{ tipo: 'mao_obra' as const, descricao: 'Serviço', quantidade: 1, valor_unitario: o.valor }] : [] };
       // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
@@ -737,7 +740,7 @@ export const demo = {
       const soma = (t: string) => itens.filter((i) => i.tipo === t).reduce((a, i) => a + i.valor, 0);
       const totais = { pecas: soma('peca'), mao_de_obra: soma('mao_obra'), terceiros: soma('servico_terceiro'), total: itens.reduce((a, i) => a + i.valor, 0) };
       return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
-        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length },
+        etapa: etapaOs,
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos });
     }
