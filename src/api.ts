@@ -78,6 +78,15 @@ export interface PessoaDetalhe {
   pedidos_recentes: Array<{ id: number; numero: string; data: string; valor: number }>;
 }
 
+// ── Produção (API-CONTRATO-v1 §5, ERP #8495): fila por etapa da venda, colunas fixas nesta ordem. ──
+export const COLUNAS_PRODUCAO = ['quote_approved', 'in_production', 'on_hold', 'ready_for_invoice'] as const;
+export type ColunaProducao = (typeof COLUNAS_PRODUCAO)[number];
+export interface FilaProducao {
+  /** Até 50 itens por coluna, prazo mais próximo primeiro; item igual ao da lista de pedidos.
+   *  `total` é a contagem real da etapa (pode passar de 50). */
+  colunas: Array<{ id: ColunaProducao; rotulo: string; total: number; itens: PedidoResumo[] }>;
+}
+
 // ── Tarefas (API-CONTRATO-v1 §3): ToDo do usuário + justificativas do Ponto. ──
 export type OrigemTarefa = 'todo' | 'ponto';
 export type FiltroTarefas = 'todas' | OrigemTarefa;
@@ -207,6 +216,7 @@ export const api = {
   pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
+  producao: () => chamar<FilaProducao>('GET', '/api/app/producao'),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   concluirTodo: (id: string) => chamar<{ sucesso: boolean }>('POST', `/api/app/tarefas/todo/${id}/concluir`),

@@ -237,3 +237,15 @@ a.p4-link { text-decoration: none; }
 .ps-dado:last-child { border-bottom: 0; }
 .ps-dado span { font-size: 12.5px; color: var(--text-mute); width: 96px; flex-shrink: 0; }
 .ps-dado b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 400; text-align: right; overflow-wrap: anywhere; }
+
+/* Produção — tela 02 do v4 (etapas da venda no lugar das OPs) */
+.pr-etapas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pr-etapa { min-height: 60px; padding: 8px 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; color: var(--text); }
+.pr-etapa.on { border-color: var(--accent); background: var(--accent-soft); }
+.pr-etapa b { font-family: var(--font-mono); font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.pr-etapa b i { width: 7px; height: 7px; border-radius: 99px; }
+.pr-etapa span { font-size: 10.5px; line-height: 1.2; color: var(--text-dim); text-align: center; overflow-wrap: anywhere; }
+.pr-etapa.on span { color: var(--text); }
+.pr-pipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; margin-top: 2px; }
+.pr-pipe i { height: 4px; border-radius: 2px; background: var(--border); }

@@ -10,6 +10,7 @@ import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
 import { tratarVoltar } from './voltar';
 import { Pedidos } from './telas/Pedidos';
+import { Producao } from './telas/Producao';
 import { Tarefas } from './telas/Tarefas';
 import { Mais, VoltarMais, type SubMais } from './telas/Mais';
 import { Pessoas } from './telas/Pessoas';
@@ -19,13 +20,14 @@ import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
 
-type Aba = 'inicio' | 'tarefas' | 'pedidos' | 'mais';
+type Aba = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'mais';
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
 const ABAS: Array<{ id: Aba; label: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'inicio', label: 'Início', Icone: Ic.inicio },
   { id: 'tarefas', label: 'Tarefas', Icone: Ic.tarefa },
   { id: 'pedidos', label: 'Pedidos', Icone: Ic.pedido },
+  { id: 'producao', label: 'Produção', Icone: Ic.producao },
   { id: 'mais', label: 'Mais', Icone: Ic.mais },
 ];
 
@@ -85,6 +87,7 @@ export function App() {
         {aba === 'inicio' && <Inicio irParaPonto={() => irPara('mais', 'ponto')} />}
         {aba === 'tarefas' && <Tarefas avisar={avisar} abrirPonto={() => irPara('mais', 'ponto')} />}
         {aba === 'pedidos' && <Pedidos />}
+        {aba === 'producao' && <Producao />}
         {aba === 'mais' && subMais === null && <Mais abrir={setSubMais} />}
         {aba === 'mais' && subMais === 'pessoas' && <Pessoas voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}

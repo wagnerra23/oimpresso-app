@@ -83,7 +83,7 @@ function Lista({ aoAbrir }: { aoAbrir: (id: number) => void }) {
   );
 }
 
-function Detalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+export function Detalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
   const [p, setP] = useState<PedidoDetalheApi | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { api.pedido(id).then(setP).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')); }, [id]);
