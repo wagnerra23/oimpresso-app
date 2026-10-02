@@ -1,23 +1,29 @@
 // Veículos — desenho v4 (tela 08), Onda D. Só leitura. Aba da Oficina, ao lado das ordens de serviço.
-// Rota PROVISÓRIA GET /api/app/veiculos: formato pedido ao ERP, ainda sem contrato; só a demo responde.
+// Rota GET /api/app/veiculos (formato fechado pela sessão ERP da Onda D, tabela vehicles do OficinaAuto).
 // Tocar no veículo abre o histórico de OS dele (busca ao expandir); tocar numa OS abre o detalhe (tela 03).
+// O ERP não guarda marca/modelo nem o desenho da placa: o título é o tipo e o desenho sai do formato da placa.
 // Fora de propósito: "+ Veículo" (escrita, PR próprio).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
-/** Linha de baixo do cartão: "48.312 km · Branco", pulando o que vier vazio. */
-export function textoVeiculo(v: Pick<VeiculoResumo, 'km' | 'cor'>): string {
-  return [textoKm(v.km), v.cor].filter(Boolean).join(' · ');
+/** Linha de baixo do cartão: "48.312 km · 2019/2020 · Branco", pulando o que vier vazio. */
+export function textoVeiculo(v: Pick<VeiculoResumo, 'km' | 'ano' | 'cor'>): string {
+  return [textoKm(v.km), v.ano, v.cor].filter(Boolean).join(' · ');
 }
 
 /** Data curta do histórico: "12/06". */
 export const dataOs = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
+/** Desenho da placa pelo formato: antiga = 3 letras + 4 números (com ou sem hífen); o resto ganha o desenho Mercosul. */
+export function placaAntiga(placa: string): boolean {
+  return /^[A-Z]{3}-?[0-9]{4}$/.test(placa.trim().toUpperCase());
+}
+
 /** Placa no desenho certo: Mercosul ganha a faixa azul; a antiga, não. */
-export function Placa({ placa, padrao }: { placa: string; padrao?: VeiculoResumo['padrao_placa'] }) {
-  return <span className={'os-placa' + (padrao === 'antiga' ? ' antiga' : '')} aria-label={`Placa ${placa}`}>{placa}</span>;
+export function Placa({ placa }: { placa: string }) {
+  return <span className={'os-placa' + (placaAntiga(placa) ? ' antiga' : '')} aria-label={`Placa ${placa}`}>{placa}</span>;
 }
 
 interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void }
@@ -74,7 +80,7 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
         <div className="pd-corpo">
           <label className="ps-busca">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-            <input type="search" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Placa, marca, modelo ou cliente" aria-label="Buscar veículo" enterKeyHint="search" />
+            <input type="search" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Placa, tipo ou dono" aria-label="Buscar veículo" enterKeyHint="search" />
           </label>
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
           {!dados && !erro && <p className="p4-legal">Carregando…</p>}
@@ -88,10 +94,13 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
             return (
               <div key={v.id} className="pd-card vei-card">
                 <button className="vei-topo" aria-expanded={estaAberto} onClick={() => alternar(v.id)}>
-                  <Placa placa={v.placa} padrao={v.padrao_placa} />
+                  <span className="vei-placas">
+                    <Placa placa={v.placa} />
+                    {v.placa_secundaria && <Placa placa={v.placa_secundaria} />}
+                  </span>
                   <span className="os-texto">
-                    <b>{v.modelo}</b>
-                    <small>{v.cliente}</small>
+                    <b>{v.descricao ?? 'Veículo'}{v.placa_secundaria && <span className="vei-reboque"> + reboque</span>}</b>
+                    <small>{v.cliente ?? 'Sem dono cadastrado'}</small>
                     {meta && <small className="vei-meta">{meta}</small>}
                   </span>
                   <span className="vei-chev" aria-hidden="true">{estaAberto ? '−' : '+'}</span>
@@ -105,7 +114,10 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
                     {h && h !== 'erro' && h.itens.map((x) => (
                       <button key={x.os_id} className="vei-os" onClick={() => aoAbrirOs(x.os_id)}>
                         <span className="pd-num">{x.numero}</span>
-                        <span className="vei-os-t">{dataOs(x.data)} · {x.etapa_rotulo}</span>
+                        <span className="vei-os-t">
+                          {dataOs(x.data)} · {x.etapa_rotulo ?? 'fora do fluxo'}
+                          {x.cliente && x.cliente !== v.cliente && <small>{x.cliente}</small>}
+                        </span>
                         <span className="vei-os-v">{x.valor === null ? '—' : reais(x.valor)}</span>
                       </button>
                     ))}

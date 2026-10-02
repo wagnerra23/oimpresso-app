@@ -252,17 +252,28 @@ export interface OsDetalhe {
   fotos_laudo: number;
 }
 
-/** Tela 08 · Veículos. FORMATO PROVISÓRIO (pedido ao ERP). Busca no servidor por placa, marca, modelo ou cliente. */
+/** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
+ *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
 export interface VeiculoResumo {
   id: number; placa: string;
-  /** Desenho da placa; null quando o ERP não sabe. */
-  padrao_placa: 'mercosul' | 'antiga' | null;
-  /** O ERP não guarda marca/modelo: hoje é o tipo do veículo (a confirmar no formato da 08). */
-  modelo: string; cliente: string; km: number | null; cor: string | null;
+  /** Placa do reboque, quando houver. */
+  placa_secundaria: string | null;
+  /** Tipo do veículo (o ERP não guarda marca/modelo); null quando não informado. */
+  descricao: string | null;
+  /** Ano de fabricação/modelo, ex.: "2019/2020". */
+  ano: string | null;
+  /** Dono do veículo. */
+  cliente: string | null;
+  /** Último km conhecido (cadastro ou OS). */
+  km: number | null;
+  cor: string | null;
 }
 export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }
-/** Histórico de OS do veículo, da mais nova para a mais antiga. */
-export interface HistoricoVeiculo { itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string; valor: number | null }> }
+/** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
+ *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
+export interface HistoricoVeiculo {
+  itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>;
+}
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
@@ -466,10 +477,10 @@ export const api = {
     chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
   /** Tela 03 · Detalhe da OS. OS de outra empresa ou inexistente → 404 nao_encontrado. */
   osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
-  /** Tela 08 · Veículos. Rota PROVISÓRIA. */
+  /** Tela 08 · Veículos. */
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
-  /** Histórico de OS do veículo (tela 08, ao expandir). Rota PROVISÓRIA. */
+  /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */
   veiculoOs: (id: number) => chamar<HistoricoVeiculo>('GET', `/api/app/veiculos/${id}/os`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
