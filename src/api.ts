@@ -328,13 +328,15 @@ export interface DocumentoFiscal {
 }
 export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<FiltroFiscal, number>; pagina: number; tem_mais: boolean }
 
-/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). `kpis` vêm sempre;
- *  só o bloco da aba pedida vem preenchido (os outros null). Exportar PDF/Excel fica no computador. */
+/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Contrato §10.3 (ERP Onda C). Só o bloco da aba pedida vem
+ *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
+ *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
 export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
 export interface Relatorios {
   periodo: { de: string; ate: string };
-  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null };
+  /** null sem acesso ao Financeiro. `margem_pct` = saldo ÷ receitas × 100, null sem receita. */
+  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null } | null;
   dre: { receitas_por_categoria: Array<{ nome: string; valor: number }>; despesas_por_categoria: Array<{ nome: string; valor: number }> } | null;
   /** `receita_por_dia`: últimos 14 dias; `top_clientes`: até 5. */
   vendas: { receita_por_dia: Array<{ data: string; valor: number }>; top_clientes: Array<{ nome: string; valor: number }> } | null;

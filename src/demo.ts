@@ -8,6 +8,8 @@ interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; 
 let logado = false;
 // Perfil da demo: usuário com "ponto" no nome (ex.: revisor.ponto) entra como colaborador (D6).
 let perfilDemo: 'erp' | 'colaborador' = 'erp';
+// Usuário com "vendas" no nome entra sem acesso ao Financeiro (relatórios sem indicadores nem DRE, §10.3).
+let semFinanceiro = false;
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
@@ -181,6 +183,7 @@ export const demo = {
     if (!usuario.trim() || senha.length < 3) throw Object.assign(new Error('Usuário ou senha incorretos.'), { status: 401 });
     logado = true;
     perfilDemo = /ponto/i.test(usuario) ? 'colaborador' : 'erp';
+    semFinanceiro = /vendas/i.test(usuario);
   },
   sair() { logado = false; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
@@ -475,8 +478,8 @@ export const demo = {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo === 'producao');
       const etapas = [...new Set(ativos.map((x) => x.etapa.rotulo))].map((rotulo) => ({ rotulo, total: ativos.filter((x) => x.etapa.rotulo === rotulo).length }));
       return r({ periodo: { de, ate: diaRel(0) },
-        kpis: { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
-        dre: aba !== 'dre' ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
+        kpis: semFinanceiro ? null : { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
+        dre: aba !== 'dre' || semFinanceiro ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
           despesas_por_categoria: parte(desp, [['Insumos', 0.46], ['Folha', 0.31], ['Aluguel e energia', 0.14], ['Outros', 0.09]]) },
         vendas: aba !== 'vendas' ? null : {
           receita_por_dia: [4.2, 5.1, 3.8, 6.4, 7.2, 2.1, 1.4, 5.8, 6.1, 4.9, 7.8, 8.4, 3.2, 8.42].map((x, i) => ({ data: diaRel(i - 13), valor: x * 1000 })),
