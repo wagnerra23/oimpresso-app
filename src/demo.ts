@@ -71,14 +71,14 @@ const ESTOQUE = [
 
 // Histórico da tela 29 (só leitura), imitando o protótipo. Horário relativo a hoje para "hoje"/"ontem" funcionarem.
 const quandoRel = (dias: number, h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() + dias); d.setHours(h, m, 0, 0); return d.toISOString(); };
-const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string; referencia: string | null; quando: string; qtd: number }>> = {
+const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string; referencia: string | null; quando: string; qtd: number; saldo: number }>> = {
   301: [
-    { id: 9001, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2318 · Mercado Bom Preço', quando: quandoRel(0, 8, 10), qtd: -3.6 },
-    { id: 9002, tipo: 'purchase', rotulo: 'Compra', referencia: 'NF 88213 · Distribuidora Sul Mídia', quando: quandoRel(-1, 15, 40), qtd: 50 },
-    { id: 9003, tipo: 'stock_adjustment', rotulo: 'Ajuste', referencia: 'Refilo · ajuste de cor', quando: quandoRel(-6, 11, 5), qtd: -1.2 },
-    { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4 },
+    { id: 9001, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2318 · Mercado Bom Preço', quando: quandoRel(0, 8, 10), qtd: -3.6, saldo: 18 },
+    { id: 9002, tipo: 'purchase', rotulo: 'Compra', referencia: 'NF 88213 · Distribuidora Sul Mídia', quando: quandoRel(-1, 15, 40), qtd: 20, saldo: 21.6 },
+    { id: 9003, tipo: 'stock_adjustment', rotulo: 'Ajuste', referencia: 'Refilo · ajuste de cor', quando: quandoRel(-6, 11, 5), qtd: -1.2, saldo: 1.6 },
+    { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4, saldo: 2.8 },
   ],
-  306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9 }],
+  306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
 };
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).

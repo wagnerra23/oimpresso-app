@@ -1,6 +1,6 @@
 // Movimentações — tela 29 do v4, SÓ LEITURA: saldo e histórico de uma linha do estoque (variação × loja,
-// aberta pela tela 05). Formato PROVISÓRIO: o ERP ainda fecha o GET. Até lá a tela só existe na demo
-// (DETALHE_ESTOQUE), e a demo faz o papel do ERP.
+// aberta pela tela 05). Contrato §9.3 (ERP #8581). Até o #8581 estar em produção a tela só existe na demo
+// (DETALHE_ESTOQUE). O saldo de cada linha vem do ERP; o app não soma nada.
 // Fora de propósito por enquanto: o bloco "Registrar movimento" do protótipo. No ERP não há movimento
 // genérico: entrada é compra (com fornecedor e custo); saída e perda são ajuste de estoque, com valor e
 // custeio FIFO; e o ajuste só diminui. Quais tipos o app pode fazer, e com qual valor, é decisão do Wagner
@@ -93,7 +93,10 @@ export function Movimentacoes({ id, aoVoltar }: { id: number; aoVoltar: () => vo
                           {/* A referência encolhe com reticências; a data fica sempre inteira. */}
                           <small>{m.referencia && <span className="mov-ref">{m.referencia}</span>}<span className="mov-quando">{m.referencia ? '\u00a0·\u00a0' : ''}{quando(m.quando)}</span></small>
                         </span>
-                        <span className={'mov-qtd ' + (m.qtd < 0 ? 'neg' : 'pos')}>{textoMovimento(m.qtd, item.unidade)}</span>
+                        <span className="mov-valores">
+                          <span className={'mov-qtd ' + (m.qtd < 0 ? 'neg' : 'pos')}>{textoMovimento(m.qtd, item.unidade)}</span>
+                          <small>saldo {textoQtd(m.saldo, item.unidade)}</small>
+                        </span>
                       </div>
                     ))}
                   </div>
