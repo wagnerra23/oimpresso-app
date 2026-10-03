@@ -6,7 +6,7 @@ import { Browser } from '@capacitor/browser';
 import { Ic } from '../icones';
 import logo from '../assets/oimpresso-logo.png';
 
-export type SubMais = 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'equipe' | 'ponto_gestor' | 'pagamentos' | 'ponto' | 'conta';
+export type SubMais = 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto_gestor' | 'pagamentos' | 'ponto' | 'conta';
 
 const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
   { id: 'pessoas', label: 'Pessoas', desc: 'Clientes, fornecedores e equipe', Icone: Ic.pessoas },
@@ -19,6 +19,7 @@ const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { ta
   { id: 'dashboard', label: 'Dashboard', desc: 'Faturamento e indicadores de 30 dias', Icone: Ic.grafico },
   { id: 'ponto_gestor', label: 'Validar ponto', desc: 'Marcações fora da área para revisar', Icone: Ic.check },
   { id: 'equipe', label: 'Equipe', desc: 'Quem está na equipe e a carga de cada um', Icone: Ic.usuario },
+  { id: 'assistente', label: 'Assistente', desc: 'Pergunte à Jana sobre o sistema', Icone: Ic.chat },
   { id: 'pagamentos', label: 'Pagamentos', desc: 'Links de cobrança e quem já pagou', Icone: Ic.dinheiro },
   { id: 'ponto', label: 'Ponto', desc: 'Bater ponto, espelho e justificativas', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },

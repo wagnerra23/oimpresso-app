@@ -21,6 +21,7 @@ import { Relatorios } from './telas/Relatorios';
 import { Dashboard } from './telas/Dashboard';
 import { FilaGestor } from './telas/FilaGestor';
 import { Equipe } from './telas/Equipe';
+import { Assistente } from './telas/Assistente';
 import { Pagamentos } from './telas/Pagamentos';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
@@ -143,6 +144,7 @@ export function App() {
           voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto_gestor' && <FilaGestor avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'equipe' && <Equipe voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'assistente' && <Assistente online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'pagamentos' && <Pagamentos avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
