@@ -16,6 +16,22 @@ const intercorrencias: Array<Record<string, unknown>> = [];
 // Tela 30 · escolha da barra guardada "no ERP" da demo (null = sem escolha → padrão do ERP).
 let barraDemo: string[] | null = null;
 const BARRA_PADRAO_DEMO = ['tarefas', 'pedidos', 'producao'];
+// Tela 39 · Marcações fora do geofence (nomes e números do protótipo). `min` = minutos atrás.
+const VALIDACAO = [
+  { id: 'd39a1000-0000-4000-8000-000000000001', colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'A 84,2 km do local de trabalho', min: 95, nsr: 348821, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
+  { id: 'd39a2000-0000-4000-8000-000000000002', colaborador_nome: 'Marcos Teixeira', tipo: 'SAIDA', local_texto: 'A 84,2 km do local de trabalho', min: 960, nsr: 348809, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '27d9d853', estado: 'pendente' },
+  { id: 'd39a3000-0000-4000-8000-000000000003', colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'A 3,7 km do local de trabalho', min: 1500, nsr: 348715, gps_precisao_m: null, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
+  { id: 'd39a4000-0000-4000-8000-000000000004', colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: null, min: 2800, nsr: 348690, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
+];
+// Tela 25 · respostas simuladas da Jana (as do protótipo). Sem Date no topo do módulo.
+const conversaDemo: Array<{ de: 'eu' | 'jana'; texto: string; criada_em: string }> = [];
+const respostaJana = (t: string) => {
+  const x = t.toLowerCase();
+  if (x.includes('venda') || x.includes('pedido')) return 'Para acompanhar vendas, abra Pedidos: lá você vê o status de cada um e o que está atrasado.';
+  if (x.includes('produç') || x.includes('producao')) return 'Em Produção você vê a fila por etapa: aprovado, em produção, em espera e pronto pra faturar.';
+  if (x.includes('financ')) return 'O resumo do caixa, a receber e a pagar aparece no Início. O detalhe completo está no oimpresso no computador.';
+  return 'Posso ajudar com pedidos, produção, estoque e ponto. Toque numa sugestão ou escreva sua dúvida.';
+};
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -397,7 +413,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -406,7 +422,7 @@ export const demo = {
     }
     if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
       const { modulos } = (corpo ?? {}) as { modulos?: string[] };
-      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'mais'];
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'];
       // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
       const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
         : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
@@ -444,6 +460,48 @@ export const demo = {
         comentarios: [{ quando: diaRel(0) + 'T08:40:00-03:00', autor: 'Carla', texto: 'pediu letra maior ao fornecedor', detalhe: null },
           { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
         concluida: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/ponto/aprovacoes')) {
+      // Hora calculada aqui, nunca no topo do módulo.
+      const est = (caminho.match(/estado=(\w+)/) || [])[1] || 'pendente';
+      const itens = VALIDACAO.filter((x) => est === 'todas' || x.estado === est)
+        .map(({ min, ...x }) => ({ ...x, marcada_em: new Date(Date.now() - min * 60000).toISOString() }));
+      const conta = (e: string) => VALIDACAO.filter((x) => x.estado === e).length;
+      return r({ itens, contadores: { pendente: conta('pendente'), validada: conta('validada'), recusada: conta('recusada'), todas: VALIDACAO.length }, pode_recusar: true });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/ponto\/aprovacoes\/[^/]+\/(validar|recusar)$/.test(caminho)) {
+      const partes = caminho.split('/');
+      const m = VALIDACAO.find((x) => x.id === decodeURIComponent(partes[5]));
+      if (!m) throw Object.assign(new Error('Marcação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      if (m.estado !== 'pendente') throw Object.assign(new Error('Esta marcação já foi revisada.'), { status: 409, codigo: 'ja_revisada' });
+      // Demo: só muda o estado da fila. No ERP a recusa grava uma anulação nova; a marcação não é tocada.
+      if (partes[6] === 'validar') { m.estado = 'validada'; return r({ estado: 'validada' }); }
+      m.estado = 'recusada'; nsr += 1;
+      return r({ estado: 'recusada', nsr_anulacao: nsr });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/equipe') {
+      // Nomes do protótipo (tela 26), nas regras do ERP #8588: ordem alfabética, carga só de OS, status montado
+      // pelo ERP (Em serviço quando tem carga, Disponível sem, Inativo para usuário inativo).
+      return r({ itens: [
+        { id: 2, nome: 'André Silva', funcao: 'Impressor · plotter 1,60', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 3, nome: 'Bruno Cruz', funcao: 'Mecânico · Box 1', carga: '1 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 4, nome: 'Carla Menezes', funcao: 'Administrativo · financeiro', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 1, nome: 'Jefferson Moraes', funcao: 'Mecânico · Box 2', carga: '2 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Inativo', tom: 'ausente' } },
+      ] });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/chat') {
+      const { mensagem } = (corpo ?? {}) as { mensagem?: string };
+      if (!mensagem || !mensagem.trim()) throw Object.assign(new Error('Escreva uma mensagem.'), { status: 422, codigo: 'validacao' });
+      await espera(900);
+      const agora = new Date().toISOString();
+      conversaDemo.push({ de: 'eu', texto: mensagem.trim(), criada_em: agora });
+      const resposta = { de: 'jana' as const, texto: respostaJana(mensagem), criada_em: new Date().toISOString() };
+      conversaDemo.push(resposta);
+      return r({ conversa_id: 'demo-1', resposta });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/chat/')) {
+      return r({ conversa_id: 'demo-1', mensagens: conversaDemo });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

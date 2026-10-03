@@ -6,7 +6,7 @@ import { Browser } from '@capacitor/browser';
 import { Ic } from '../icones';
 import logo from '../assets/oimpresso-logo.png';
 
-export type SubMais = 'tarefas' | 'pedidos' | 'producao' | 'menu' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'ponto' | 'conta';
+export type SubMais = 'tarefas' | 'pedidos' | 'producao' | 'menu' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto_gestor' | 'ponto' | 'conta';
 
 /** Módulos com tela no app (também usados pela tela 30 e pelas abas, quando o usuário põe na barra). */
 export const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
@@ -21,6 +21,9 @@ export const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (
   { id: 'fiscal', label: 'Fiscal', desc: 'Notas emitidas e rejeitadas', Icone: Ic.pedido },
   { id: 'relatorios', label: 'Relatórios', desc: 'DRE, vendas, produção e estoque', Icone: Ic.grafico },
   { id: 'dashboard', label: 'Dashboard', desc: 'Faturamento e indicadores de 30 dias', Icone: Ic.grafico },
+  { id: 'ponto_gestor', label: 'Validar ponto', desc: 'Marcações fora da área para revisar', Icone: Ic.check },
+  { id: 'equipe', label: 'Equipe', desc: 'Quem está na equipe e a carga de cada um', Icone: Ic.usuario },
+  { id: 'assistente', label: 'Assistente', desc: 'Pergunte à Jana sobre o sistema', Icone: Ic.chat },
   { id: 'ponto', label: 'Ponto', desc: 'Bater ponto, espelho e justificativas', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },
 ];

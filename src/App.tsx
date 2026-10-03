@@ -20,6 +20,9 @@ import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
 import { Relatorios } from './telas/Relatorios';
 import { Dashboard } from './telas/Dashboard';
+import { FilaGestor } from './telas/FilaGestor';
+import { Equipe } from './telas/Equipe';
+import { Assistente } from './telas/Assistente';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
 import { Financeiro } from './telas/Financeiro';
@@ -138,6 +141,9 @@ export function App() {
       case 'fiscal': return <Fiscal voltar={voltar} />;
       case 'relatorios': return <Relatorios voltar={voltar} />;
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;
+      case 'ponto_gestor': return <FilaGestor avisar={avisar} voltar={voltar} />;
+      case 'equipe': return <Equipe voltar={voltar} />;
+      case 'assistente': return <Assistente online={online} voltar={voltar} />;
       case 'ponto': return <Ponto avisar={avisar} online={online} voltar={voltar} />;
       case 'conta': return <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={voltar} />;
       case 'menu': {
