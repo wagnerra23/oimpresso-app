@@ -398,6 +398,16 @@ a.p4-link { text-decoration: none; }
 .fg-recusar { min-height: 44px; border-radius: 8px; border: 1px solid var(--danger); background: transparent; color: var(--danger); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
 .fg-recusar:disabled { opacity: .5; }
 .fg-confirma { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border-2, var(--border)); font-size: 12.5px; color: var(--text); }
+/* Tela 26 · Equipe (eq-) */
+.eq-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.eq-linha { min-height: 64px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2, var(--border)); }
+.eq-linha:last-child { border-bottom: 0; }
+.eq-quem { flex: 1; min-width: 0; }
+.eq-quem b { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-quem small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eq-status { font-size: 11px; font-weight: 500; }
 
 /* Tela 29 · Movimentações (prefixo mov-) */
 .est-card.abre { width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; min-height: 44px; }
