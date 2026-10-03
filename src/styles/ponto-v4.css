@@ -550,6 +550,11 @@ button.db-kpi { cursor: pointer; }
 .os-pipe { display: flex; gap: 3px; }
 .os-pipe i { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
 
+/* Tela 15 · Pagamentos (prefixo pg-) */
+.pg-pago { font-size: 12px; color: var(--ok); font-weight: 600; }
+.pg-acoes { display: flex; gap: 8px; }
+.pg-acoes .oi-btn { min-height: 44px; }
+
 /* Tela 30 · Meu menu (pm-) */
 .pm-restaurar { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
 .pm-restaurar:disabled { color: var(--text-mute); cursor: default; }

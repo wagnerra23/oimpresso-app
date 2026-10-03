@@ -1,7 +1,7 @@
 // Fiscal — desenho v4 (tela 14), D16 Onda C. Só leitura: documentos fiscais (NF-e, NFC-e, NFS-e) por
 // situação, com chave de acesso e motivo de rejeição. Ficam de fora "+ Emitir", "Consultar SEFAZ",
 // "Cancelar" e "DANFE" (escrevem ou geram documento — PR próprio). Mora dentro de Mais.
-// Rota GET /api/app/fiscal (formato proposto ao ERP; PR pendente).
+// Rota GET /api/app/fiscal, contrato §10.2 (ERP #8593).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroFiscal, type ListaFiscal, type StatusFiscal } from '../api';
 import { reais } from './Pedidos';
@@ -77,7 +77,7 @@ export function Fiscal({ voltar }: { voltar?: ReactNode }) {
             const s = STATUS[d.status];
             const nome = `${TIPO[d.tipo] ?? d.tipo} ${d.numero ? '#' + d.numero : '— sem número'}`;
             return (
-              <article key={d.id} className="oc-card" aria-label={nome}>
+              <article key={d.tipo + ':' + d.id} className="oc-card" aria-label={nome}>
                 <div className="oc-l1">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <b>{nome}</b>

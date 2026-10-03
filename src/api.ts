@@ -272,7 +272,7 @@ export interface ListaOs {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -364,7 +364,8 @@ export interface Notificacao {
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
-/** Tela 06 · Financeiro (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente).
+/** Tela 06 · Financeiro (D16, Onda C) — só leitura. Contrato §10.1 (ERP #8584). 20 por página; receber/pagar = em aberto
+ *  (aberto + parcial, valor = valor em aberto) por vencimento; extrato = quitados com última baixa no mês (valor = baixas).
  *  `resumo` e `contas` não mudam com a aba; só `itens` e a paginação. Valor sempre positivo: o sinal vem de `tipo`. */
 export type AbaFinanceiro = 'receber' | 'pagar' | 'extrato';
 export type StatusLancamento = 'aberto' | 'vencido' | 'liquidado';
@@ -380,11 +381,12 @@ export interface PainelFinanceiro {
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
 }
 
-/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Emitir, consultar a SEFAZ,
+/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
 export type StatusFiscal = 'rascunho' | 'processando' | 'autorizado' | 'cancelado' | 'rejeitado';
 export type FiltroFiscal = 'todos' | StatusFiscal;
 export interface DocumentoFiscal {
+  /** Id da tabela de origem: NF-e e NFS-e podem repetir o mesmo número — a chave na lista é tipo + id (§10.2, ERP #8593). */
   id: number; tipo: 'NFe' | 'NFCe' | 'NFSe'; numero: string | null;
   /** Texto pronto, ex.: "Pedido #4790 · Clínica Vita". */
   referencia: string | null; valor: number; status: StatusFiscal;
@@ -395,13 +397,15 @@ export interface DocumentoFiscal {
 }
 export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<FiltroFiscal, number>; pagina: number; tem_mais: boolean }
 
-/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). `kpis` vêm sempre;
- *  só o bloco da aba pedida vem preenchido (os outros null). Exportar PDF/Excel fica no computador. */
+/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Contrato §10.3 (entrou no ERP com o #8599). Só o bloco da aba pedida vem
+ *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
+ *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
 export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
 export interface Relatorios {
   periodo: { de: string; ate: string };
-  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null };
+  /** null sem acesso ao Financeiro. `margem_pct` = saldo ÷ receitas × 100, null sem receita. */
+  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null } | null;
   dre: { receitas_por_categoria: Array<{ nome: string; valor: number }>; despesas_por_categoria: Array<{ nome: string; valor: number }> } | null;
   /** `receita_por_dia`: últimos 14 dias; `top_clientes`: até 5. */
   vendas: { receita_por_dia: Array<{ data: string; valor: number }>; top_clientes: Array<{ nome: string; valor: number }> } | null;
@@ -411,18 +415,37 @@ export interface Relatorios {
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
 }
 
-/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Mesma permissão
- *  `dashboard.data` do Início; `a_receber`/`vencido` saem do mesmo serviço da tela 06 (os números batem). */
+/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Contrato §10.4 (ERP #8599). Sem `dashboard.data` → 403 e a área
+ *  não aparece. Por bloco: faturamento e meta com `dashboard.data`; pedidos e produção com a regra de quem vê vendas
+ *  (§2/§5) — sem ela vêm null; `a_receber`/`vencido` com o Financeiro (mesmo serviço da tela 06) — sem ele, null. */
 export interface Dashboard {
-  /** `serie_semanal`: 7 pontos, do mais antigo ao atual; `variacao_pct` null sem base de comparação. */
+  /** `serie_semanal`: os 7 últimos dias, dia a dia (antigo → hoje); `variacao_pct` null sem base de comparação. */
   faturamento_30d: { valor: number; variacao_pct: number | null; serie_semanal: number[] };
-  kpis: { pedidos_ativos: number; pedidos_novos: number; producao_em_curso: number; a_receber: number | null; vencido: number | null };
-  /** Últimos 14 dias, do mais antigo para hoje. */
-  pedidos_por_dia: Array<{ data: string; total: number }>;
-  /** Meta mensal da Jana; null quando não há meta cadastrada. */
+  /** `pedidos_novos` = pedidos de hoje; `producao_em_curso` = coluna "em produção". */
+  kpis: { pedidos_ativos: number | null; pedidos_novos: number | null; producao_em_curso: number | null; a_receber: number | null; vencido: number | null };
+  /** Últimos 14 dias, do mais antigo para hoje; null sem acesso a vendas. */
+  pedidos_por_dia: Array<{ data: string; total: number }> | null;
+  /** Meta mensal da Jana; null quando não há meta cadastrada. `realizado_pct` inteiro. */
   meta_mes: { valor: number; realizado_pct: number } | null;
-  producao_concluida: { concluidas: number; total: number };
+  /** concluídas = coluna "pronto para faturar"; total = soma das 4 colunas. null sem acesso a vendas. */
+  producao_concluida: { concluidas: number; total: number } | null;
 }
+
+/** Tela 15 · Pagamentos (D16, Onda C) — leitura. Contrato §10.5 (ERP #8600): tabela `cobrancas`, a mesma da web
+ *  /financeiro/cobranca; cobrança recusada pelo gateway não aparece; valor em reais; regra de acesso do Financeiro.
+ *  Gerar link, cancelar e consultar o provedor mexem em valor: PR de escrita, pela regra mestre. */
+export type StatusPagamento = 'pendente' | 'pago' | 'vencido' | 'cancelado';
+export type FiltroPagamentos = 'todos' | StatusPagamento;
+export type MetodoPagamento = 'qualquer' | 'pix' | 'boleto' | 'cartao';
+export interface LinkPagamento {
+  id: number;
+  /** Texto pronto, ex.: "Pedido #4807 · Mercado Bom Preço". */
+  descricao: string; valor: number; vencimento: string | null; metodo: MetodoPagamento; status: StatusPagamento;
+  pago_em: string | null;
+  /** PDF do boleto; null em PIX (e quando o provedor não devolveu). Bolepix sai com `metodo` "qualquer". */
+  link: string | null;
+}
+export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -613,6 +636,7 @@ export const api = {
   /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
   enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
   conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
+  pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
