@@ -1,6 +1,6 @@
 // Estoque — desenho v4 (tela 05), dados pelo contrato API-CONTRATO-v1 §9.2 (ERP #8577). Só leitura.
 // Uma linha por variação × loja, só de produto que controla estoque. Tocar na linha abre as Movimentações
-// (tela 29, só leitura; por enquanto só na demo, DETALHE_ESTOQUE). Fora de propósito: "+ Item",
+// (tela 29, só leitura, contrato §9.3). Fora de propósito: "+ Item",
 // "+ Entrada" (escrita espera decisão do Wagner) e a barra de abas própria do protótipo
 // (no app, Estoque mora dentro de Mais). "Baixo" é a regra do alerta da web: qtd ≤ mínimo.
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';

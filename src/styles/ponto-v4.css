@@ -378,6 +378,27 @@ a.p4-link { text-decoration: none; }
 .est-barra i { display: block; height: 100%; background: var(--text-mute); }
 .est-barra i.danger { background: var(--danger); } .est-barra i.warn { background: var(--warn); } .est-barra i.ok { background: var(--ok); }
 
+/* Tela 39 · Marcações a validar (fg-) */
+.fg-info { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface)); font-size: 12.5px; color: var(--text-dim); }
+.fg-info b { color: var(--text); font-size: 13px; }
+.fg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.fg-l1 { display: flex; align-items: flex-start; gap: 10px; }
+.fg-l1 b { display: block; font-size: 14px; font-weight: 600; }
+.fg-l1 small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.fg-estado { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; flex-shrink: 0; white-space: nowrap; }
+.fg-anulada { margin: 0; font-size: 12px; color: var(--danger); }
+.fg-estado i { width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0; }
+.fg-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mute); }
+.fg-gps { color: var(--warn); font-weight: 600; }
+.fg-gps.ruim { color: var(--danger); }
+.fg-acoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.fg-acoes .oi-btn { min-height: 44px; }
+.fg-acoes.so-validar { grid-template-columns: minmax(0, 1fr); }
+.fg-recusar { min-height: 44px; border-radius: 8px; border: 1px solid var(--danger); background: transparent; color: var(--danger); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.fg-recusar:disabled { opacity: .5; }
+.fg-confirma { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border-2, var(--border)); font-size: 12.5px; color: var(--text); }
+
 /* Tela 29 · Movimentações (prefixo mov-) */
 .est-card.abre { width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; min-height: 44px; }
 .est-card.abre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

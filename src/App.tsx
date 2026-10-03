@@ -20,6 +20,7 @@ import { Orcamentos } from './telas/Orcamentos';
 import { Relatorios } from './telas/Relatorios';
 import { Dashboard } from './telas/Dashboard';
 import { OrdensServico } from './telas/OrdensServico';
+import { FilaGestor } from './telas/FilaGestor';
 import { Produtos } from './telas/Produtos';
 import { Estoque } from './telas/Estoque';
 import { Financeiro } from './telas/Financeiro';
@@ -140,6 +141,7 @@ export function App() {
         {aba === 'mais' && subMais === 'dashboard' && <Dashboard irParaPedidos={() => irPara('pedidos')} irParaProducao={() => irPara('producao')}
           voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'oficina' && <OrdensServico voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
+        {aba === 'mais' && subMais === 'ponto_gestor' && <FilaGestor avisar={avisar} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'ponto' && <Ponto avisar={avisar} online={online} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
         {aba === 'mais' && subMais === 'conta' && <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={<VoltarMais aoVoltar={() => setSubMais(null)} />} />}
       </div>
