@@ -328,7 +328,7 @@ export interface DocumentoFiscal {
 }
 export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<FiltroFiscal, number>; pagina: number; tem_mais: boolean }
 
-/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Contrato §10.3 (ERP Onda C). Só o bloco da aba pedida vem
+/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Contrato §10.3 (entrou no ERP com o #8599). Só o bloco da aba pedida vem
  *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
  *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
