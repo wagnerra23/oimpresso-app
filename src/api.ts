@@ -222,8 +222,8 @@ export interface Movimento {
   saldo: number;
 }
 export interface DetalheEstoque { item: ItemEstoque; historico: Movimento[]; pagina: number; tem_mais: boolean }
-/** Liga a tela 29. Só a demo, até o #8581 estar em produção. */
-export const DETALHE_ESTOQUE = DEMO;
+/** Tela 29 ligada no app de loja: o ERP #8581 está em produção (rota medida respondendo 401 sem token). */
+export const DETALHE_ESTOQUE = true;
 
 /** Tela 20 · Novo produto (Onda B escrita), contrato §9.4 (ERP #8582). Decisão [W] 2026-10-02: sem preço — o
  *  produto nasce com preço zerado e o preço se acerta na web, então a tela não grava valor. Só tipo simples. */
@@ -245,7 +245,37 @@ export const ESCRITA_PRODUTO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto' | 'ponto_gestor' | 'mais';
+
+/** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
+ *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
+ *  Validar aceita a marcação; Recusar grava uma ANULAÇÃO — a marcação original nunca muda (Portaria 671). */
+export type EstadoValidacao = 'pendente' | 'validada' | 'recusada';
+export type FiltroValidacao = EstadoValidacao | 'todas';
+export interface MarcacaoAValidar {
+  /** UUID da marcação (chave de ponto_marcacoes). */
+  id: string; colaborador_nome: string; tipo: string;
+  /** Distância até o centro do geofence ("A 84,2 km do local de trabalho"); null sem geofence na empresa. */
+  local_texto: string | null;
+  /** ISO com hora. */
+  marcada_em: string; nsr: number;
+  /** Precisão do GPS em metros. Hoje sempre null: o REP-P não grava a precisão na marcação, só no log. */
+  gps_precisao_m: number | null;
+  dispositivo: string | null; hash_curto: string; estado: EstadoValidacao;
+}
+export interface ListaValidacao {
+  itens: MarcacaoAValidar[]; contadores: Record<FiltroValidacao, number>;
+  /** Só quem tem ponto.aprovacoes.manage recusa (regra da web); sem isso recusar devolve 403. Validar é livre. */
+  pode_recusar: boolean;
+}
+
+/** Tela 26 · Equipe (D16, Onda E). Só leitura. Contrato §12 (ERP #8588): equipe inteira do business, inativos
+ *  inclusos, em ordem alfabética; acesso = user.view (sem ela, 403 sem_permissao).
+ *  `carga` = OS da Oficina abertas atribuídas ("2 OS"); null sem OS aberta — o ERP não atribui OP a ninguém.
+ *  `status` vem montado pelo ERP: Inativo/ausente (usuário inativo) · Em serviço/ocupado (tem carga) · Disponível/livre. */
+export type TomStatusEquipe = 'ocupado' | 'livre' | 'ausente';
+export interface MembroEquipe { id: number; nome: string; funcao: string | null; carga: string | null; status: { rotulo: string; tom: TomStatusEquipe } }
+export interface ListaEquipe { itens: MembroEquipe[] }
 
 /** Tela 25 · Chat (D16, Onda E). Decisão [W] 2026-10-02: quem responde é a JANA (IA do ERP). Contrato §12 (ERP #8596).
  *  Área 'assistente' = módulo Jana no plano + jana.access + jana.chat, como no chat web; as conversas são as mesmas da web. */
@@ -534,6 +564,13 @@ export const api = {
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
   dashboard: () => chamar<Dashboard>('GET', '/api/app/dashboard'),
+  /** Tela 39. Contrato §12.1 (ERP #8586). Erros: 403 sem_permissao · 404 nao_encontrado · 409 ja_revisada · 503 trilha_desligada. */
+  marcacoesAValidar: (estado: FiltroValidacao) => chamar<ListaValidacao>('GET', `/api/app/ponto/aprovacoes?estado=${estado}`),
+  validarMarcacao: (id: string) => chamar<{ estado: 'validada' }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/validar`),
+  /** Grava a anulação no servidor (motivo fixo no ERP). Nada de UPDATE/DELETE na marcação: ela continua imutável. */
+  recusarMarcacao: (id: string) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/recusar`),
+  /** Tela 26. Contrato §12 (ERP #8588). */
+  equipe: () => chamar<ListaEquipe>('GET', '/api/app/equipe'),
   /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
   enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
   conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),

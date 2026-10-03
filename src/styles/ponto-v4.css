@@ -378,6 +378,36 @@ a.p4-link { text-decoration: none; }
 .est-barra i { display: block; height: 100%; background: var(--text-mute); }
 .est-barra i.danger { background: var(--danger); } .est-barra i.warn { background: var(--warn); } .est-barra i.ok { background: var(--ok); }
 
+/* Tela 39 · Marcações a validar (fg-) */
+.fg-info { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface)); font-size: 12.5px; color: var(--text-dim); }
+.fg-info b { color: var(--text); font-size: 13px; }
+.fg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.fg-l1 { display: flex; align-items: flex-start; gap: 10px; }
+.fg-l1 b { display: block; font-size: 14px; font-weight: 600; }
+.fg-l1 small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.fg-estado { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; flex-shrink: 0; white-space: nowrap; }
+.fg-anulada { margin: 0; font-size: 12px; color: var(--danger); }
+.fg-estado i { width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0; }
+.fg-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mute); }
+.fg-gps { color: var(--warn); font-weight: 600; }
+.fg-gps.ruim { color: var(--danger); }
+.fg-acoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.fg-acoes .oi-btn { min-height: 44px; }
+.fg-acoes.so-validar { grid-template-columns: minmax(0, 1fr); }
+.fg-recusar { min-height: 44px; border-radius: 8px; border: 1px solid var(--danger); background: transparent; color: var(--danger); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.fg-recusar:disabled { opacity: .5; }
+.fg-confirma { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border-2, var(--border)); font-size: 12.5px; color: var(--text); }
+/* Tela 26 · Equipe (eq-) */
+.eq-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.eq-linha { min-height: 64px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2, var(--border)); }
+.eq-linha:last-child { border-bottom: 0; }
+.eq-quem { flex: 1; min-width: 0; }
+.eq-quem b { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-quem small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eq-status { font-size: 11px; font-weight: 500; }
 /* Tela 25 · Assistente (ch-) */
 .ch-lista { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .ch-msg { max-width: 82%; padding: 10px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; }
