@@ -6,9 +6,13 @@ import { Browser } from '@capacitor/browser';
 import { Ic } from '../icones';
 import logo from '../assets/oimpresso-logo.png';
 
-export type SubMais = 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'ponto' | 'conta';
+export type SubMais = 'tarefas' | 'pedidos' | 'producao' | 'menu' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto_gestor' | 'ponto' | 'conta';
 
-const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
+/** Módulos com tela no app (também usados pela tela 30 e pelas abas, quando o usuário põe na barra). */
+export const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { tamanho?: number }) => ReactElement }> = [
+  { id: 'tarefas', label: 'Tarefas', desc: 'Pendências suas e do ponto', Icone: Ic.tarefa },
+  { id: 'pedidos', label: 'Pedidos', desc: 'Pedidos e andamento', Icone: Ic.pedido },
+  { id: 'producao', label: 'Produção', desc: 'Fila por etapa', Icone: Ic.producao },
   { id: 'pessoas', label: 'Pessoas', desc: 'Clientes, fornecedores e equipe', Icone: Ic.pessoas },
   { id: 'orcamentos', label: 'Orçamentos', desc: 'Propostas enviadas e aprovadas', Icone: Ic.pedido },
   { id: 'produtos', label: 'Produtos', desc: 'Catálogo, preço e estoque', Icone: Ic.pacote },
@@ -17,12 +21,16 @@ const MODULOS: Array<{ id: SubMais; label: string; desc: string; Icone: (p: { ta
   { id: 'fiscal', label: 'Fiscal', desc: 'Notas emitidas e rejeitadas', Icone: Ic.pedido },
   { id: 'relatorios', label: 'Relatórios', desc: 'DRE, vendas, produção e estoque', Icone: Ic.grafico },
   { id: 'dashboard', label: 'Dashboard', desc: 'Faturamento e indicadores de 30 dias', Icone: Ic.grafico },
+  { id: 'ponto_gestor', label: 'Validar ponto', desc: 'Marcações fora da área para revisar', Icone: Ic.check },
+  { id: 'equipe', label: 'Equipe', desc: 'Quem está na equipe e a carga de cada um', Icone: Ic.usuario },
+  { id: 'assistente', label: 'Assistente', desc: 'Pergunte à Jana sobre o sistema', Icone: Ic.chat },
   { id: 'ponto', label: 'Ponto', desc: 'Bater ponto, espelho e justificativas', Icone: Ic.relogio },
   { id: 'conta', label: 'Conta', desc: 'Lembrete, privacidade e sair', Icone: Ic.usuario },
 ];
 
 /** `modulos`: quais entradas mostrar (Pessoas e Ponto só quando a área é permitida; Conta sempre). */
-export function Mais({ abrir, modulos }: { abrir: (s: SubMais) => void; modulos: SubMais[] }) {
+/** `aoPersonalizar`: abre a tela 30 (Meu menu); ausente para quem não pode personalizar a barra (colaborador). */
+export function Mais({ abrir, modulos, aoPersonalizar }: { abrir: (s: SubMais) => void; modulos: SubMais[]; aoPersonalizar?: () => void }) {
   return (
     <>
       <div className="pd-head"><div className="pd-titulo">Mais</div></div>
@@ -38,6 +46,17 @@ export function Mais({ abrir, modulos }: { abrir: (s: SubMais) => void; modulos:
               </button>
             ))}
           </div>
+          {aoPersonalizar && (
+            <>
+              <div className="p4-rotulo">Preferências</div>
+              <div className="p4-lista">
+                <button className="ms-linha" onClick={aoPersonalizar}>
+                  <span style={{ flex: 1 }}><b>Meu menu</b><small>Escolha até 3 módulos para a barra de baixo</small></span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              </div>
+            </>
+          )}
           <div className="p4-rotulo">No computador</div>
           <div className="p4-lista">
             <button className="ms-linha" onClick={() => Browser.open({ url: 'https://oimpresso.com/home' })}>

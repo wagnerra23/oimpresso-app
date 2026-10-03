@@ -245,7 +245,43 @@ export const ESCRITA_PRODUTO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'ponto' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto' | 'ponto_gestor' | 'mais';
+
+/** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
+ *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
+ *  Validar aceita a marcação; Recusar grava uma ANULAÇÃO — a marcação original nunca muda (Portaria 671). */
+export type EstadoValidacao = 'pendente' | 'validada' | 'recusada';
+export type FiltroValidacao = EstadoValidacao | 'todas';
+export interface MarcacaoAValidar {
+  /** UUID da marcação (chave de ponto_marcacoes). */
+  id: string; colaborador_nome: string; tipo: string;
+  /** Distância até o centro do geofence ("A 84,2 km do local de trabalho"); null sem geofence na empresa. */
+  local_texto: string | null;
+  /** ISO com hora. */
+  marcada_em: string; nsr: number;
+  /** Precisão do GPS em metros. Hoje sempre null: o REP-P não grava a precisão na marcação, só no log. */
+  gps_precisao_m: number | null;
+  dispositivo: string | null; hash_curto: string; estado: EstadoValidacao;
+}
+export interface ListaValidacao {
+  itens: MarcacaoAValidar[]; contadores: Record<FiltroValidacao, number>;
+  /** Só quem tem ponto.aprovacoes.manage recusa (regra da web); sem isso recusar devolve 403. Validar é livre. */
+  pode_recusar: boolean;
+}
+
+/** Tela 26 · Equipe (D16, Onda E). Só leitura. Contrato §12 (ERP #8588): equipe inteira do business, inativos
+ *  inclusos, em ordem alfabética; acesso = user.view (sem ela, 403 sem_permissao).
+ *  `carga` = OS da Oficina abertas atribuídas ("2 OS"); null sem OS aberta — o ERP não atribui OP a ninguém.
+ *  `status` vem montado pelo ERP: Inativo/ausente (usuário inativo) · Em serviço/ocupado (tem carga) · Disponível/livre. */
+export type TomStatusEquipe = 'ocupado' | 'livre' | 'ausente';
+export interface MembroEquipe { id: number; nome: string; funcao: string | null; carga: string | null; status: { rotulo: string; tom: TomStatusEquipe } }
+export interface ListaEquipe { itens: MembroEquipe[] }
+
+/** Tela 25 · Chat (D16, Onda E). Decisão [W] 2026-10-02: quem responde é a JANA (IA do ERP). Contrato §12 (ERP #8596).
+ *  Área 'assistente' = módulo Jana no plano + jana.access + jana.chat, como no chat web; as conversas são as mesmas da web. */
+export interface MensagemChat { de: 'eu' | 'jana'; texto: string; /** ISO com hora. */ criada_em: string }
+export interface RespostaChat { conversa_id: string; resposta: MensagemChat }
+export interface ConversaChat { conversa_id: string; mensagens: MensagemChat[] }
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -269,6 +305,10 @@ export interface PainelInicio {
   abre_em: 'inicio' | 'ponto' | 'mais';
   /** Lista ordenada; "mais" sempre presente. */
   areas: Area[];
+  /** Tela 30 (ERP #8592): módulos da barra entre Início e Mais, até 3, na ordem. Sempre = escolha salva ∩ areas;
+   *  sem escolha (ou se nada sobrar), o padrão do ERP (tarefas, pedidos, producao, completado com outras áreas).
+   *  Ausente/null = ERP sem a rota (versão antiga): o app usa o padrão dele. */
+  barra?: Area[] | null;
   usuario: string; empresa: string;
   /** Só com dashboard.data. */
   faturado_hoje: { valor: number; ontem: number; variacao_pct: number | null } | null;
@@ -314,11 +354,12 @@ export interface PainelFinanceiro {
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
 }
 
-/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Emitir, consultar a SEFAZ,
+/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
 export type StatusFiscal = 'rascunho' | 'processando' | 'autorizado' | 'cancelado' | 'rejeitado';
 export type FiltroFiscal = 'todos' | StatusFiscal;
 export interface DocumentoFiscal {
+  /** Id da tabela de origem: NF-e e NFS-e podem repetir o mesmo número — a chave na lista é tipo + id (§10.2, ERP #8593). */
   id: number; tipo: 'NFe' | 'NFCe' | 'NFSe'; numero: string | null;
   /** Texto pronto, ex.: "Pedido #4790 · Clínica Vita". */
   referencia: string | null; valor: number; status: StatusFiscal;
@@ -329,13 +370,15 @@ export interface DocumentoFiscal {
 }
 export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<FiltroFiscal, number>; pagina: number; tem_mais: boolean }
 
-/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). `kpis` vêm sempre;
- *  só o bloco da aba pedida vem preenchido (os outros null). Exportar PDF/Excel fica no computador. */
+/** Tela 13 · Relatórios (D16, Onda C) — só leitura. Contrato §10.3 (entrou no ERP com o #8599). Só o bloco da aba pedida vem
+ *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
+ *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
 export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
 export interface Relatorios {
   periodo: { de: string; ate: string };
-  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null };
+  /** null sem acesso ao Financeiro. `margem_pct` = saldo ÷ receitas × 100, null sem receita. */
+  kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null } | null;
   dre: { receitas_por_categoria: Array<{ nome: string; valor: number }>; despesas_por_categoria: Array<{ nome: string; valor: number }> } | null;
   /** `receita_por_dia`: últimos 14 dias; `top_clientes`: até 5. */
   vendas: { receita_por_dia: Array<{ data: string; valor: number }>; top_clientes: Array<{ nome: string; valor: number }> } | null;
@@ -345,17 +388,20 @@ export interface Relatorios {
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
 }
 
-/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Mesma permissão
- *  `dashboard.data` do Início; `a_receber`/`vencido` saem do mesmo serviço da tela 06 (os números batem). */
+/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Contrato §10.4 (ERP #8599). Sem `dashboard.data` → 403 e a área
+ *  não aparece. Por bloco: faturamento e meta com `dashboard.data`; pedidos e produção com a regra de quem vê vendas
+ *  (§2/§5) — sem ela vêm null; `a_receber`/`vencido` com o Financeiro (mesmo serviço da tela 06) — sem ele, null. */
 export interface Dashboard {
-  /** `serie_semanal`: 7 pontos, do mais antigo ao atual; `variacao_pct` null sem base de comparação. */
+  /** `serie_semanal`: os 7 últimos dias, dia a dia (antigo → hoje); `variacao_pct` null sem base de comparação. */
   faturamento_30d: { valor: number; variacao_pct: number | null; serie_semanal: number[] };
-  kpis: { pedidos_ativos: number; pedidos_novos: number; producao_em_curso: number; a_receber: number | null; vencido: number | null };
-  /** Últimos 14 dias, do mais antigo para hoje. */
-  pedidos_por_dia: Array<{ data: string; total: number }>;
-  /** Meta mensal da Jana; null quando não há meta cadastrada. */
+  /** `pedidos_novos` = pedidos de hoje; `producao_em_curso` = coluna "em produção". */
+  kpis: { pedidos_ativos: number | null; pedidos_novos: number | null; producao_em_curso: number | null; a_receber: number | null; vencido: number | null };
+  /** Últimos 14 dias, do mais antigo para hoje; null sem acesso a vendas. */
+  pedidos_por_dia: Array<{ data: string; total: number }> | null;
+  /** Meta mensal da Jana; null quando não há meta cadastrada. `realizado_pct` inteiro. */
   meta_mes: { valor: number; realizado_pct: number } | null;
-  producao_concluida: { concluidas: number; total: number };
+  /** concluídas = coluna "pronto para faturar"; total = soma das 4 colunas. null sem acesso a vendas. */
+  producao_concluida: { concluidas: number; total: number } | null;
 }
 
 /** GET /ponto/api/me (ERP #8481). */
@@ -429,7 +475,7 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH', caminho: string, corpo?: unknown): Promise<T> {
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: string, corpo?: unknown): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo);
   let r: HttpResponse;
   try {
@@ -523,12 +569,26 @@ export const api = {
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
+   *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
+   *  Devolve a escolha gravada e a barra que passa a valer. */
+  salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
   dashboard: () => chamar<Dashboard>('GET', '/api/app/dashboard'),
+  /** Tela 39. Contrato §12.1 (ERP #8586). Erros: 403 sem_permissao · 404 nao_encontrado · 409 ja_revisada · 503 trilha_desligada. */
+  marcacoesAValidar: (estado: FiltroValidacao) => chamar<ListaValidacao>('GET', `/api/app/ponto/aprovacoes?estado=${estado}`),
+  validarMarcacao: (id: string) => chamar<{ estado: 'validada' }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/validar`),
+  /** Grava a anulação no servidor (motivo fixo no ERP). Nada de UPDATE/DELETE na marcação: ela continua imutável. */
+  recusarMarcacao: (id: string) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/recusar`),
+  /** Tela 26. Contrato §12 (ERP #8588). */
+  equipe: () => chamar<ListaEquipe>('GET', '/api/app/equipe'),
+  /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
+  enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
+  conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),

@@ -1,7 +1,7 @@
 // Relatórios — desenho v4 (tela 13), D16 Onda C. Só leitura: período (mês, 3 meses, 12 meses), quatro
 // indicadores e quatro recortes (DRE, vendas, produção, estoque). "Exportar PDF" e "Excel" geram arquivo
 // no servidor e continuam no computador. "OS por status" é da oficina (Onda D) e fica de fora. Mora em Mais.
-// Rota GET /api/app/relatorios (formato proposto ao ERP; PR pendente).
+// Rota GET /api/app/relatorios, contrato §10.3 (entrou no ERP com o #8599).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type AbaRelatorio, type PeriodoRelatorio, type Relatorios as Dados } from '../api';
 import { reais } from './Pedidos';
