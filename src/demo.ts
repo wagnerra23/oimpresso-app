@@ -571,7 +571,7 @@ export const demo = {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
       return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
         kpis: { pedidos_ativos: semVendas ? null : ativos.length, pedidos_novos: semVendas ? null : 4,
-          producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: 11415, vencido: 1260 },
+          producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
         pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
         meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
     }
