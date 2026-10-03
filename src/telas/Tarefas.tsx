@@ -1,7 +1,7 @@
 // Tarefas — desenho v4 (tela 12), dados pelo contrato API-CONTRATO-v1 §3: ToDo do usuário +
 // justificativas do Ponto (D11). Urgente = atrasado. A única escrita é concluir um ToDo do
 // próprio usuário; justificativas abrem o Ponto (aprovar é no computador). ToDo abre o detalhe (tela 28).
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroTarefas, type GrupoTarefa, type ListaTarefas, type Tarefa } from '../api';
 import { useVoltar } from '../voltar';
 import { Ic } from '../icones';
@@ -28,9 +28,11 @@ interface Props {
   avisar: Aviso; abrirPonto: () => void;
   /** Tarefa a abrir assim que a tela monta (vinda do sino); a App limpa depois de entregue. */
   abrir?: string | null; aoAbrir?: () => void;
+  /** Voltar para Mais, quando a tela não está na barra (tela 30). */
+  voltar?: ReactNode;
 }
 
-export function Tarefas({ avisar, abrirPonto, abrir, aoAbrir }: Props) {
+export function Tarefas({ avisar, abrirPonto, abrir, aoAbrir, voltar }: Props) {
   const [filtro, setFiltro] = useState<FiltroTarefas>('todas');
   const [dados, setDados] = useState<ListaTarefas | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -57,8 +59,13 @@ export function Tarefas({ avisar, abrirPonto, abrir, aoAbrir }: Props) {
   return (
     <>
       <div className="pd-head">
-        <div className="p4-rotulo">{c ? `${c.todas} ${c.todas === 1 ? 'pendente' : 'pendentes'}${atrasadas ? ` · ${atrasadas} ${atrasadas === 1 ? 'atrasada' : 'atrasadas'}` : ''}` : 'Tarefas'}</div>
-        <div className="pd-titulo">Tarefas</div>
+        <div className="p4-head-row" style={{ gap: 4 }}>
+          {voltar}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="p4-rotulo">{c ? `${c.todas} ${c.todas === 1 ? 'pendente' : 'pendentes'}${atrasadas ? ` · ${atrasadas} ${atrasadas === 1 ? 'atrasada' : 'atrasadas'}` : ''}` : 'Tarefas'}</div>
+            <div className="pd-titulo">Tarefas</div>
+          </div>
+        </div>
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
