@@ -245,7 +245,7 @@ export const ESCRITA_PRODUTO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -403,6 +403,22 @@ export interface Dashboard {
   /** concluídas = coluna "pronto para faturar"; total = soma das 4 colunas. null sem acesso a vendas. */
   producao_concluida: { concluidas: number; total: number } | null;
 }
+
+/** Tela 15 · Pagamentos (D16, Onda C) — leitura. Contrato §10.5 (ERP #8600): tabela `cobrancas`, a mesma da web
+ *  /financeiro/cobranca; cobrança recusada pelo gateway não aparece; valor em reais; regra de acesso do Financeiro.
+ *  Gerar link, cancelar e consultar o provedor mexem em valor: PR de escrita, pela regra mestre. */
+export type StatusPagamento = 'pendente' | 'pago' | 'vencido' | 'cancelado';
+export type FiltroPagamentos = 'todos' | StatusPagamento;
+export type MetodoPagamento = 'qualquer' | 'pix' | 'boleto' | 'cartao';
+export interface LinkPagamento {
+  id: number;
+  /** Texto pronto, ex.: "Pedido #4807 · Mercado Bom Preço". */
+  descricao: string; valor: number; vencimento: string | null; metodo: MetodoPagamento; status: StatusPagamento;
+  pago_em: string | null;
+  /** PDF do boleto; null em PIX (e quando o provedor não devolveu). Bolepix sai com `metodo` "qualquer". */
+  link: string | null;
+}
+export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
 export interface Me { nome: string; matricula: string | null; empresa: string; limites: { accuracy_max: number; drift_max: number } }
@@ -589,6 +605,7 @@ export const api = {
   /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
   enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
   conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
+  pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),

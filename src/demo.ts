@@ -185,6 +185,15 @@ const FISCAIS = [
   { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },
 ] as const;
 
+// Links de pagamento de demonstração (tela 15), como o protótipo. Clientes fictícios; o link aponta para um domínio
+// de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
+const PAGAMENTOS = [
+  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 1260, dias: -7, metodo: 'boleto', status: 'vencido', pago: null },
+  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 2315, dias: 3, metodo: 'pix', status: 'pendente', pago: null },
+  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 3420, dias: -5, metodo: 'pix', status: 'pago', pago: -5 },
+  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 640, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null },
+];
+
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
   { id: 'todo:15', origem: 'todo' as const, titulo: 'Ligar para o fornecedor de lona', subtitulo: 'ToDo · Compras', prazo: diaRel(-1), atrasado: true, grupo: 'atrasadas' as const },
@@ -420,7 +429,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -429,7 +438,7 @@ export const demo = {
     }
     if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
       const { modulos } = (corpo ?? {}) as { modulos?: string[] };
-      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'];
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'pagamentos', 'mais'];
       // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
       const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
         : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
@@ -574,6 +583,15 @@ export const demo = {
           producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
         pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
         meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
