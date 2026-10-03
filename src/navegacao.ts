@@ -6,7 +6,7 @@ import type { Area } from './api';
 import type { SubMais } from './telas/Mais';
 
 /** Áreas que moram dentro de Mais (nunca na barra), na ordem em que aparecem lá. */
-const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe'] as const;
+const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'ponto_gestor'] as const;
 export type Aba = Exclude<Area, (typeof DENTRO_DE_MAIS)[number]>;
 export interface Navegacao {
   /** Abas da barra, na ordem. "mais" sempre por último. */
@@ -34,4 +34,4 @@ export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], ab
 }
 
 /** Sem resposta do ERP (rota ainda não publicada, por exemplo): mostra tudo, como antes da D6. */
-export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'ponto', 'mais'], 'inicio');
+export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'ponto', 'ponto_gestor', 'mais'], 'inicio');

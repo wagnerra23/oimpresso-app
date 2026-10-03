@@ -72,6 +72,12 @@ describe('montarNavegacao', () => {
     expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
   });
 
+  it('Marcações a validar (tela 39) mora em Mais e só aparece para quem tem a área de gestor', () => {
+    expect(montarNavegacao('erp', ['inicio', 'ponto', 'ponto_gestor', 'mais'], 'inicio').modulosMais).toEqual(['ponto_gestor', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'ponto', 'ponto_gestor', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
+    expect(montarNavegacao('colaborador', ['ponto', 'mais'], 'ponto').modulosMais).toEqual(['conta']);
+  });
+
   it('Equipe (tela 26) mora em Mais e só aparece se a área vier liberada', () => {
     expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').modulosMais).toEqual(['equipe', 'conta']);
     expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
@@ -80,6 +86,6 @@ describe('montarNavegacao', () => {
 
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'ponto_gestor', 'ponto', 'conta']);
   });
 });
