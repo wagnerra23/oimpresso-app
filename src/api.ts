@@ -353,11 +353,12 @@ export interface PainelFinanceiro {
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
 }
 
-/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Emitir, consultar a SEFAZ,
+/** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
 export type StatusFiscal = 'rascunho' | 'processando' | 'autorizado' | 'cancelado' | 'rejeitado';
 export type FiltroFiscal = 'todos' | StatusFiscal;
 export interface DocumentoFiscal {
+  /** Id da tabela de origem: NF-e e NFS-e podem repetir o mesmo número — a chave na lista é tipo + id (§10.2, ERP #8593). */
   id: number; tipo: 'NFe' | 'NFCe' | 'NFSe'; numero: string | null;
   /** Texto pronto, ex.: "Pedido #4790 · Clínica Vita". */
   referencia: string | null; valor: number; status: StatusFiscal;
