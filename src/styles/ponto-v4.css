@@ -544,3 +544,22 @@ button.db-kpi { cursor: pointer; }
 .pg-pago { font-size: 12px; color: var(--ok); font-weight: 600; }
 .pg-acoes { display: flex; gap: 8px; }
 .pg-acoes .oi-btn { min-height: 44px; }
+
+/* Tela 30 · Meu menu (pm-) */
+.pm-restaurar { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+.pm-restaurar:disabled { color: var(--text-mute); cursor: default; }
+.pm-previa { display: grid; gap: 2px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.pm-aba { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: 10px; color: var(--text-dim); }
+.pm-aba small { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-aba.on { background: var(--accent-soft); color: var(--accent-text); }
+.pm-lista { display: flex; flex-direction: column; gap: 8px; }
+.pm-mod { min-height: 56px; width: 100%; padding: 8px 12px; display: flex; align-items: center; gap: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.pm-mod.on { border-color: var(--accent); background: var(--accent-soft); }
+.pm-texto { flex: 1; min-width: 0; }
+.pm-texto b { display: block; font-size: 14px; font-weight: 600; }
+.pm-texto small { display: block; font-size: 12px; color: var(--text-dim); }
+.pm-pos { width: 26px; height: 26px; flex-shrink: 0; border-radius: 99px; border: 1px solid var(--border); display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.pm-mod.on .pm-pos { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.pm-rodape { flex-shrink: 0; padding: 10px 16px 12px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
