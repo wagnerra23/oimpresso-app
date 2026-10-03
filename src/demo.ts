@@ -13,6 +13,9 @@ const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
+// Tela 30 · escolha da barra guardada "no ERP" da demo (null = sem escolha → padrão do ERP).
+let barraDemo: string[] | null = null;
+const BARRA_PADRAO_DEMO = ['tarefas', 'pedidos', 'producao'];
 // Tela 39 · Marcações fora do geofence (nomes e números do protótipo). `min` = minutos atrás.
 const VALIDACAO = [
   { id: 'd39a1000-0000-4000-8000-000000000001', colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'A 84,2 km do local de trabalho', min: 95, nsr: 348821, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
@@ -424,7 +427,20 @@ export const demo = {
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
         financeiro: { a_receber: 8200, a_pagar: 3100 },
-        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
+        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, barra: barraDemo ?? BARRA_PADRAO_DEMO });
+    }
+    if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
+      const { modulos } = (corpo ?? {}) as { modulos?: string[] };
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'pagamentos', 'mais'];
+      // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
+      const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
+        : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
+        : new Set(modulos).size !== modulos.length ? 'Módulo repetido.'
+        : modulos.some((m) => !liberados.includes(m) || m === 'inicio' || m === 'mais') ? 'Há módulo que seu usuário não pode usar.' : null;
+      if (erro) throw Object.assign(new Error(erro), { status: 422, codigo: 'validacao', campos: { modulos: erro } });
+      await espera(400);
+      barraDemo = modulos!.length ? [...modulos!] : null;
+      return r({ modulos: barraDemo ?? [], barra: barraDemo ?? BARRA_PADRAO_DEMO });
     }
     if (metodo === 'POST' && caminho === '/api/app/notificacoes/lidas') {
       const marcadas = NOTIFICACOES.filter((x) => !x.lida).length;

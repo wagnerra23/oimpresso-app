@@ -4,7 +4,7 @@
 // "Gerar OP", o botão de avançar etapa, "Arte" e "Link" (mover de etapa é ação da FSM, fora da v1).
 // A busca filtra no aparelho: a rota não recebe texto e devolve no máximo 50 itens por coluna
 // (o `total` traz a contagem real).
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api, COLUNAS_PRODUCAO, ErroApi, type ColunaProducao, type FilaProducao } from '../api';
 import { useVoltar } from '../voltar';
 import { Detalhe, reais } from './Pedidos';
@@ -15,19 +15,20 @@ const TINTA: Record<ColunaProducao, string> = {
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-export function Producao() {
+/** `voltar`: botão para Mais, quando Produção não está na barra (tela 30). */
+export function Producao({ voltar }: { voltar?: ReactNode } = {}) {
   const [aberto, setAberto] = useState<number | null>(null);
   useVoltar(aberto !== null, () => setAberto(null));
   // A fila fica montada por baixo do detalhe para não recarregar nem perder a coluna escolhida.
   return (
     <>
       {aberto !== null && <Detalhe id={aberto} aoVoltar={() => setAberto(null)} />}
-      <div style={{ display: aberto !== null ? 'none' : 'contents' }}><Fila aoAbrir={setAberto} /></div>
+      <div style={{ display: aberto !== null ? 'none' : 'contents' }}><Fila aoAbrir={setAberto} voltar={voltar} /></div>
     </>
   );
 }
 
-function Fila({ aoAbrir }: { aoAbrir: (id: number) => void }) {
+function Fila({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: ReactNode }) {
   const [dados, setDados] = useState<FilaProducao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [coluna, setColuna] = useState<ColunaProducao>('in_production');
@@ -53,8 +54,13 @@ function Fila({ aoAbrir }: { aoAbrir: (id: number) => void }) {
   return (
     <>
       <div className="pd-head">
-        <div className="p4-rotulo">{dados ? `${total} na fila${atrasados ? ` · ${atrasados} ${atrasados === 1 ? 'atrasado' : 'atrasados'}` : ''}` : 'Produção'}</div>
-        <div className="pd-titulo">Produção</div>
+        <div className="p4-head-row" style={{ gap: 4 }}>
+          {voltar}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="p4-rotulo">{dados ? `${total} na fila${atrasados ? ` · ${atrasados} ${atrasados === 1 ? 'atrasado' : 'atrasados'}` : ''}` : 'Produção'}</div>
+            <div className="pd-titulo">Produção</div>
+          </div>
+        </div>
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
