@@ -272,7 +272,7 @@ export interface ListaOs {
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'equipe' | 'oficina' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'ponto' | 'ponto_gestor' | 'mais';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -303,6 +303,12 @@ export interface ListaValidacao {
 export type TomStatusEquipe = 'ocupado' | 'livre' | 'ausente';
 export interface MembroEquipe { id: number; nome: string; funcao: string | null; carga: string | null; status: { rotulo: string; tom: TomStatusEquipe } }
 export interface ListaEquipe { itens: MembroEquipe[] }
+
+/** Tela 25 · Chat (D16, Onda E). Decisão [W] 2026-10-02: quem responde é a JANA (IA do ERP). Contrato §12 (ERP #8596).
+ *  Área 'assistente' = módulo Jana no plano + jana.access + jana.chat, como no chat web; as conversas são as mesmas da web. */
+export interface MensagemChat { de: 'eu' | 'jana'; texto: string; /** ISO com hora. */ criada_em: string }
+export interface RespostaChat { conversa_id: string; resposta: MensagemChat }
+export interface ConversaChat { conversa_id: string; mensagens: MensagemChat[] }
 
 /** Tela 04 · Orçamentos (D16, Onda A). Contrato §2.1 (ERP #8555), 20 por página. `validade` e `area_m2`
  *  saem sempre null hoje (o ERP não guarda); a tela esconde os dois quando vêm null. */
@@ -596,6 +602,9 @@ export const api = {
   recusarMarcacao: (id: string) => chamar<{ estado: 'recusada'; nsr_anulacao: number }>('POST', `/api/app/ponto/aprovacoes/${encodeURIComponent(id)}/recusar`),
   /** Tela 26. Contrato §12 (ERP #8588). */
   equipe: () => chamar<ListaEquipe>('GET', '/api/app/equipe'),
+  /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
+  enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
+  conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
