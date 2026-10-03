@@ -20,6 +20,15 @@ const VALIDACAO = [
   { id: 'd39a3000-0000-4000-8000-000000000003', colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'A 3,7 km do local de trabalho', min: 1500, nsr: 348715, gps_precisao_m: null, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
   { id: 'd39a4000-0000-4000-8000-000000000004', colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: null, min: 2800, nsr: 348690, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
 ];
+// Tela 25 · respostas simuladas da Jana (as do protótipo). Sem Date no topo do módulo.
+const conversaDemo: Array<{ de: 'eu' | 'jana'; texto: string; criada_em: string }> = [];
+const respostaJana = (t: string) => {
+  const x = t.toLowerCase();
+  if (x.includes('venda') || x.includes('pedido')) return 'Para acompanhar vendas, abra Pedidos: lá você vê o status de cada um e o que está atrasado.';
+  if (x.includes('produç') || x.includes('producao')) return 'Em Produção você vê a fila por etapa: aprovado, em produção, em espera e pronto pra faturar.';
+  if (x.includes('financ')) return 'O resumo do caixa, a receber e a pagar aparece no Início. O detalhe completo está no oimpresso no computador.';
+  return 'Posso ajudar com pedidos, produção, estoque e ponto. Toque numa sugestão ou escreva sua dúvida.';
+};
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -410,7 +419,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -473,6 +482,19 @@ export const demo = {
         { id: 1, nome: 'Jefferson Moraes', funcao: 'Mecânico · Box 2', carga: '2 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
         { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Inativo', tom: 'ausente' } },
       ] });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/chat') {
+      const { mensagem } = (corpo ?? {}) as { mensagem?: string };
+      if (!mensagem || !mensagem.trim()) throw Object.assign(new Error('Escreva uma mensagem.'), { status: 422, codigo: 'validacao' });
+      await espera(900);
+      const agora = new Date().toISOString();
+      conversaDemo.push({ de: 'eu', texto: mensagem.trim(), criada_em: agora });
+      const resposta = { de: 'jana' as const, texto: respostaJana(mensagem), criada_em: new Date().toISOString() };
+      conversaDemo.push(resposta);
+      return r({ conversa_id: 'demo-1', resposta });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/chat/')) {
+      return r({ conversa_id: 'demo-1', mensagens: conversaDemo });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

@@ -408,6 +408,25 @@ a.p4-link { text-decoration: none; }
 .eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .eq-status { font-size: 11px; font-weight: 500; }
+/* Tela 25 · Assistente (ch-) */
+.ch-lista { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.ch-msg { max-width: 82%; padding: 10px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.ch-msg small { font-family: var(--font-mono); font-size: 10.5px; }
+.ch-msg.jana { align-self: flex-start; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.ch-msg.eu { align-self: flex-end; background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); border-bottom-right-radius: 4px; }
+.ch-msg.jana.falhou { border-color: var(--danger); color: var(--danger); }
+.ch-msg.eu.falhou { opacity: .75; }
+.ch-digitando { margin: 0; font-size: 12px; color: var(--text-mute); }
+.ch-rodape { flex-shrink: 0; padding: 10px 16px 12px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.ch-aviso { margin: 0; font-size: 12px; color: var(--text-dim); }
+.ch-sugestoes { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ch-sugestoes .pd-chip { white-space: nowrap; }
+.ch-sugestoes .pd-chip:disabled { opacity: .5; }
+.ch-campo { display: flex; gap: 8px; }
+.ch-campo input { flex: 1; min-width: 0; height: 44px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 0 12px; font: inherit; font-size: 15px; }
+.ch-enviar { width: 48px; height: 44px; flex-shrink: 0; border-radius: 10px; border: 0; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; cursor: pointer; }
+.ch-campo input::placeholder { color: var(--text-mute); }
+.ch-enviar:disabled { background: var(--bg-2, var(--border)); color: var(--text-mute); cursor: default; }
 
 /* Tela 29 · Movimentações (prefixo mov-) */
 .est-card.abre { width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; min-height: 44px; }
