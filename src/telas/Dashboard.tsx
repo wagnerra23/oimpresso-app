@@ -1,7 +1,7 @@
 // Dashboard — desenho v4 (tela 35), D16 Onda C. Só leitura: faturamento de 30 dias com a tendência semanal,
 // indicadores (pedidos, produção, a receber), pedidos por dia e o fechamento do mês. "OS no pátio" é da oficina
 // (Onda D) e fica de fora. Mora em Mais; os cartões de pedidos e produção abrem as abas.
-// Rota GET /api/app/dashboard (formato proposto ao ERP; PR pendente).
+// Rota GET /api/app/dashboard, contrato §10.4 (ERP #8599).
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type Dashboard as Dados } from '../api';
 import { reais } from './Pedidos';
