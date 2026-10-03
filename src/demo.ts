@@ -8,6 +8,10 @@ interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; 
 let logado = false;
 // Perfil da demo: usuário com "ponto" no nome (ex.: revisor.ponto) entra como colaborador (D6).
 let perfilDemo: 'erp' | 'colaborador' = 'erp';
+// Usuário com "vendas" no nome entra sem acesso ao Financeiro (relatórios sem indicadores nem DRE, §10.3).
+let semFinanceiro = false;
+// Usuário com "gestor" no nome vê o dashboard sem acesso a vendas: pedidos e produção vêm null (§10.4).
+let semVendas = false;
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
@@ -174,11 +178,21 @@ const LANCAMENTOS = [
 const FISCAIS = [
   { id: 1287, tipo: 'NFe', numero: '1287', referencia: 'Pedido #0038 · Papelaria Sol', valor: 3420, status: 'autorizado',
     chave: '0000 0000 0000 0000 0000 5500 1000 0012 8710 0000 0000', erro: null, dias: -5 },
-  { id: 342, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
+  // Mesmo id da NF-e acima de propósito: no ERP os ids vêm de tabelas diferentes (§10.2).
+  { id: 1287, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
   { id: 9001, tipo: 'NFCe', numero: null, referencia: 'Venda balcão #V-0010', valor: 186, status: 'rejeitado', chave: null,
     erro: 'Rejeição 539: duplicidade de NF-e com diferença na chave de acesso.', dias: -1 },
   { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },
 ] as const;
+
+// Links de pagamento de demonstração (tela 15), como o protótipo. Clientes fictícios; o link aponta para um domínio
+// de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
+const PAGAMENTOS = [
+  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 1260, dias: -7, metodo: 'boleto', status: 'vencido', pago: null },
+  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 2315, dias: 3, metodo: 'pix', status: 'pendente', pago: null },
+  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 3420, dias: -5, metodo: 'pix', status: 'pago', pago: -5 },
+  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 640, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null },
+];
 
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
@@ -217,6 +231,8 @@ export const demo = {
     if (!usuario.trim() || senha.length < 3) throw Object.assign(new Error('Usuário ou senha incorretos.'), { status: 401 });
     logado = true;
     perfilDemo = /ponto/i.test(usuario) ? 'colaborador' : 'erp';
+    semFinanceiro = /vendas/i.test(usuario);
+    semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
@@ -430,7 +446,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -439,7 +455,7 @@ export const demo = {
     }
     if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
       const { modulos } = (corpo ?? {}) as { modulos?: string[] };
-      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'mais'];
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'pagamentos', 'mais'];
       // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
       const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
         : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
@@ -566,8 +582,8 @@ export const demo = {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo === 'producao');
       const etapas = [...new Set(ativos.map((x) => x.etapa.rotulo))].map((rotulo) => ({ rotulo, total: ativos.filter((x) => x.etapa.rotulo === rotulo).length }));
       return r({ periodo: { de, ate: diaRel(0) },
-        kpis: { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
-        dre: aba !== 'dre' ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
+        kpis: semFinanceiro ? null : { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
+        dre: aba !== 'dre' || semFinanceiro ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
           despesas_por_categoria: parte(desp, [['Insumos', 0.46], ['Folha', 0.31], ['Aluguel e energia', 0.14], ['Outros', 0.09]]) },
         vendas: aba !== 'vendas' ? null : {
           receita_por_dia: [4.2, 5.1, 3.8, 6.4, 7.2, 2.1, 1.4, 5.8, 6.1, 4.9, 7.8, 8.4, 3.2, 8.42].map((x, i) => ({ data: diaRel(i - 13), valor: x * 1000 })),
@@ -580,10 +596,19 @@ export const demo = {
       // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
       return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
-        kpis: { pedidos_ativos: ativos.length, pedidos_novos: PEDIDOS.filter((x) => x.etapa.grupo === 'orcamento').length,
-          producao_em_curso: PEDIDOS.filter((x) => x.etapa.grupo === 'producao').length, a_receber: 11415, vencido: 1260 },
-        pedidos_por_dia: [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, ativos.length].map((total, i) => ({ data: diaRel(i - 13), total })),
-        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: { concluidas: 7, total: 10 } });
+        kpis: { pedidos_ativos: semVendas ? null : ativos.length, pedidos_novos: semVendas ? null : 4,
+          producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
+        pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
+        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
