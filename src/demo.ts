@@ -10,6 +10,8 @@ let logado = false;
 let perfilDemo: 'erp' | 'colaborador' = 'erp';
 // Usuário com "vendas" no nome entra sem acesso ao Financeiro (relatórios sem indicadores nem DRE, §10.3).
 let semFinanceiro = false;
+// Usuário com "gestor" no nome vê o dashboard sem acesso a vendas: pedidos e produção vêm null (§10.4).
+let semVendas = false;
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
@@ -204,6 +206,7 @@ export const demo = {
     logado = true;
     perfilDemo = /ponto/i.test(usuario) ? 'colaborador' : 'erp';
     semFinanceiro = /vendas/i.test(usuario);
+    semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
@@ -567,10 +570,10 @@ export const demo = {
       // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
       return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
-        kpis: { pedidos_ativos: ativos.length, pedidos_novos: PEDIDOS.filter((x) => x.etapa.grupo === 'orcamento').length,
-          producao_em_curso: PEDIDOS.filter((x) => x.etapa.grupo === 'producao').length, a_receber: 11415, vencido: 1260 },
-        pedidos_por_dia: [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, ativos.length].map((total, i) => ({ data: diaRel(i - 13), total })),
-        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: { concluidas: 7, total: 10 } });
+        kpis: { pedidos_ativos: semVendas ? null : ativos.length, pedidos_novos: semVendas ? null : 4,
+          producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
+        pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
+        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';

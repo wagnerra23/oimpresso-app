@@ -387,17 +387,20 @@ export interface Relatorios {
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
 }
 
-/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Formato proposto ao ERP (PR pendente). Mesma permissão
- *  `dashboard.data` do Início; `a_receber`/`vencido` saem do mesmo serviço da tela 06 (os números batem). */
+/** Tela 35 · Dashboard (D16, Onda C) — só leitura. Contrato §10.4 (ERP #8599). Sem `dashboard.data` → 403 e a área
+ *  não aparece. Por bloco: faturamento e meta com `dashboard.data`; pedidos e produção com a regra de quem vê vendas
+ *  (§2/§5) — sem ela vêm null; `a_receber`/`vencido` com o Financeiro (mesmo serviço da tela 06) — sem ele, null. */
 export interface Dashboard {
-  /** `serie_semanal`: 7 pontos, do mais antigo ao atual; `variacao_pct` null sem base de comparação. */
+  /** `serie_semanal`: os 7 últimos dias, dia a dia (antigo → hoje); `variacao_pct` null sem base de comparação. */
   faturamento_30d: { valor: number; variacao_pct: number | null; serie_semanal: number[] };
-  kpis: { pedidos_ativos: number; pedidos_novos: number; producao_em_curso: number; a_receber: number | null; vencido: number | null };
-  /** Últimos 14 dias, do mais antigo para hoje. */
-  pedidos_por_dia: Array<{ data: string; total: number }>;
-  /** Meta mensal da Jana; null quando não há meta cadastrada. */
+  /** `pedidos_novos` = pedidos de hoje; `producao_em_curso` = coluna "em produção". */
+  kpis: { pedidos_ativos: number | null; pedidos_novos: number | null; producao_em_curso: number | null; a_receber: number | null; vencido: number | null };
+  /** Últimos 14 dias, do mais antigo para hoje; null sem acesso a vendas. */
+  pedidos_por_dia: Array<{ data: string; total: number }> | null;
+  /** Meta mensal da Jana; null quando não há meta cadastrada. `realizado_pct` inteiro. */
   meta_mes: { valor: number; realizado_pct: number } | null;
-  producao_concluida: { concluidas: number; total: number };
+  /** concluídas = coluna "pronto para faturar"; total = soma das 4 colunas. null sem acesso a vendas. */
+  producao_concluida: { concluidas: number; total: number } | null;
 }
 
 /** GET /ponto/api/me (ERP #8481). */
