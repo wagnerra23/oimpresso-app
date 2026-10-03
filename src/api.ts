@@ -6,6 +6,7 @@
 import { CapacitorHttp, type HttpResponse } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { demo } from './demo';
+import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -418,6 +419,9 @@ export interface LinkPagamento {
   /** PDF do boleto; null em PIX (e quando o provedor não devolveu). Bolepix sai com `metodo` "qualquer". */
   link: string | null;
 }
+/** Documento que pode virar link de pagamento (GET /api/app/pagamentos/referencias). `valor` = SALDO EM ABERTO do
+ *  documento (decisão [W], 2026-10-02) e é só para exibir: o POST não manda valor — o ERP calcula o mesmo saldo. */
+export interface ReferenciaCobranca { tipo: TipoReferencia; id: number; rotulo: string; cliente: string; valor: number }
 export interface ListaPagamentos { itens: LinkPagamento[]; contadores: Record<FiltroPagamentos, number>; pagina: number; tem_mais: boolean }
 
 /** GET /ponto/api/me (ERP #8481). */
@@ -606,6 +610,15 @@ export const api = {
   enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
   conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
   pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
+  // ── Escrita da tela 15 (regra mestre: dupla prova, antes→depois e ok do [W] antes do merge). Formato proposto ao ERP. ──
+  referenciasCobranca: () => chamar<{ itens: ReferenciaCobranca[] }>('GET', '/api/app/pagamentos/referencias'),
+  /** 201 com o link criado · 422 { campos } · 409 ja_existe (já há link em aberto para o documento) ·
+   *  503 provedor_indisponivel / sem_configuracao (o provedor não gerou o link; nada é gravado). */
+  gerarLink: (n: NovoLinkPagamento) => chamar<LinkPagamento>('POST', '/api/app/pagamentos', n),
+  /** Pergunta ao provedor a situação atual; devolve o link atualizado (pode continuar pendente). */
+  consultarPagamento: (id: number) => chamar<LinkPagamento>('POST', `/api/app/pagamentos/${id}/consultar`),
+  /** Cancela a cobrança no provedor; 409 nao_cancelavel se já foi paga. */
+  cancelarPagamento: (id: number) => chamar<LinkPagamento>('POST', `/api/app/pagamentos/${id}/cancelar`),
   tarefas: (origem: FiltroTarefas) => chamar<ListaTarefas>('GET', `/api/app/tarefas?origem=${origem}`),
   /** Só ToDo do próprio usuário (contrato §3). `id` é o número do ToDo, sem o prefixo "todo:". */
   tarefa: (id: string) => chamar<TarefaDetalhe>('GET', `/api/app/tarefas/todo/${id}`),
