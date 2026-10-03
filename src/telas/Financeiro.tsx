@@ -1,7 +1,7 @@
 // Financeiro — desenho v4 (tela 06), D16 Onda C. Só leitura: saldo do mês, contas e lançamentos em
 // aberto (a receber / a pagar) ou liquidados no mês (extrato). Baixar título e pagar ficam na tela 15
 // (Pagamentos), que mexe em valor e passa pela regra mestre. Mora dentro de Mais.
-// Rota GET /api/app/financeiro (formato proposto ao ERP; PR pendente).
+// Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
 import { reais } from './Pedidos';
