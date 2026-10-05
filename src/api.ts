@@ -372,12 +372,12 @@ export const NOVO_VEICULO = true;
  *  conhecido (cadastro ou OS). O formulário usa o daqui. */
 export interface VeiculoEdicao extends NovoVeiculo {
   id: number; cliente: string | null; pode_editar?: boolean;
-  /** Pode excluir (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = não mostra "Excluir veículo". */
+  /** Pode excluir (oficinaauto.vehicle.delete, ERP #8717; superadmin não entra). Ausente = não mostra "Excluir veículo". */
   pode_excluir?: boolean;
 }
 /** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
 export const EDITAR_VEICULO = true;
-/** Liga excluir veículo. Só a demo, até a rota DELETE /api/app/veiculos/{id} existir no ERP. */
+/** Liga excluir veículo. Só a demo, até o ERP #8717 estar em produção. */
 export const EXCLUIR_VEICULO = DEMO;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
 export interface ConsultaPlaca {
@@ -809,8 +809,9 @@ export const api = {
   editarVeiculo: (id: number, v: NovoVeiculo) => (EDITAR_VEICULO
     ? chamar<VeiculoResumo>('PUT', `/api/app/veiculos/${id}`, v)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Editar veículo pelo app ainda não está disponível.'))),
-  /** Excluir veículo (rota PROVISÓRIA, pedida ao ERP): soft delete, igual à web. 200/204 · 404 · 403 · 503 ·
-   *  409 { erro: "em_uso", mensagem, os_abertas } quando há OS em andamento (proposta, decisão do [W]). */
+  /** Excluir veículo (ERP #8717): soft delete, sem como restaurar pela web. 200 { ok: true } · 404 nao_encontrado ·
+   *  403 sem_permissao · 503 sem_configuracao · 409 { erro: "em_uso", mensagem, os_abertas } quando há OS em andamento
+   *  (decisão [W]). Libera a placa; sem valor, estoque nem cobrança. */
   excluirVeiculo: (id: number) => (EXCLUIR_VEICULO
     ? chamar<unknown>('DELETE', `/api/app/veiculos/${id}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Excluir veículo pelo app ainda não está disponível.'))),

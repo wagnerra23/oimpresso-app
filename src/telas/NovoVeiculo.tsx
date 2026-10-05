@@ -6,7 +6,7 @@
 // motor, combustível, chassi do reboque e observações (ficam na web). Com veiculoId vira "Editar veículo": carrega
 // GET /api/app/veiculos/{id} e salva com PUT (ERP #8708, em produção). Na edição
 // não há "Buscar": a consulta trataria a placa do próprio veículo como já ativa. "Excluir veículo" (pode_excluir) pede
-// confirmação e chama DELETE (rota PROVISÓRIA pedida ao ERP, ligada por EXCLUIR_VEICULO); o ERP faz soft delete. "Buscar" da placa: consulta no fornecedor do
+// confirmação e chama DELETE (ERP #8717, ligado por EXCLUIR_VEICULO). Soft delete sem restauração: definitivo para o usuário. "Buscar" da placa: consulta no fornecedor do
 // ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { api, camposDoErro, ErroApi, EXCLUIR_VEICULO, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
@@ -302,7 +302,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
             <div className="oi-sheet-grip" />
             <div className="oi-sheet-h"><b id="nve-exc-t">Excluir o veículo {placaSalva}?</b></div>
             <div className="osd-folha">
-              <p className="osd-conf">Ele sai da lista de veículos e a placa fica livre para outro cadastro. Isso não se desfaz pelo app.</p>
+              <p className="osd-conf">Ele sai da lista de veículos e a placa fica livre para outro cadastro. <b>Não dá para desfazer, nem pela web.</b></p>
               {erroExcluir && <p className="np-erro" role="alert">{erroExcluir}</p>}
               <div className="osd-conf-bts">
                 <button className="oi-btn" disabled={excluindo === 'enviando'} onClick={() => setExcluindo(null)}>Voltar</button>

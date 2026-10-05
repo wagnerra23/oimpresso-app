@@ -824,7 +824,7 @@ export const demo = {
       const i = VEICULOS.findIndex((x) => x.id === Number(caminho.split('/')[4]));
       if (i < 0) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
       const abertas = ORDENS.filter((o) => o.placa === VEICULOS[i].placa && !(o.etapa in TERMINAIS_OS)).length;
-      if (abertas) throw Object.assign(new Error(`Este veículo tem ${abertas} OS em andamento. Encerre as OS antes de excluir.`), { status: 409, erro: 'em_uso', os_abertas: abertas });
+      if (abertas) throw Object.assign(new Error(`Este veículo tem ${abertas} OS em andamento. Encerre ${abertas === 1 ? 'a OS' : 'as OS'} antes de excluir.`), { status: 409, erro: 'em_uso', os_abertas: abertas });
       await espera(500);
       VEICULOS.splice(i, 1);
       return r({ ok: true });
