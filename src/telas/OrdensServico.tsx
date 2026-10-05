@@ -59,7 +59,8 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   useVoltar(novoVeiculo, () => setNovoVeiculo(false));
   useVoltar(editandoVeiculo !== null, () => setEditandoVeiculo(null));
   if (editandoVeiculo !== null) return <NovoVeiculo key={editandoVeiculo} veiculoId={editandoVeiculo} avisar={avisar}
-    aoVoltar={() => setEditandoVeiculo(null)} aoCriar={() => { setEditandoVeiculo(null); setAba('veiculos'); }} />;
+    aoVoltar={() => setEditandoVeiculo(null)} aoCriar={() => { setEditandoVeiculo(null); setAba('veiculos'); }}
+    aoExcluir={() => { setEditandoVeiculo(null); setAba('veiculos'); }} />;
   if (novoVeiculo) return <NovoVeiculo avisar={avisar} aoVoltar={() => setNovoVeiculo(false)} aoCriar={() => { setNovoVeiculo(false); setAba('veiculos'); }} />;
   if (nova) return <NovaOs avisar={avisar} aoVoltar={() => setNova(false)} aoCriar={(os) => { setNova(false); setAba('os'); setAberta(os.id); }} />;
   if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;

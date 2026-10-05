@@ -370,9 +370,15 @@ export const NOVO_VEICULO = true;
 /** Veículo para editar: GET /api/app/veiculos/{id} (ERP #8708). Os campos do formulário, com o tipo como chave de
  *  veiculos/opcoes e os anos separados. ATENÇÃO: aqui "km" é o do CADASTRO (o que o PUT grava); na lista é o maior
  *  conhecido (cadastro ou OS). O formulário usa o daqui. */
-export interface VeiculoEdicao extends NovoVeiculo { id: number; cliente: string | null; pode_editar?: boolean }
+export interface VeiculoEdicao extends NovoVeiculo {
+  id: number; cliente: string | null; pode_editar?: boolean;
+  /** Pode excluir (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = não mostra "Excluir veículo". */
+  pode_excluir?: boolean;
+}
 /** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
 export const EDITAR_VEICULO = true;
+/** Liga excluir veículo. Só a demo, até a rota DELETE /api/app/veiculos/{id} existir no ERP. */
+export const EXCLUIR_VEICULO = DEMO;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
 export interface ConsultaPlaca {
   encontrado: boolean; mensagem?: string | null;
@@ -674,7 +680,7 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
   let r: HttpResponse;
   try {
@@ -803,6 +809,11 @@ export const api = {
   editarVeiculo: (id: number, v: NovoVeiculo) => (EDITAR_VEICULO
     ? chamar<VeiculoResumo>('PUT', `/api/app/veiculos/${id}`, v)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Editar veículo pelo app ainda não está disponível.'))),
+  /** Excluir veículo (rota PROVISÓRIA, pedida ao ERP): soft delete, igual à web. 200/204 · 404 · 403 · 503 ·
+   *  409 { erro: "em_uso", mensagem, os_abertas } quando há OS em andamento (proposta, decisão do [W]). */
+  excluirVeiculo: (id: number) => (EXCLUIR_VEICULO
+    ? chamar<unknown>('DELETE', `/api/app/veiculos/${id}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Excluir veículo pelo app ainda não está disponível.'))),
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */
