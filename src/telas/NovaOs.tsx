@@ -4,9 +4,10 @@
 // aberta, entrada agora e a empresa do usuário, e põe a OS na Recepção: abrir OS não gera item, valor nem
 // estoque. Fora de propósito: criar veículo (fica na web), combustível, avarias e mecânico responsável.
 import { useEffect, useState } from 'react';
-import { api, camposDoErro, ErroApi, type OsDetalhe, type PessoaResumo, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, NOVO_VEICULO, type OsDetalhe, type PessoaResumo, type VeiculoResumo } from '../api';
 import { useVoltar } from '../voltar';
 import { Placa } from './Veiculos';
+import { NovoVeiculo } from './NovoVeiculo';
 
 /**
  * Km digitado: só inteiro, com ou sem ponto de milhar ("48312" ou "48.312"). Vazio = null (não informado).
@@ -22,8 +23,8 @@ export function kmDigitado(texto: string): number | null | 'invalido' {
 /** Texto livre opcional: em branco vira null. */
 export const textoOuNulo = (t: string): string | null => (t.trim() ? t.trim() : null);
 
-type Cliente = { id: number; nome: string } | null;
-type Modo = 'form' | 'veiculo' | 'cliente';
+export type Cliente = { id: number; nome: string } | null;
+type Modo = 'form' | 'veiculo' | 'cliente' | 'novoVeiculo';
 
 interface Props {
   aoVoltar: () => void; aoCriar: (os: OsDetalhe) => void;
@@ -41,7 +42,8 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
   const [salvando, setSalvando] = useState(false);
 
   // Voltar do Android: da busca volta ao formulário; do formulário, sai.
-  useVoltar(modo !== 'form' && veiculo !== null, () => setModo('form'));
+  useVoltar(modo !== 'form' && modo !== 'novoVeiculo' && veiculo !== null, () => setModo('form'));
+  useVoltar(modo === 'novoVeiculo', () => setModo('veiculo'));
 
   const escolherVeiculo = (v: VeiculoResumo) => {
     setVeiculo(v);
@@ -70,7 +72,9 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
     } finally { setSalvando(false); }
   };
 
-  if (modo === 'veiculo') return <BuscaVeiculo aoEscolher={escolherVeiculo} aoVoltar={veiculo ? () => setModo('form') : aoVoltar} />;
+  if (modo === 'novoVeiculo') return <NovoVeiculo rotulo="Nova OS" avisar={avisar} aoVoltar={() => setModo('veiculo')} aoCriar={escolherVeiculo} />;
+  if (modo === 'veiculo') return <BuscaVeiculo aoEscolher={escolherVeiculo} aoVoltar={veiculo ? () => setModo('form') : aoVoltar}
+    aoNovo={NOVO_VEICULO ? () => setModo('novoVeiculo') : undefined} />;
   if (modo === 'cliente') return <BuscaCliente aoEscolher={(c) => { setCliente(c); setModo('form'); }} aoVoltar={() => setModo('form')} />;
 
   const erro = (k: string) => erros[k] ? <span id={'nos-e-' + k} className="np-erro">{erros[k]}</span> : null;
@@ -139,14 +143,14 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
   );
 }
 
-function Cabecalho({ titulo, aoVoltar }: { titulo: string; aoVoltar: () => void }) {
+export function Cabecalho({ titulo, aoVoltar, rotulo = 'Nova OS' }: { titulo: string; aoVoltar: () => void; rotulo?: string }) {
   return (
     <div className="pd-dhead">
       <button className="pd-voltar" onClick={aoVoltar} aria-label="Voltar">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="p4-rotulo">Nova OS</div>
+        <div className="p4-rotulo">{rotulo}</div>
         <div className="pd-dtitulo">{titulo}</div>
       </div>
     </div>
@@ -154,7 +158,7 @@ function Cabecalho({ titulo, aoVoltar }: { titulo: string; aoVoltar: () => void 
 }
 
 /** Busca de veículo (mesma rota da tela 08). Veículo novo continua sendo cadastrado na web. */
-function BuscaVeiculo({ aoEscolher, aoVoltar }: { aoEscolher: (v: VeiculoResumo) => void; aoVoltar: () => void }) {
+function BuscaVeiculo({ aoEscolher, aoVoltar, aoNovo }: { aoEscolher: (v: VeiculoResumo) => void; aoVoltar: () => void; aoNovo?: () => void }) {
   const [texto, setTexto] = useState('');
   const [itens, setItens] = useState<VeiculoResumo[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -176,7 +180,8 @@ function BuscaVeiculo({ aoEscolher, aoVoltar }: { aoEscolher: (v: VeiculoResumo)
           </label>
           {erro && <div className="p4-vazio"><b>Não foi possível buscar</b><span>{erro}</span></div>}
           {!itens && !erro && <p className="p4-legal">Carregando…</p>}
-          {itens && itens.length === 0 && <div className="p4-vazio"><b>Nenhum veículo encontrado</b><span>Veículo novo se cadastra no oimpresso web.</span></div>}
+          {itens && itens.length === 0 && <div className="p4-vazio"><b>Nenhum veículo encontrado</b><span>{aoNovo ? 'Cadastre o veículo abaixo.' : 'Veículo novo se cadastra no oimpresso web.'}</span></div>}
+          {aoNovo && <button className="oi-btn block" style={{ minHeight: 44 }} onClick={aoNovo}>+ Cadastrar veículo</button>}
           {itens && itens.length > 0 && (
             <div className="p4-lista">
               {itens.map((v) => (
@@ -194,7 +199,7 @@ function BuscaVeiculo({ aoEscolher, aoVoltar }: { aoEscolher: (v: VeiculoResumo)
 }
 
 /** Busca de cliente (mesma rota da tela Pessoas, só clientes). */
-function BuscaCliente({ aoEscolher, aoVoltar }: { aoEscolher: (c: Cliente) => void; aoVoltar: () => void }) {
+export function BuscaCliente({ aoEscolher, aoVoltar, rotulo }: { aoEscolher: (c: Cliente) => void; aoVoltar: () => void; rotulo?: string }) {
   const [texto, setTexto] = useState('');
   const [itens, setItens] = useState<PessoaResumo[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -207,7 +212,7 @@ function BuscaCliente({ aoEscolher, aoVoltar }: { aoEscolher: (c: Cliente) => vo
   }, [texto]);
   return (
     <>
-      <Cabecalho titulo="Escolher cliente" aoVoltar={aoVoltar} />
+      <Cabecalho titulo="Escolher cliente" aoVoltar={aoVoltar} rotulo={rotulo} />
       <div className="oi-scroll">
         <div className="pd-corpo">
           <label className="ps-busca">

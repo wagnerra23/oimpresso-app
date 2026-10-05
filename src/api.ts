@@ -343,7 +343,24 @@ export interface VeiculoResumo {
   km: number | null;
   cor: string | null;
 }
-export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }
+export interface ListaVeiculos {
+  itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean;
+  /** Pode cadastrar veículo (oficinaauto.vehicle.create). Pedido ao ERP; ausente = não mostra "+ Veículo". */
+  pode_criar?: boolean;
+}
+/** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
+export interface OpcoesVeiculo { tipos: Array<{ chave: string; rotulo: string }> }
+/** Corpo do POST /api/app/veiculos. FORMATO PROVISÓRIO, pedido ao ERP. O ERP normaliza a placa e grava na
+ *  empresa do token. Cadastrar veículo não gera valor, estoque nem cobrança. */
+export interface NovoVeiculo {
+  placa: string; tipo: string;
+  placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
+  cor: string | null; km: number | null; chassi: string | null; renavam: string | null;
+  /** Dono do veículo (contato da empresa); null = sem dono. */
+  contact_id: number | null;
+}
+/** Liga o cadastro de veículo. Só a demo, até a rota POST /api/app/veiculos existir no ERP. */
+export const NOVO_VEICULO = DEMO;
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
@@ -734,6 +751,15 @@ export const api = {
   criarOs: (p: NovaOs) => (NOVA_OS
     ? chamar<OsDetalhe>('POST', '/api/app/os', p)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Abrir OS pelo app ainda não está disponível.'))),
+  /** Tipos de veículo para o cadastro. Rota PROVISÓRIA (pedida ao ERP). */
+  opcoesVeiculo: () => (NOVO_VEICULO
+    ? chamar<OpcoesVeiculo>('GET', '/api/app/veiculos/opcoes')
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
+  /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos } · 403 sem_permissao.
+   *  Rota PROVISÓRIA (pedida ao ERP). */
+  criarVeiculo: (v: NovoVeiculo) => (NOVO_VEICULO
+    ? chamar<VeiculoResumo>('POST', '/api/app/veiculos', v)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */

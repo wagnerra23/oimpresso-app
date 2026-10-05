@@ -5,7 +5,7 @@
 // Tocar no veículo abre o histórico de OS dele (HISTORICO_VEICULO, rota do ERP #8635).
 // Fora de propósito: "+ Veículo" (escrita, PR próprio).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, HISTORICO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { api, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -27,9 +27,9 @@ export function Placa({ placa }: { placa: string }) {
   return <span className={'os-placa' + (placaAntiga(placa) ? ' antiga' : '')} aria-label={`Placa ${placa}`}>{placa}</span>;
 }
 
-interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void }
+interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void; aoNovo?: () => void }
 
-export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
+export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo }: Props) {
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [dados, setDados] = useState<ListaVeiculos | null>(null);
@@ -74,6 +74,7 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
             <div className="p4-rotulo">{dados ? `${dados.total} ${dados.total === 1 ? 'veículo' : 'veículos'}` : 'Oficina'}</div>
             <div className="pd-titulo">Veículos</div>
           </div>
+          {NOVO_VEICULO && aoNovo && dados?.pode_criar && <button className="oi-btn primary nos-nova" onClick={aoNovo}>+ Veículo</button>}
         </div>
         {abas}
       </div>

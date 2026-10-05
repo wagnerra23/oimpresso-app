@@ -10,6 +10,7 @@ import { useVoltar } from '../voltar';
 import { OsDetalhe } from './OsDetalhe';
 import { Veiculos } from './Veiculos';
 import { NovaOs } from './NovaOs';
+import { NovoVeiculo } from './NovoVeiculo';
 
 /** Cor da etapa: travada em vermelho, última etapa do pipeline em verde, o resto no acento. */
 export function tintaOs(o: Pick<OsResumo, 'travada' | 'etapa'>): string {
@@ -51,8 +52,11 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   const [aba, setAba] = useState<'os' | 'veiculos'>('os');
   const [aberta, setAberta] = useState<number | null>(null);
   const [nova, setNova] = useState(false);
+  const [novoVeiculo, setNovoVeiculo] = useState(false);
   useVoltar(aberta !== null, () => setAberta(null));
   useVoltar(nova, () => setNova(false));
+  useVoltar(novoVeiculo, () => setNovoVeiculo(false));
+  if (novoVeiculo) return <NovoVeiculo avisar={avisar} aoVoltar={() => setNovoVeiculo(false)} aoCriar={() => { setNovoVeiculo(false); setAba('veiculos'); }} />;
   if (nova) return <NovaOs avisar={avisar} aoVoltar={() => setNova(false)} aoCriar={(os) => { setNova(false); setAba('os'); setAberta(os.id); }} />;
   if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
   // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
@@ -63,7 +67,7 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
     </div>
   );
   return aba === 'veiculos'
-    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} />
+    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} aoNovo={() => setNovoVeiculo(true)} />
     : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} aoNova={() => setNova(true)} />;
 }
 
