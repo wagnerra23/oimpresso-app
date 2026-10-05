@@ -106,6 +106,20 @@ const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string
   306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
 };
 
+// Ordens de serviço da demo (tela 07). Pipeline como o ERP fechou (FSM oficina_mecanica_os, 6 etapas
+// não-terminais; terminais não entram na lista). O veículo do ERP não tem marca/modelo: vem o tipo.
+// Placas e clientes fictícios.
+const ETAPAS_OS = [['recepcao', 'Recepção'], ['em_diagnostico', 'Diagnóstico'], ['aguardando_aprovacao', 'Aguardando aprovação'],
+  ['aguardando_pecas', 'Aguardando peças'], ['em_execucao', 'Em execução'], ['pronto_retirada', 'Pronto p/ retirar']] as const;
+const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
+const ORDENS = [
+  { id: 1046, numero: 'OS-01046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
+  { id: 1045, numero: 'OS-01045', placa: 'MLK4C09', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
+  { id: 1044, numero: 'OS-01044', placa: 'QJT8A21', veiculo: 'Utilitário', cliente: 'Auto Center Rota', valor: 1380, etapa: 'aguardando_aprovacao' },
+  { id: 1042, numero: 'OS-01042', placa: 'RLV2E48', veiculo: 'Picape', cliente: 'Transportes Vale Norte', valor: 750, etapa: 'em_execucao' },
+  { id: 1039, numero: 'OS-01039', placa: 'RBA2H78', veiculo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
+  { id: 1036, numero: 'OS-01036', placa: 'QHX5B33', veiculo: null, cliente: 'Studio Forma', valor: 980, etapa: 'pronto_retirada' },
+];
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -446,7 +460,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -717,6 +731,15 @@ export const demo = {
         metodo: ROTULO_METODO[n.metodo as string] };
       VENDAS_POR_CHAVE[chave] = { corpo: corpoTxt, venda };
       return r({ ...venda });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
+      const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
+      const pos = (k: string) => ETAPAS_OS.findIndex((e) => e[0] === k);
+      const itens = ORDENS.filter((o) => etapa === 'todas' || o.etapa === etapa).sort((a, b) => pos(b.etapa) - pos(a.etapa) || b.id - a.id).map((o) => ({
+        id: o.id, numero: o.numero, placa: o.placa, veiculo: o.veiculo, cliente: o.cliente, valor: o.valor, travada: OS_TRAVA.includes(o.etapa),
+        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
+      const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ORDENS.filter((o) => o.etapa === chave).length }));
+      return r({ itens, etapas, total: ORDENS.length, travadas: ORDENS.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);

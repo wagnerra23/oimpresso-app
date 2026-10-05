@@ -9,7 +9,7 @@ import type { Area } from './api';
 import type { SubMais } from './telas/Mais';
 
 /** Áreas que moram dentro de Mais (nunca na barra), na ordem em que aparecem lá. */
-const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto_gestor', 'pagamentos'] as const;
+const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'ponto_gestor', 'pagamentos'] as const;
 /** Qualquer área pode ser aba quando o usuário escolhe (tela 30). */
 export type Aba = Area;
 /** Módulos com tela no app que podem ir para a barra (tela 30), na ordem em que aparecem em Mais. */
@@ -63,4 +63,4 @@ export function montarNavegacao(perfil: 'erp' | 'colaborador', areas: Area[], ab
 }
 
 /** Sem resposta do ERP (rota ainda não publicada, por exemplo): mostra tudo, como antes da D6. */
-export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'], 'inicio');
+export const NAV_PADRAO = montarNavegacao('erp', ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'], 'inicio');

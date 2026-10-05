@@ -588,6 +588,16 @@ button.db-kpi { cursor: pointer; }
 .db-prog { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
 .db-prog .in-barra i.db-ok { background: var(--ok); }
 
+/* Tela 07 · Ordens de serviço (prefixo os-) */
+.os-card { gap: 8px; }
+.os-linha { display: flex; align-items: center; gap: 10px; }
+.os-placa { flex-shrink: 0; font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; letter-spacing: 1px; color: var(--text);
+  background: var(--surface); border: 1.5px solid var(--text-dim); border-top: 5px solid oklch(0.45 0.13 255); border-radius: 5px; padding: 2px 7px; }
+.os-texto { flex: 1; min-width: 0; }
+.os-texto b { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 14px; font-weight: 600; line-height: 18px; overflow: hidden; }
+.os-texto small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-pipe { display: flex; gap: 3px; }
+.os-pipe i { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
 
 /* Tela 15 · Pagamentos (prefixo pg-) */
 .pg-pago { font-size: 12px; color: var(--ok); font-weight: 600; }

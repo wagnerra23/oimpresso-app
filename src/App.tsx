@@ -20,6 +20,7 @@ import { Pessoas } from './telas/Pessoas';
 import { Orcamentos } from './telas/Orcamentos';
 import { Relatorios } from './telas/Relatorios';
 import { Dashboard } from './telas/Dashboard';
+import { OrdensServico } from './telas/OrdensServico';
 import { FilaGestor } from './telas/FilaGestor';
 import { Equipe } from './telas/Equipe';
 import { Assistente } from './telas/Assistente';
@@ -144,6 +145,7 @@ export function App() {
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;
       case 'ponto_gestor': return <FilaGestor avisar={avisar} voltar={voltar} />;
       case 'equipe': return <Equipe voltar={voltar} />;
+      case 'oficina': return <OrdensServico voltar={voltar} />;
       case 'assistente': return <Assistente online={online} voltar={voltar} />;
       case 'pagamentos': return <Pagamentos avisar={avisar} voltar={voltar} />;
       case 'ponto': return <Ponto avisar={avisar} online={online} voltar={voltar} />;
