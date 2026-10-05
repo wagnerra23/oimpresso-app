@@ -315,6 +315,8 @@ export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: 
 export interface HistoricoVeiculo {
   itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>;
 }
+/** Liga o histórico de OS da tela 08. Só a demo, até a rota GET /api/app/veiculos/{id}/os existir no ERP (hoje 404). */
+export const HISTORICO_VEICULO = DEMO;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */

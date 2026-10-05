@@ -2,9 +2,10 @@
 // Rota GET /api/app/veiculos (formato fechado pela sessão ERP da Onda D, tabela vehicles do OficinaAuto).
 // Tocar no veículo abre o histórico de OS dele (busca ao expandir); tocar numa OS abre o detalhe (tela 03).
 // O ERP não guarda marca/modelo nem o desenho da placa: o título é o tipo e o desenho sai do formato da placa.
+// O histórico de OS ao expandir fica atrás de HISTORICO_VEICULO até o ERP publicar a rota dele.
 // Fora de propósito: "+ Veículo" (escrita, PR próprio).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { api, ErroApi, HISTORICO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -93,7 +94,8 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
             const meta = textoVeiculo(v);
             return (
               <div key={v.id} className="pd-card vei-card">
-                <button className="vei-topo" aria-expanded={estaAberto} onClick={() => alternar(v.id)}>
+                {(() => {
+                  const conteudo = (<>
                   <span className="vei-placas">
                     <Placa placa={v.placa} />
                     {v.placa_secundaria && <Placa placa={v.placa_secundaria} />}
@@ -103,9 +105,13 @@ export function Veiculos({ voltar, abas, aoAbrirOs }: Props) {
                     <small>{v.cliente ?? 'Sem dono cadastrado'}</small>
                     {meta && <small className="vei-meta">{meta}</small>}
                   </span>
-                  <span className="vei-chev" aria-hidden="true">{estaAberto ? '−' : '+'}</span>
-                </button>
-                {estaAberto && (
+                  {HISTORICO_VEICULO && <span className="vei-chev" aria-hidden="true">{estaAberto ? '−' : '+'}</span>}
+                  </>);
+                  return HISTORICO_VEICULO
+                    ? <button className="vei-topo" aria-expanded={estaAberto} onClick={() => alternar(v.id)}>{conteudo}</button>
+                    : <div className="vei-topo">{conteudo}</div>;
+                })()}
+                {HISTORICO_VEICULO && estaAberto && (
                   <div className="vei-hist">
                     <span className="p4-rotulo">Histórico de OS</span>
                     {!h && <p className="p4-legal">Carregando…</p>}
