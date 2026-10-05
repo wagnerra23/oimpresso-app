@@ -242,8 +242,8 @@ export interface NovoProduto {
   prateleira: { rack: string | null; fileira: string | null; posicao: string | null } | null;
   fiscal: { ncm: string | null; cest: string | null; cfop_interno: string | null; cfop_externo: string | null };
 }
-/** Liga a tela 20. Só a demo, até o #8582 estar em produção. */
-export const ESCRITA_PRODUTO = DEMO;
+/** Tela 20 ligada no app de loja: o ERP #8582 está em produção (rotas medidas respondendo 401 sem token). */
+export const ESCRITA_PRODUTO = true;
 
 // ── Ordens de serviço (tela 07, Onda D). Formato fechado pela sessão ERP da Onda D: service_orders do
 //    OficinaAuto, pipeline FSM oficina_mecanica_os. Lista = OS ativas (etapas terminais não entram). ──
@@ -316,8 +316,8 @@ export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: 
 export interface HistoricoVeiculo {
   itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>;
 }
-/** Liga o histórico de OS da tela 08. Só a demo, até a rota GET /api/app/veiculos/{id}/os existir no ERP (hoje 404). */
-export const HISTORICO_VEICULO = DEMO;
+/** Liga o histórico de OS da tela 08. Rota GET /api/app/veiculos/{id}/os no ERP (#8635), até 200 OS, da mais nova para a mais antiga. */
+export const HISTORICO_VEICULO = true;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
@@ -625,7 +625,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: stri
   return r.data as T;
 }
 
-/** Cadastro de produto fora da demo não sai do aparelho até o #8582 estar em produção. */
+/** Porta única do cadastro de produto (ESCRITA_PRODUTO desligada = nada sai do aparelho). */
 function escritaProduto<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
   if (!ESCRITA_PRODUTO) return Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastro de produto pelo app ainda não está disponível.'));
   return chamar<T>(metodo, caminho, corpo);
