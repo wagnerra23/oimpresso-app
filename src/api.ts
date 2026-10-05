@@ -299,8 +299,8 @@ export interface OsDetalhe {
 /** Uma ação de avanço da OS. `critica` = is_critical ou requires_confirmation (o app confirma antes);
  *  `bloqueio` = "Falta: <requisitos>." quando o gate barra, senão null. */
 export interface OsAcao { chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null }
-/** Liga "avançar etapa" na tela 03. Só a demo, até a rota do ERP #8637 estar em produção. */
-export const ESCRITA_OS = DEMO;
+/** Liga "avançar etapa" na tela 03. Rota do ERP #8637 em produção desde 2026-10-05. */
+export const ESCRITA_OS = true;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
  *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */

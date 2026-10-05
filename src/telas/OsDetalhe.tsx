@@ -6,7 +6,7 @@
 // "Link de aprovação" e "Faturar" (escritas, que mexem em valor e cobrança).
 // Avançar etapa (rodapé): as ações vêm do ERP com o motivo do bloqueio quando o gate barra; ação crítica pede
 // confirmação. Mudar de etapa não mexe em estoque nem valor (o processo da oficina não tem efeito colateral).
-// Cancelar, recusar orçamento e acionar garantia ficam na web. Ligado por ESCRITA_OS.
+// Cancelar, recusar orçamento e acionar garantia ficam na web. Rota do ERP #8637 (contrato tela-03).
 import { useEffect, useState } from 'react';
 import { api, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
 import { reais } from './Pedidos';
