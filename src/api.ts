@@ -270,7 +270,20 @@ export interface ListaOs {
   /** As etapas não-terminais do pipeline, sempre todas, na ordem do ERP, com a contagem (inclusive 0). */
   etapas: Array<{ chave: string; rotulo: string; total: number }>;
   total: number; travadas: number; pagina: number; tem_mais: boolean;
+  /** Pode abrir OS: permissão oficinaauto.service_order.create E processo da oficina cadastrado (ERP #8639). Ausente = não mostra. */
+  pode_criar?: boolean;
 }
+/** Corpo do POST /api/app/os (Nova OS, contrato tela-07, ERP #8639). O servidor fixa tipo mecânica, situação aberta,
+ *  entrada agora e a empresa do token, põe a OS na Recepção e liga o veículo se estiver livre. Não gera item, valor nem venda. */
+export interface NovaOs {
+  vehicle_id: number;
+  /** Cliente da OS; null = sem cliente (o veículo segue com o dono dele). */
+  contact_id: number | null;
+  /** km inteiro ≥ 0 · box até 60 caracteres · observações até 2000. */
+  mileage_at_service: number | null; box_label: string | null; notes: string | null;
+}
+/** Liga "+ Nova OS". Rota do ERP #8639 em produção desde 2026-10-05. */
+export const NOVA_OS = true;
 
 /** Tela 03 · Detalhe da OS. Formato fechado pela sessão ERP da Onda D. Totais calculados pelo ERP, nunca pelo app. */
 export type TipoItemOs = 'peca' | 'mao_obra' | 'servico_terceiro';
@@ -314,6 +327,8 @@ export interface VeiculoResumo {
   ano: string | null;
   /** Dono do veículo. */
   cliente: string | null;
+  /** Id do dono (ERP #8639), para o app sugerir o cliente da Nova OS; ausente = não sugere. */
+  cliente_id?: number | null;
   /** Último km conhecido (cadastro ou OS). */
   km: number | null;
   cor: string | null;
@@ -699,6 +714,11 @@ export const api = {
     ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Mudar a etapa pelo app ainda não está disponível.'))),
   /** Tela 08 · Veículos. */
+  /** Nova OS. 201 = o mesmo JSON do GET /api/app/os/{id} · 422 { erro: "validacao", campos } (vehicle_id, contact_id…) ·
+   *  403 sem_permissao · 503 sem_configuracao (módulo ausente) · throttle 30/min. Contrato tela-07 (ERP #8639). */
+  criarOs: (p: NovaOs) => (NOVA_OS
+    ? chamar<OsDetalhe>('POST', '/api/app/os', p)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Abrir OS pelo app ainda não está disponível.'))),
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */

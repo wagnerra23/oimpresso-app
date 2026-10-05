@@ -697,3 +697,16 @@ button.db-kpi { cursor: pointer; }
 .osd-conf { margin: 0; font-size: 14px; line-height: 1.5; }
 .osd-conf-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .osd-conf-bts .oi-btn, .osd-conf-bts .p4-cta { min-height: 48px; height: 48px; }
+
+/* Nova OS (prefixo nos-) */
+.nos-nova { min-height: 44px; padding: 0 14px; flex-shrink: 0; font-size: 13px; }
+.nos-escolha { flex-direction: row; align-items: center; gap: 12px; width: 100%; font: inherit; color: var(--text); text-align: left; }
+button.nos-escolha { cursor: pointer; }
+.nos-trocar { font-size: 13px; font-weight: 600; color: var(--accent-text); flex-shrink: 0; }
+.nos-bts { display: flex; gap: 4px; flex-shrink: 0; }
+.nos-link { min-height: 44px; padding: 0 10px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); }
+.nos-texto-livre { font-family: var(--font-sans, inherit) !important; }
+.nos-obs { border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 10px 12px; font: inherit; font-size: 14px; width: 100%; resize: vertical; }
+.nos-linha { min-height: 64px; width: 100%; padding: 10px 14px; display: flex; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border-2);
+  background: none; font: inherit; color: var(--text); text-align: left; }
+.nos-linha:last-child { border-bottom: 0; }

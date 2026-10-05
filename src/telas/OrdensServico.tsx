@@ -4,11 +4,12 @@
 // pipeline do ERP: o app não conhece a lista de etapas. Fora desta tela de propósito: "+ Nova OS", "→ próxima etapa" e
 // "Link" (são escritas, cada uma num PR próprio). Tocar no cartão abre o detalhe (tela 03).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type ListaOs, type OsResumo } from '../api';
+import { api, ErroApi, NOVA_OS, type ListaOs, type OsResumo } from '../api';
 import { reais } from './Pedidos';
 import { useVoltar } from '../voltar';
 import { OsDetalhe } from './OsDetalhe';
 import { Veiculos } from './Veiculos';
+import { NovaOs } from './NovaOs';
 
 /** Cor da etapa: travada em vermelho, última etapa do pipeline em verde, o resto no acento. */
 export function tintaOs(o: Pick<OsResumo, 'travada' | 'etapa'>): string {
@@ -49,7 +50,10 @@ export const valorOs = (v: number | null): string => (v === null ? '—' : reais
 export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aba, setAba] = useState<'os' | 'veiculos'>('os');
   const [aberta, setAberta] = useState<number | null>(null);
+  const [nova, setNova] = useState(false);
   useVoltar(aberta !== null, () => setAberta(null));
+  useVoltar(nova, () => setNova(false));
+  if (nova) return <NovaOs avisar={avisar} aoVoltar={() => setNova(false)} aoCriar={(os) => { setNova(false); setAba('os'); setAberta(os.id); }} />;
   if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
   // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
   const abas = (
@@ -60,10 +64,10 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   );
   return aba === 'veiculos'
     ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} />
-    : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} />;
+    : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} aoNova={() => setNova(true)} />;
 }
 
-function Lista({ voltar, abas, aoAbrir }: { voltar?: ReactNode; abas: ReactNode; aoAbrir: (id: number) => void }) {
+function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: ReactNode; aoAbrir: (id: number) => void; aoNova: () => void }) {
   const [etapa, setEtapa] = useState('todas');
   const [dados, setDados] = useState<ListaOs | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -95,6 +99,7 @@ function Lista({ voltar, abas, aoAbrir }: { voltar?: ReactNode; abas: ReactNode;
             <div className="p4-rotulo">{rotuloOs(dados)}</div>
             <div className="pd-titulo">Ordens de serviço</div>
           </div>
+          {NOVA_OS && dados?.pode_criar && <button className="oi-btn primary nos-nova" onClick={aoNova}>+ Nova OS</button>}
         </div>
         {abas}
       </div>
