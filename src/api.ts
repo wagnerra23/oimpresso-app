@@ -359,8 +359,8 @@ export interface NovoVeiculo {
   /** Dono do veículo (contato da empresa); null = sem dono. */
   contact_id: number | null;
 }
-/** Liga o cadastro de veículo. Só a demo, até o ERP #8687 estar em produção. */
-export const NOVO_VEICULO = DEMO;
+/** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
+export const NOVO_VEICULO = true;
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
