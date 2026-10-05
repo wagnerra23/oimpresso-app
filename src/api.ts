@@ -377,8 +377,8 @@ export interface VeiculoEdicao extends NovoVeiculo {
 }
 /** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
 export const EDITAR_VEICULO = true;
-/** Liga excluir veículo. Só a demo, até o ERP #8717 estar em produção. */
-export const EXCLUIR_VEICULO = DEMO;
+/** Liga excluir veículo. Rota do ERP #8717 em produção desde 2026-10-05. */
+export const EXCLUIR_VEICULO = true;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
 export interface ConsultaPlaca {
   encontrado: boolean; mensagem?: string | null;
