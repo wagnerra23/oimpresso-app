@@ -343,7 +343,24 @@ export interface VeiculoResumo {
   km: number | null;
   cor: string | null;
 }
-export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }
+export interface ListaVeiculos {
+  itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean;
+  /** Pode cadastrar veículo (oficinaauto.vehicle.create, ERP #8687). Ausente = não mostra "+ Veículo". */
+  pode_criar?: boolean;
+}
+/** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
+export interface OpcoesVeiculo { tipos: Array<{ chave: string; rotulo: string }> }
+/** Corpo do POST /api/app/veiculos (contrato tela-08, ERP #8687). O ERP normaliza as placas e grava na empresa do token;
+ *  recusa placa que já esteja em outro veículo ativo (decisão [W]). Só insere o veículo: sem OS, valor, estoque nem cobrança. */
+export interface NovoVeiculo {
+  placa: string; tipo: string;
+  placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
+  cor: string | null; km: number | null; chassi: string | null; renavam: string | null;
+  /** Dono do veículo (contato da empresa); null = sem dono. */
+  contact_id: number | null;
+}
+/** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
+export const NOVO_VEICULO = true;
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
@@ -572,12 +589,21 @@ export interface Espelho {
 /** Erro com a mensagem que o servidor devolveu (em PT-BR), pronta para a tela. */
 export class ErroApi extends Error {
   /** Erros por campo de um 422 ({ erro: "validacao", campos: { campo: "mensagem" } }). */
-  constructor(public status: number, public codigo: string, mensagem: string, public campos?: Record<string, string>) { super(mensagem); }
+  constructor(public status: number, public codigo: string, mensagem: string, public campos?: Record<string, string>,
+    /** Resto do corpo do erro (ex.: veiculo_existente_id na placa repetida). */
+    public extra?: Record<string, unknown>) { super(mensagem); }
 }
 
 /** Erros por campo de qualquer erro (da API ou da demo). */
 export const camposDoErro = (e: unknown): Record<string, string> =>
   ((e as { campos?: Record<string, string> } | null)?.campos) ?? {};
+
+/** Placa repetida (ERP #8687): id do veículo ativo que já tem a placa, quando o erro traz; senão null. */
+export function veiculoExistenteDoErro(e: unknown): number | null {
+  const x = e as { extra?: Record<string, unknown>; veiculo_existente_id?: unknown } | null;
+  const v = x?.extra?.veiculo_existente_id ?? x?.veiculo_existente_id;
+  return typeof v === 'number' ? v : null;
+}
 
 let token: string | null = null;
 /** Diferença relógio do aparelho − servidor, em segundos, medida pelo header Date. */
@@ -658,7 +684,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: stri
     const primeiro = errosCampo ? Object.values(errosCampo)[0]?.[0] : undefined;
     const campos = d.campos && typeof d.campos === 'object' ? (d.campos as Record<string, string>) : undefined;
     const msg = (primeiro ?? d.mensagem ?? d.message ?? (campos ? Object.values(campos)[0] : undefined) ?? 'Algo deu errado. Tente de novo.') as string;
-    throw new ErroApi(r.status, String(d.erro ?? 'erro'), msg, campos);
+    throw new ErroApi(r.status, String(d.erro ?? 'erro'), msg, campos, d);
   }
   return r.data as T;
 }
@@ -734,6 +760,15 @@ export const api = {
   criarOs: (p: NovaOs) => (NOVA_OS
     ? chamar<OsDetalhe>('POST', '/api/app/os', p)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Abrir OS pelo app ainda não está disponível.'))),
+  /** Tipos de veículo para o cadastro (ERP #8687), na ordem do ERP. */
+  opcoesVeiculo: () => (NOVO_VEICULO
+    ? chamar<OpcoesVeiculo>('GET', '/api/app/veiculos/opcoes')
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
+  /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos, veiculo_existente_id? } ·
+   *  403 sem_permissao · 503 sem_configuracao. Contrato tela-08 (ERP #8687). */
+  criarVeiculo: (v: NovoVeiculo) => (NOVO_VEICULO
+    ? chamar<VeiculoResumo>('POST', '/api/app/veiculos', v)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */

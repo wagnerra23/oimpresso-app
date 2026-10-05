@@ -163,7 +163,11 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
 };
 
 // Veículos da demo (tela 08). Placas fictícias; o histórico sai das OS da demo pela placa.
-const VEICULOS = [
+// Tipos de veículo da demo (no app real vêm do ERP, TiposVeiculo do núcleo).
+const TIPOS_VEICULO: Array<[string, string]> = [['caminhao', 'Caminhão'], ['caminhao_basculante', 'Caminhão basculante'], ['cavalo', 'Cavalo mecânico'],
+  ['utilitario', 'Utilitário'], ['picape', 'Picape'], ['furgao', 'Furgão'], ['carro', 'Carro']];
+const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | null; descricao: string | null; ano: string | null;
+  cliente: string | null; cliente_id: number | null; km: number | null; cor: string | null }> = [
   { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 48312, cor: 'Branco' },
   { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 312040, cor: 'Prata' },
   { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null },
@@ -801,10 +805,37 @@ export const demo = {
         etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor }));
       return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])] });
     }
+    if (metodo === 'GET' && caminho === '/api/app/veiculos/opcoes') {
+      return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })) });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/veiculos') {
+      const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
+        cor: string | null; km: number | null; contact_id: number | null };
+      const placa = (p.placa ?? '').toUpperCase().split('').filter((c) => (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')).join('');
+      const campos: Record<string, string> = {};
+      if (!placa) campos.placa = 'A placa do veículo é obrigatória.';
+      // Decisão [W]: o ERP recusa placa que já esteja em outro veículo ativo (principal ou reboque).
+      const existe = placa ? VEICULOS.find((v) => v.placa === placa || v.placa_secundaria === placa) : undefined;
+      if (existe) campos.placa = 'Esta placa já está em outro veículo ativo.';
+      const reb = (p.placa_secundaria ?? '').toUpperCase();
+      const existeReb = reb ? VEICULOS.find((v) => v.placa === reb || v.placa_secundaria === reb) : undefined;
+      if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
+      else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
+      if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
+      await espera(500);
+      const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
+      const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
+      const novoV = { id: Math.max(...VEICULOS.map((v) => v.id)) + 1, placa, placa_secundaria: p.placa_secundaria,
+        descricao: TIPOS_VEICULO.find((t) => t[0] === p.tipo)?.[1] ?? p.tipo, ano: anoF ? anoF + '/' + anoM : null,
+        cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor };
+      VEICULOS.push(novoV);
+      return r(novoV);
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos')) {
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
       const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
-      return r({ itens, total: itens.length, pagina: 1, tem_mais: false });
+      return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true });
     }
     if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
       const partes = caminho.split('/');
