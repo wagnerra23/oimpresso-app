@@ -3,9 +3,10 @@
 // ERP #8687), ligada por NOVO_VEICULO. Placa já em outro veículo ativo: o ERP recusa e manda o id; na Nova OS o app
 // oferece usar esse veículo. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
 // cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito: consulta de placa externa,
-// motor, combustível, chassi do reboque e observações (ficam na web).
+// motor, combustível, chassi do reboque e observações (ficam na web). "Buscar" da placa: consulta no fornecedor do
+// ERP (sem proprietário, LGPD), preenche só campos vazios; ligado por CONSULTA_PLACA.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type OpcoesVeiculo, type VeiculoResumo } from '../api';
+import { api, camposDoErro, CONSULTA_PLACA, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -29,8 +30,21 @@ export function anoDigitado(t: string): number | null | 'invalido' {
   return n >= 1900 && n <= 2100 ? n : 'invalido';
 }
 
-interface Form { placa: string; tipo: string; reboque: string; anoFab: string; anoMod: string; cor: string; km: string; chassi: string; renavam: string }
+export interface Form { placa: string; tipo: string; reboque: string; anoFab: string; anoMod: string; cor: string; km: string; chassi: string; renavam: string }
 const VAZIO: Form = { placa: '', tipo: '', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '' };
+
+/** Preenche com o resultado da consulta só os campos que ainda estão vazios (o que a pessoa digitou fica). */
+export function aplicarConsulta(f: Form, d: NonNullable<ConsultaPlaca['dados']>): Form {
+  const vazio = (v: string) => !v.trim();
+  return {
+    ...f,
+    anoFab: vazio(f.anoFab) && d.ano_fabricacao ? String(d.ano_fabricacao) : f.anoFab,
+    anoMod: vazio(f.anoMod) && d.ano_modelo ? String(d.ano_modelo) : f.anoMod,
+    cor: vazio(f.cor) && d.cor ? d.cor : f.cor,
+    chassi: vazio(f.chassi) && d.chassi ? d.chassi : f.chassi,
+    renavam: vazio(f.renavam) && d.renavam ? d.renavam : f.renavam,
+  };
+}
 
 /** Confere o formulário antes de enviar; devolve os erros por campo da API (vazio = pode enviar). */
 export function errosDoForm(f: Form): Record<string, string> {
@@ -67,6 +81,8 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
   const [existente, setExistente] = useState<VeiculoResumo | null>(null);
+  const [consultando, setConsultando] = useState(false);
+  const [achado, setAchado] = useState<string | null>(null);
 
   useEffect(() => {
     api.opcoesVeiculo().then(setOpcoes).catch((e) => setErroOpcoes(e instanceof Error ? e.message : 'Não foi possível carregar os tipos.'));
@@ -75,6 +91,40 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
   const mudar = (k: keyof Form, v: string, campoApi: string) => {
     setF((x) => ({ ...x, [k]: v }));
     if (erros[campoApi]) setErros((e) => ({ ...e, [campoApi]: '' }));
+  };
+
+  // Placa já em outro veículo ativo: na Nova OS, busca o veículo para oferecer "Usar este".
+  const oferecerExistente = (id: number) => {
+    if (!aoUsarExistente) return;
+    api.veiculos(1, normalizarPlaca(f.placa)).then((r) => setExistente(r.itens.find((v) => v.id === id) ?? null)).catch(() => {});
+  };
+
+  const consultar = async () => {
+    const placa = normalizarPlaca(f.placa);
+    if (!placaValida(placa)) { setErros((e) => ({ ...e, placa: 'Placa inválida: use ABC1234 ou ABC1D23.' })); return; }
+    setConsultando(true); setAchado(null); setExistente(null);
+    try {
+      const r = await api.consultaPlaca(placa);
+      if (r.veiculo_existente_id) {
+        setErros((e) => ({ ...e, placa: r.mensagem ?? 'Esta placa já está em outro veículo ativo.' }));
+        oferecerExistente(r.veiculo_existente_id);
+      } else if (r.encontrado && r.dados) {
+        setF((x) => aplicarConsulta(x, r.dados!));
+        setAchado(r.dados.marca_modelo ? `${r.dados.marca_modelo} — confira os dados abaixo.` : 'Dados preenchidos — confira abaixo.');
+        setErros((e) => ({ ...e, placa: '' }));
+      } else {
+        setErros((e) => ({ ...e, placa: r.mensagem ?? 'Nenhum dado encontrado para esta placa. Preencha abaixo.' }));
+      }
+    } catch (x) {
+      const st = x instanceof ErroApi ? x.status : (x as { status?: number } | null)?.status;
+      const msg = st === 503 ? 'Consulta de placa não configurada. Preencha abaixo.'
+        : st === 502 ? 'Consulta indisponível agora. Preencha abaixo.'
+        : st === 422 ? 'Placa inválida: use ABC1234 ou ABC1D23.'
+        : null;
+      if (msg) setErros((e) => ({ ...e, placa: msg }));
+      else if (st === 429) avisar?.('Muitas consultas seguidas. Tente de novo em um minuto.', 'warn');
+      else avisar?.(x instanceof Error ? x.message : 'Não foi possível consultar a placa.', 'erro');
+    } finally { setConsultando(false); }
   };
 
   const salvar = async () => {
@@ -96,9 +146,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
       setErros(campos);
       // Placa repetida: busca o veículo que já tem a placa para oferecer usá-lo (só na Nova OS).
       const idExistente = veiculoExistenteDoErro(x);
-      if (idExistente !== null && aoUsarExistente) {
-        api.veiculos(1, normalizarPlaca(f.placa)).then((r) => setExistente(r.itens.find((v) => v.id === idExistente) ?? null)).catch(() => {});
-      }
+      if (idExistente !== null) oferecerExistente(idExistente);
       if (!Object.keys(campos).length) avisar?.(x instanceof ErroApi && x.status === 403 ? 'Seu usuário não pode cadastrar veículo.'
         : x instanceof ErroApi && x.status === 503 ? 'A oficina ainda não está configurada nesta empresa.'
         : x instanceof Error ? x.message : 'Não foi possível cadastrar.', 'erro');
@@ -131,7 +179,14 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
-          {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10 })}
+          {CONSULTA_PLACA ? (
+            <div className="np-cep">
+              {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10,
+                onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); consultar(); } } })}
+              <button className="oi-btn" disabled={consultando || salvando} onClick={consultar}>{consultando ? 'Buscando…' : 'Buscar'}</button>
+            </div>
+          ) : campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10 })}
+          {achado && <p className="np-ajuda nve-achado" role="status">{achado}</p>}
           {existente && aoUsarExistente && (
             <button className="pd-cartao nos-escolha" onClick={() => aoUsarExistente(existente)}>
               <Placa placa={existente.placa} />

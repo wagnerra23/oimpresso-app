@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ErroApi, veiculoExistenteDoErro } from '../api';
-import { anoDigitado, errosDoForm, normalizarPlaca, placaValida } from './NovoVeiculo';
+import { aplicarConsulta, anoDigitado, errosDoForm, normalizarPlaca, placaValida, type Form } from './NovoVeiculo';
 
 const form = (o: Partial<Record<string, string>> = {}) => ({ placa: 'RBA2H78', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', ...o });
 
@@ -47,5 +47,28 @@ describe('Novo veículo — regras do ERP #8687', () => {
     expect(veiculoExistenteDoErro(Object.assign(new Error('x'), { veiculo_existente_id: 3 }))).toBe(3);
     expect(veiculoExistenteDoErro(new ErroApi(422, 'validacao', 'x', { placa: 'y' }))).toBeNull();
     expect(veiculoExistenteDoErro(null)).toBeNull();
+  });
+});
+
+describe('Novo veículo — consulta de placa', () => {
+  const vazio: Form = { placa: 'ABC1D23', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', km: '', cor: '', chassi: '', renavam: '' };
+  const dados = { placa: 'ABC1D23', ano_fabricacao: 2020, ano_modelo: 2021, cor: 'Branco', chassi: 'CH1', renavam: 'RN1', marca_modelo: 'X' };
+
+  it('preenche os campos vazios com o resultado', () => {
+    const f = aplicarConsulta(vazio, dados);
+    expect([f.anoFab, f.anoMod, f.cor, f.chassi, f.renavam]).toEqual(['2020', '2021', 'Branco', 'CH1', 'RN1']);
+  });
+
+  it('não sobrescreve o que a pessoa já digitou', () => {
+    const f = aplicarConsulta({ ...vazio, cor: 'Azul', anoFab: '2019' }, dados);
+    expect(f.cor).toBe('Azul');
+    expect(f.anoFab).toBe('2019');
+    expect(f.anoMod).toBe('2021');
+  });
+
+  it('dado ausente na consulta deixa o campo como está', () => {
+    const f = aplicarConsulta(vazio, { ...dados, cor: null, ano_modelo: null });
+    expect(f.cor).toBe('');
+    expect(f.anoMod).toBe('');
   });
 });

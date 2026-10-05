@@ -361,6 +361,16 @@ export interface NovoVeiculo {
 }
 /** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
 export const NOVO_VEICULO = true;
+/** Resposta da consulta de placa (FORMATO PROVISÓRIO, pedido ao ERP). Só dados técnicos: sem proprietário (LGPD). */
+export interface ConsultaPlaca {
+  encontrado: boolean; mensagem?: string | null;
+  dados?: { placa: string; ano_fabricacao: number | null; ano_modelo: number | null; cor: string | null;
+    chassi: string | null; renavam: string | null; marca_modelo: string | null } | null;
+  /** A placa já está em outro veículo ativo da empresa: o app oferece usá-lo em vez de cadastrar. */
+  veiculo_existente_id?: number | null;
+}
+/** Liga o "Buscar" da placa no cadastro de veículo. Só a demo, até o ERP confirmar o fornecedor real e publicar a rota. */
+export const CONSULTA_PLACA = DEMO;
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
@@ -766,6 +776,11 @@ export const api = {
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
   /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos, veiculo_existente_id? } ·
    *  403 sem_permissao · 503 sem_configuracao. Contrato tela-08 (ERP #8687). */
+  /** Consulta de placa (pedida ao ERP). 200 encontrado/não encontrado · 422 placa inválida · 429 muitas consultas ·
+   *  502 indisponivel (fornecedor fora) · 503 sem_configuracao (sem fornecedor real). */
+  consultaPlaca: (placa: string) => (CONSULTA_PLACA
+    ? chamar<ConsultaPlaca>('GET', `/api/app/veiculos/consulta-placa/${encodeURIComponent(placa)}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Consulta de placa pelo app ainda não está disponível.'))),
   criarVeiculo: (v: NovoVeiculo) => (NOVO_VEICULO
     ? chamar<VeiculoResumo>('POST', '/api/app/veiculos', v)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),

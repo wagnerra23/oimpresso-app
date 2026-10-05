@@ -805,6 +805,16 @@ export const demo = {
         etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor }));
       return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])] });
     }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/consulta-placa/')) {
+      // Demo: resposta fixa e marcada como demonstração; no app real os dados vêm do fornecedor do ERP.
+      const placa = decodeURIComponent(caminho.split('/').pop() ?? '').toUpperCase();
+      await espera(500);
+      const existe = VEICULOS.find((v) => v.placa === placa || v.placa_secundaria === placa);
+      if (existe) return r({ encontrado: false, mensagem: 'Esta placa já está em outro veículo ativo.', dados: null, veiculo_existente_id: existe.id });
+      if (placa.startsWith('NF')) return r({ encontrado: false, mensagem: 'Nenhum dado encontrado para esta placa.', dados: null, veiculo_existente_id: null });
+      return r({ encontrado: true, mensagem: null, veiculo_existente_id: null,
+        dados: { placa, ano_fabricacao: 2020, ano_modelo: 2021, cor: 'Branco', chassi: '9BWZZZ377VT004251', renavam: '01234567890', marca_modelo: 'Veículo de demonstração' } });
+    }
     if (metodo === 'GET' && caminho === '/api/app/veiculos/opcoes') {
       return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })) });
     }
