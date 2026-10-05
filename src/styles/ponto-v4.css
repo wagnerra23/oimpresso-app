@@ -710,3 +710,9 @@ button.nos-escolha { cursor: pointer; }
 .nos-linha { min-height: 64px; width: 100%; padding: 10px 14px; display: flex; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border-2);
   background: none; font: inherit; color: var(--text); text-align: left; }
 .nos-linha:last-child { border-bottom: 0; }
+
+/* Tela 03 · cancelar OS e recusar orçamento */
+.osd-encerrar { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.osd-encerra { min-height: 44px; padding: 0 12px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--danger); }
+.osd-encerra:disabled { color: var(--text-mute); }
+.osd-perigo { background: var(--danger); border-color: var(--danger); color: var(--bg); }

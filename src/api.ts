@@ -311,9 +311,15 @@ export interface OsDetalhe {
 }
 /** Uma ação de avanço da OS. `critica` = is_critical ou requires_confirmation (o app confirma antes);
  *  `bloqueio` = "Falta: <requisitos>." quando o gate barra, senão null. */
-export interface OsAcao { chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null }
+export interface OsAcao {
+  chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null;
+  /** "encerra" = cancelar OS ou recusar orçamento (ERP #8646); ausente = avanço. */
+  tipo?: 'avanco' | 'encerra';
+}
 /** Liga "avançar etapa" na tela 03. Rota do ERP #8637 em produção desde 2026-10-05. */
 export const ESCRITA_OS = true;
+/** Liga cancelar OS e recusar orçamento na tela 03. Rota do ERP #8646 em produção desde 2026-10-05. */
+export const ENCERRAR_OS = true;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
  *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
@@ -710,8 +716,8 @@ export const api = {
   /** Tela 03 · avançar etapa (FSM do ERP, sem efeito em estoque ou valor). 200 = a OS já na etapa nova ·
    *  422 bloqueado (gate) ou nao_suportada (fora das 7 ações, ou ação com efeito colateral no banco) ·
    *  409 etapa_mudou · 403 sem_permissao · 404 nao_encontrado · throttle 30/min. Contrato tela-03 (ERP #8637). */
-  executarAcaoOs: (id: number, chave: string) => (ESCRITA_OS
-    ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`)
+  executarAcaoOs: (id: number, chave: string, motivo: string | null = null) => (ESCRITA_OS
+    ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`, motivo ? { motivo } : undefined)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Mudar a etapa pelo app ainda não está disponível.'))),
   /** Tela 08 · Veículos. */
   /** Nova OS. 201 = o mesmo JSON do GET /api/app/os/{id} · 422 { erro: "validacao", campos } (vehicle_id, contact_id…) ·
