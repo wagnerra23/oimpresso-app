@@ -2,8 +2,9 @@
 // Uso: node capturar.mjs <www> <saida> [--sem-faixa]
 // Android telefone: 360x640 @3 = 1080x1920 · iPhone 6.9": 440x956 @3 = 1320x2868.
 // GPS simulado (coordenada genérica), nada vai para servidor (build de demonstração, dados fictícios de demo.ts).
-// Ordem na loja (8 = máximo da Play; a App Store aceita até 10 e usa as mesmas 8):
-// 01 início · 02 pedidos · 03 produção · 04 tarefas · 05 produtos · 06 financeiro · 07 ordens de serviço · 08 bater ponto.
+// Ordem na loja: a Play aceita até 8 por telefone e leva 01 a 08; a App Store aceita até 10 e leva as 9.
+// 01 início · 02 venda rápida · 03 pedidos · 04 produção · 05 produtos · 06 financeiro · 07 ordens de serviço ·
+// 08 bater ponto · 09 tarefas (só App Store).
 import { createRequire } from 'node:module'; import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 const { chromium } = createRequire('D:/oimpresso.com/package.json')('playwright');
 const ROOT = process.argv[2], OUT = process.argv[3], SEM_FAIXA = process.argv.includes('--sem-faixa');
@@ -49,9 +50,19 @@ for (const ap of APARELHOS) {
   await p.getByPlaceholder('Usuário ou e-mail').fill('demo'); await p.getByPlaceholder('Senha').fill('demo123');
   await p.locator('button', { hasText: 'Entrar' }).last().click(); await p.waitForTimeout(1500);
   await foto('01-inicio');
-  await aba('Pedidos'); await foto('02-pedidos');
-  await aba('Produção'); await foto('03-producao');
-  await aba('Tarefas'); await foto('04-tarefas');
+  // Venda rápida (tela 11): carrinho com 2 itens do catálogo fictício. Nada é enviado: a foto sai antes de confirmar.
+  await aba('Pedidos');
+  await p.locator('button.pd-novo', { hasText: 'Venda' }).click(); await p.waitForTimeout(1000);
+  for (const i of [0, 1]) {
+    await p.getByRole('button', { name: /Buscar produto|Adicionar mais produtos/ }).last().click(); await p.waitForTimeout(800);
+    const prods = p.locator('button.vr-prod:not([disabled])');
+    if ((await prods.count()) < 2) throw new Error(`${ap.pasta}: esperava ao menos 2 produtos na busca da venda`);
+    await prods.nth(i).click(); await p.waitForTimeout(800);
+  }
+  await foto('02-venda-rapida');
+  await p.locator('button.pd-voltar[aria-label="Voltar para pedidos"]').click(); await p.waitForTimeout(800);
+  await aba('Pedidos'); await foto('03-pedidos');
+  await aba('Produção'); await foto('04-producao');
   await modulo('Produtos'); await foto('05-produtos');
   await modulo('Financeiro'); await foto('06-financeiro');
   await modulo('Oficina'); await foto('07-ordens-de-servico');
@@ -59,6 +70,8 @@ for (const ap of APARELHOS) {
   const atualizar = p.locator('button').filter({ hasText: 'Atualizar local' });
   if (await atualizar.count()) { await atualizar.first().click(); await p.waitForTimeout(1200); }
   await foto('08-bater-ponto');
+  // A Play aceita no máximo 8 por telefone: a 9ª só sai para a App Store.
+  if (ap.pasta.startsWith('iphone')) { await aba('Tarefas'); await foto('09-tarefas'); }
   await ctx.close();
 }
 await b.close(); srv.close(); console.log('ok');
