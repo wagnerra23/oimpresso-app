@@ -113,6 +113,16 @@ const ETAPAS_OS = [['recepcao', 'Recepção'], ['em_diagnostico', 'Diagnóstico'
   ['aguardando_pecas', 'Aguardando peças'], ['em_execucao', 'Em execução'], ['pronto_retirada', 'Pronto p/ retirar']] as const;
 const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
 // Ações de avanço por etapa (como o seeder do ERP): [chave, rótulo, crítica, etapa de destino].
+// Ações que encerram a OS (cancelar e recusar orçamento), como o seeder: só gerente, sempre críticas.
+const ENCERRA_OS: Record<string, Array<[string, string, boolean, string]>> = {
+  recepcao: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+  em_diagnostico: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+  aguardando_aprovacao: [['recusar_orcamento', 'Cliente recusou orçamento', true, 'cancelado']],
+  aguardando_pecas: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+  em_execucao: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+  pronto_retirada: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+};
+const TERMINAIS_OS: Record<string, string> = { entregue: 'Entregue', cancelado: 'Cancelado' };
 const AVANCO_OS: Record<string, Array<[string, string, boolean, string]>> = {
   recepcao: [['iniciar_diagnostico', 'Iniciar diagnóstico', false, 'em_diagnostico']],
   em_diagnostico: [['enviar_orcamento', 'Enviar orçamento pra aprovação', false, 'aguardando_aprovacao']],
@@ -793,7 +803,7 @@ export const demo = {
       const partes = caminho.split('/');
       const o = ORDENS.find((x) => x.id === Number(partes[4]));
       if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
-      const acao = (AVANCO_OS[o.etapa] ?? []).find((a) => a[0] === decodeURIComponent(partes[6]));
+      const acao = [...(AVANCO_OS[o.etapa] ?? []), ...(ENCERRA_OS[o.etapa] ?? [])].find((a) => a[0] === decodeURIComponent(partes[6]));
       if (!acao) throw Object.assign(new Error('A OS mudou de etapa. Atualize a tela.'), { status: 409 });
       const det = DETALHE_OS[o.id];
       if (acao[0] === 'enviar_orcamento' && (!det || det.itens.length === 0) && !o.valor) throw Object.assign(new Error('Falta: Orçamento com ≥ 1 item lançado.'), { status: 422 });
@@ -824,7 +834,7 @@ export const demo = {
       const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
       // OS terminal (entregue, aberta pelo histórico do veículo): indice null e terminal true, como o ERP fechou.
       const etapaOs = pos >= 0 ? { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length }
-        : { chave: o.etapa, rotulo: 'Entregue', indice: null, total_etapas: ETAPAS_OS.length, terminal: true };
+        : { chave: o.etapa, rotulo: TERMINAIS_OS[o.etapa] ?? 'Encerrada', indice: null, total_etapas: ETAPAS_OS.length, terminal: true };
       const d = DETALHE_OS[o.id] ?? { local: null, km: null, observacoes: null, vistoria: null, fotos: 0,
         itens: o.valor ? [{ tipo: 'mao_obra' as const, descricao: 'Serviço', quantidade: 1, valor_unitario: o.valor }] : [] };
       // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
@@ -836,8 +846,9 @@ export const demo = {
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos,
         // Gate de exemplo: sem item lançado não dá para mandar o orçamento (como o StageGateEvaluator do ERP).
-        acoes: (AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true,
-          bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })) });
+        acoes: [...(AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true, tipo: 'avanco' as const,
+          bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })),
+          ...(ENCERRA_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true, bloqueio: null, tipo: 'encerra' as const }))] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');

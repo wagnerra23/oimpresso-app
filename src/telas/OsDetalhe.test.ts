@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acoesVisiveis, erroDaAcao, ETIQUETA_ITEM, textoFotos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
+import { acoesEncerrar, acoesVisiveis, erroDaAcao, motivoParaEnvio, ETIQUETA_ITEM, textoFotos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
 import { ErroApi } from '../api';
 
 describe('tela 03 · Detalhe da OS — textos', () => {
@@ -53,5 +53,22 @@ describe('tela 03 · avançar etapa', () => {
 describe('tela 03 · avançar etapa — ação recusada pelo ERP', () => {
   it('nao_suportada (ação fora da lista ou com efeito colateral) mostra a mensagem do ERP', () => {
     expect(erroDaAcao(new ErroApi(422, 'nao_suportada', 'Esta ação não é feita pelo app.'))).toBe('Esta ação não é feita pelo app.');
+  });
+});
+
+describe('tela 03 · cancelar OS e recusar orçamento', () => {
+  const a = (chave: string, pode: boolean, tipo?: 'avanco' | 'encerra') => ({ chave, rotulo: chave, critica: true, pode, bloqueio: null, tipo });
+  const acoes = [a('concluir_servico', true, 'avanco'), a('cancelar_os', true, 'encerra'), a('recusar_orcamento', false, 'encerra'), a('entregar', true)];
+  it('as que encerram vão para o botão vermelho; as de avanço (com ou sem tipo) ficam no rodapé', () => {
+    expect(acoesVisiveis(acoes, true).map((x) => x.chave)).toEqual(['concluir_servico', 'entregar']);
+    expect(acoesEncerrar(acoes, true).map((x) => x.chave)).toEqual(['cancelar_os']);
+  });
+  it('com a chave desligada nada de encerrar aparece', () => {
+    expect(acoesEncerrar(acoes, false)).toEqual([]);
+  });
+  it('motivo em branco não vai; o resto vai limpo e cortado em 500', () => {
+    expect(motivoParaEnvio('   ')).toBeNull();
+    expect(motivoParaEnvio('  cliente desistiu ')).toBe('cliente desistiu');
+    expect(motivoParaEnvio('x'.repeat(600))).toHaveLength(500);
   });
 });
