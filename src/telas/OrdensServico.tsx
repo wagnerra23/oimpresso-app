@@ -8,6 +8,7 @@ import { api, ErroApi, type ListaOs, type OsResumo } from '../api';
 import { reais } from './Pedidos';
 import { useVoltar } from '../voltar';
 import { OsDetalhe } from './OsDetalhe';
+import { Veiculos } from './Veiculos';
 
 /** Cor da etapa: travada em vermelho, última etapa do pipeline em verde, o resto no acento. */
 export function tintaOs(o: Pick<OsResumo, 'travada' | 'etapa'>): string {
@@ -33,12 +34,23 @@ export function rotuloOs(d: Pick<ListaOs, 'total' | 'travadas'> | null): string 
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
 export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
+  const [aba, setAba] = useState<'os' | 'veiculos'>('os');
   const [aberta, setAberta] = useState<number | null>(null);
   useVoltar(aberta !== null, () => setAberta(null));
-  return aberta !== null ? <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} /> : <Lista voltar={voltar} aoAbrir={setAberta} />;
+  if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} />;
+  // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
+  const abas = (
+    <div className="p4-abas ofi-abas" role="tablist" aria-label="Oficina">
+      <button role="tab" aria-selected={aba === 'os'} className={aba === 'os' ? 'on' : undefined} onClick={() => setAba('os')}>Ordens de serviço</button>
+      <button role="tab" aria-selected={aba === 'veiculos'} className={aba === 'veiculos' ? 'on' : undefined} onClick={() => setAba('veiculos')}>Veículos</button>
+    </div>
+  );
+  return aba === 'veiculos'
+    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} />
+    : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} />;
 }
 
-function Lista({ voltar, aoAbrir }: { voltar?: ReactNode; aoAbrir: (id: number) => void }) {
+function Lista({ voltar, abas, aoAbrir }: { voltar?: ReactNode; abas: ReactNode; aoAbrir: (id: number) => void }) {
   const [etapa, setEtapa] = useState('todas');
   const [dados, setDados] = useState<ListaOs | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -71,6 +83,7 @@ function Lista({ voltar, aoAbrir }: { voltar?: ReactNode; aoAbrir: (id: number) 
             <div className="pd-titulo">Ordens de serviço</div>
           </div>
         </div>
+        {abas}
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">

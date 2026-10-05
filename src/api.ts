@@ -294,6 +294,31 @@ export interface OsDetalhe {
   fotos_laudo: number;
 }
 
+/** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
+ *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
+export interface VeiculoResumo {
+  id: number; placa: string;
+  /** Placa do reboque, quando houver. */
+  placa_secundaria: string | null;
+  /** Tipo do veículo (o ERP não guarda marca/modelo); null quando não informado. */
+  descricao: string | null;
+  /** Ano de fabricação/modelo, ex.: "2019/2020". */
+  ano: string | null;
+  /** Dono do veículo. */
+  cliente: string | null;
+  /** Último km conhecido (cadastro ou OS). */
+  km: number | null;
+  cor: string | null;
+}
+export interface ListaVeiculos { itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean }
+/** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
+ *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
+export interface HistoricoVeiculo {
+  itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>;
+}
+/** Liga o histórico de OS da tela 08. Só a demo, até a rota GET /api/app/veiculos/{id}/os existir no ERP (hoje 404). */
+export const HISTORICO_VEICULO = DEMO;
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
@@ -659,6 +684,11 @@ export const api = {
     chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
   /** Tela 03 · Detalhe da OS. OS de outra empresa ou inexistente → 404 nao_encontrado. */
   osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
+  /** Tela 08 · Veículos. */
+  veiculos: (pagina = 1, q = '') =>
+    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */
+  veiculoOs: (id: number) => chamar<HistoricoVeiculo>('GET', `/api/app/veiculos/${id}/os`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
