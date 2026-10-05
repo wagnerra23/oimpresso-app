@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assinatura, centavos, corpoVenda, errosPorItem, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
+import { assinatura, centavos, corpoVenda, errosPorItem, temPreco, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
 
 // Valores fictícios do protótipo (s11).
 const banner: ProdutoVenda = { id: 1, nome: 'Banner lona 0,80 × 1,20 m', categoria: 'Comunicação visual', preco: 89, estoque: 10 };
@@ -107,5 +107,22 @@ describe('erros do 422 por item', () => {
   });
   it('ignora índice fora do carrinho', () => {
     expect(errosPorItem({ 'itens.9.quantidade': 'x' }, [])).toEqual({});
+  });
+});
+
+describe('preço zero (decisão [W] 2026-10-05)', () => {
+  const semPreco: ProdutoVenda = { id: 9, nome: 'Sem preço', categoria: null, preco: 0, estoque: 10 };
+  it('produto com R$ 0,00 não entra no carrinho e o "+" fica travado', () => {
+    expect(temPreco(semPreco)).toBe(false);
+    expect(mudarQtd([], semPreco, 1)).toEqual([]);
+    expect(podeSomar([], semPreco)).toBe(false);
+  });
+  it('meio centavo arredonda para 0 e também é sem preço; 1 centavo vende', () => {
+    expect(temPreco({ ...semPreco, preco: 0.004 })).toBe(false);
+    expect(temPreco({ ...semPreco, preco: 0.01 })).toBe(true);
+    expect(mudarQtd([], { ...semPreco, preco: 0.01 }, 1)).toHaveLength(1);
+  });
+  it('preço negativo também não entra', () => {
+    expect(mudarQtd([], { ...semPreco, preco: -5 }, 1)).toEqual([]);
   });
 });

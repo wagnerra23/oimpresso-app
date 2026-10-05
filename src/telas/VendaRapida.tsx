@@ -10,7 +10,7 @@ import { api, camposDoErro, type VendaCriada } from '../api';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import {
-  assinatura, corpoVenda, errosPorItem, METODOS, mudarQtd, novaChave, podeSomar, previa, subtotal, unidades,
+  assinatura, corpoVenda, errosPorItem, METODOS, mudarQtd, novaChave, podeSomar, previa, subtotal, temPreco, unidades,
   type ItemCarrinho, type MetodoPagamento, type ProdutoVenda,
 } from '../venda';
 
@@ -217,7 +217,9 @@ function Busca({ itens, aoFechar, aoEscolher }: { itens: ItemCarrinho[]; aoFecha
             <button key={p.id} className="vr-prod" onClick={() => aoEscolher(p)} disabled={!pode}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <b>{p.nome}</b>
-                <small>{[p.categoria, p.estoque === null ? null : p.estoque > 0 ? `${p.estoque} em estoque` : 'sem estoque'].filter(Boolean).join(' · ')}</small>
+                <small>{temPreco(p)
+                  ? [p.categoria, p.estoque === null ? null : p.estoque > 0 ? `${p.estoque} em estoque` : 'sem estoque'].filter(Boolean).join(' · ')
+                  : 'Sem preço · corrija o cadastro na web'}</small>
               </span>
               <span className="vr-prod-v">{reais(p.preco)}</span>
             </button>

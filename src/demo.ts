@@ -281,6 +281,8 @@ const CATALOGO = [
   { id: 4, nome: 'Placa PS 30 × 40 cm', categoria: 'Sinalização', preco: 38, estoque: 0 as number | null },
   { id: 5, nome: 'Lona impressa (m²)', categoria: 'Comunicação visual', preco: 42, estoque: null as number | null },
   { id: 6, nome: 'Caneca personalizada', categoria: 'Brindes', preco: 29.9, estoque: 5 as number | null },
+  // Sem preço: o app não deixa vender (decisão [W] 2026-10-05).
+  { id: 7, nome: 'Chaveiro acrílico', categoria: 'Brindes', preco: 0, estoque: 10 as number | null },
 ];
 const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito', debito: 'Débito', dinheiro: 'Dinheiro' };
 let numeroVenda = 4820;

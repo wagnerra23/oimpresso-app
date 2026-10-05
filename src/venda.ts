@@ -45,9 +45,15 @@ export const previa = (itens: ItemCarrinho[]): number => itens.reduce((a, i) => 
 /** Quantidade total de unidades no carrinho. */
 export const unidades = (itens: ItemCarrinho[]): number => itens.reduce((a, i) => a + i.qtd, 0);
 
-/** Soma `delta` à quantidade do produto; entra no fim se é novo; sai se chega a 0. Não passa do estoque. */
+/** Produto com preço R$ 0,00 (ou negativo) não se vende pelo app: a correção do preço é feita na web.
+ *  Decisão [W] em 2026-10-05. */
+export const temPreco = (produto: ProdutoVenda): boolean => centavos(produto.preco) > 0;
+
+/** Soma `delta` à quantidade do produto; entra no fim se é novo; sai se chega a 0. Não passa do estoque.
+ *  Produto sem preço não entra no carrinho. */
 export function mudarQtd(itens: ItemCarrinho[], produto: ProdutoVenda, delta: number): ItemCarrinho[] {
   const atual = itens.find((i) => i.produto.id === produto.id);
+  if (!atual && !temPreco(produto)) return itens;
   const nova = (atual?.qtd ?? 0) + delta;
   const teto = produto.estoque === null ? Infinity : Math.max(0, Math.floor(produto.estoque));
   const qtd = Math.min(nova, teto);
@@ -56,8 +62,9 @@ export function mudarQtd(itens: ItemCarrinho[], produto: ProdutoVenda, delta: nu
   return itens.map((i) => (i.produto.id === produto.id ? { ...i, qtd } : i));
 }
 
-/** true se o próximo "+" ainda cabe no estoque. */
+/** true se o produto tem preço e o próximo "+" ainda cabe no estoque. */
 export const podeSomar = (itens: ItemCarrinho[], produto: ProdutoVenda): boolean => {
+  if (!temPreco(produto)) return false;
   if (produto.estoque === null) return true;
   const atual = itens.find((i) => i.produto.id === produto.id)?.qtd ?? 0;
   return atual + 1 <= produto.estoque;
