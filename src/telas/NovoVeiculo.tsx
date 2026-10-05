@@ -4,7 +4,7 @@
 // oferece usar esse veículo. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
 // cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito:
 // motor, combustível, chassi do reboque e observações (ficam na web). Com veiculoId vira "Editar veículo": carrega
-// GET /api/app/veiculos/{id} e salva com PUT (ERP #8708, ligadas por EDITAR_VEICULO). Na edição
+// GET /api/app/veiculos/{id} e salva com PUT (ERP #8708, em produção). Na edição
 // não há "Buscar": a consulta trataria a placa do próprio veículo como já ativa. "Buscar" da placa: consulta no fornecedor do
 // ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';

@@ -371,8 +371,8 @@ export const NOVO_VEICULO = true;
  *  veiculos/opcoes e os anos separados. ATENÇÃO: aqui "km" é o do CADASTRO (o que o PUT grava); na lista é o maior
  *  conhecido (cadastro ou OS). O formulário usa o daqui. */
 export interface VeiculoEdicao extends NovoVeiculo { id: number; cliente: string | null; pode_editar?: boolean }
-/** Liga editar veículo. Só a demo, até o ERP #8708 estar em produção. */
-export const EDITAR_VEICULO = DEMO;
+/** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
+export const EDITAR_VEICULO = true;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
 export interface ConsultaPlaca {
   encontrado: boolean; mensagem?: string | null;
