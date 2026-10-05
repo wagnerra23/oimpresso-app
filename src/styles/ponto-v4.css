@@ -721,3 +721,4 @@ button.nos-escolha { cursor: pointer; }
 .nve-previa { flex-shrink: 0; padding-right: 8px; }
 .nve-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .nve-achado { margin-top: -6px; color: var(--text); }
+.vei-editar { min-height: 44px; width: 100%; margin-bottom: 10px; }

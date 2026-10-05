@@ -347,6 +347,8 @@ export interface ListaVeiculos {
   itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean;
   /** Pode cadastrar veículo (oficinaauto.vehicle.create, ERP #8687). Ausente = não mostra "+ Veículo". */
   pode_criar?: boolean;
+  /** Pode editar veículo (oficinaauto.vehicle.update, ERP #8708). Ausente = não mostra "Editar". */
+  pode_editar?: boolean;
 }
 /** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
 export interface OpcoesVeiculo {
@@ -365,6 +367,12 @@ export interface NovoVeiculo {
 }
 /** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
 export const NOVO_VEICULO = true;
+/** Veículo para editar: GET /api/app/veiculos/{id} (ERP #8708). Os campos do formulário, com o tipo como chave de
+ *  veiculos/opcoes e os anos separados. ATENÇÃO: aqui "km" é o do CADASTRO (o que o PUT grava); na lista é o maior
+ *  conhecido (cadastro ou OS). O formulário usa o daqui. */
+export interface VeiculoEdicao extends NovoVeiculo { id: number; cliente: string | null; pode_editar?: boolean }
+/** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
+export const EDITAR_VEICULO = true;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
 export interface ConsultaPlaca {
   encontrado: boolean; mensagem?: string | null;
@@ -776,15 +784,25 @@ export const api = {
   opcoesVeiculo: () => (NOVO_VEICULO
     ? chamar<OpcoesVeiculo>('GET', '/api/app/veiculos/opcoes')
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
-  /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos, veiculo_existente_id? } ·
-   *  403 sem_permissao · 503 sem_configuracao. Contrato tela-08 (ERP #8687). */
   /** Consulta de placa (ERP #8695). Só é chamada quando opcoes.consulta_placa é true.
    *  200 encontrado / não encontrado / placa já ativa (veiculo_existente_id) · 422 validacao · 429 throttle 10/min ·
    *  502 indisponivel · 503 sem_configuracao · 403 sem_permissao. */
   consultaPlaca: (placa: string) => chamar<ConsultaPlaca>('GET', `/api/app/veiculos/consulta-placa/${encodeURIComponent(placa)}`),
+  /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos, veiculo_existente_id? } ·
+   *  403 sem_permissao · 503 sem_configuracao. Contrato tela-08 (ERP #8687). */
   criarVeiculo: (v: NovoVeiculo) => (NOVO_VEICULO
     ? chamar<VeiculoResumo>('POST', '/api/app/veiculos', v)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
+  /** Veículo para editar (ERP #8708). 404 nao_encontrado (outra empresa ou inexistente) · 403 sem vehicle.view. */
+  veiculo: (id: number) => (EDITAR_VEICULO
+    ? chamar<VeiculoEdicao>('GET', `/api/app/veiculos/${id}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Editar veículo pelo app ainda não está disponível.'))),
+  /** Salvar a edição (ERP #8708). Mesmo corpo do cadastro. 200 = o item no formato da lista ·
+   *  422 { erro: "validacao", campos, veiculo_existente_id? } (a placa só é conferida se MUDAR) · 403 · 404 · 503.
+   *  Só atualiza o veículo: sem valor, estoque nem cobrança; km menor que o atual é aceito. */
+  editarVeiculo: (id: number, v: NovoVeiculo) => (EDITAR_VEICULO
+    ? chamar<VeiculoResumo>('PUT', `/api/app/veiculos/${id}`, v)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'Editar veículo pelo app ainda não está disponível.'))),
   veiculos: (pagina = 1, q = '') =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */

@@ -3,9 +3,9 @@
 // Tocar no veículo abre o histórico de OS dele (busca ao expandir); tocar numa OS abre o detalhe (tela 03).
 // O ERP não guarda marca/modelo nem o desenho da placa: o título é o tipo e o desenho sai do formato da placa.
 // Tocar no veículo abre o histórico de OS dele (HISTORICO_VEICULO, rota do ERP #8635).
-// Fora de propósito: "+ Veículo" (escrita, PR próprio).
+// "Editar" (dentro do cartão aberto) abre o formulário do cadastro em modo edição (EDITAR_VEICULO + pode_editar).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -27,9 +27,9 @@ export function Placa({ placa }: { placa: string }) {
   return <span className={'os-placa' + (placaAntiga(placa) ? ' antiga' : '')} aria-label={`Placa ${placa}`}>{placa}</span>;
 }
 
-interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void; aoNovo?: () => void }
+interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void; aoNovo?: () => void; aoEditar?: (id: number) => void }
 
-export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo }: Props) {
+export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [dados, setDados] = useState<ListaVeiculos | null>(null);
@@ -114,6 +114,9 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo }: Props) {
                 })()}
                 {HISTORICO_VEICULO && estaAberto && (
                   <div className="vei-hist">
+                    {EDITAR_VEICULO && aoEditar && dados?.pode_editar && (
+                      <button className="oi-btn vei-editar" onClick={() => aoEditar(v.id)}>Editar veículo</button>
+                    )}
                     <span className="p4-rotulo">Histórico de OS</span>
                     {!h && <p className="p4-legal">Carregando…</p>}
                     {h === 'erro' && <p className="p4-legal">Não foi possível carregar o histórico.</p>}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ErroApi, veiculoExistenteDoErro } from '../api';
-import { aplicarConsulta, anoDigitado, errosDoForm, normalizarPlaca, placaValida, type Form } from './NovoVeiculo';
+import { aplicarConsulta, anoDigitado, errosDoForm, formDoVeiculo, normalizarPlaca, placaValida, type Form } from './NovoVeiculo';
 
 const form = (o: Partial<Record<string, string>> = {}) => ({ placa: 'RBA2H78', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', ...o });
 
@@ -70,5 +70,21 @@ describe('Novo veículo — consulta de placa', () => {
     const f = aplicarConsulta(vazio, { ...dados, cor: null, ano_modelo: null });
     expect(f.cor).toBe('');
     expect(f.anoMod).toBe('');
+  });
+});
+
+describe('Editar veículo — formulário a partir do ERP', () => {
+  const base = { id: 7, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', tipo: 'caminhao_basculante', ano_fabricacao: 2019, ano_modelo: 2020,
+    cor: 'Prata', km: 312040, chassi: null, renavam: '01234567890', contact_id: 101, cliente: 'Transportes Vale Norte' };
+
+  it('carrega todos os campos como texto', () => {
+    expect(formDoVeiculo(base)).toEqual({ placa: 'RBA2H78', tipo: 'caminhao_basculante', reboque: 'RBC3J10', anoFab: '2019', anoMod: '2020',
+      cor: 'Prata', km: '312040', chassi: '', renavam: '01234567890' });
+  });
+
+  it('o que vier nulo do ERP fica vazio e o formulário segue válido', () => {
+    const f = formDoVeiculo({ ...base, placa_secundaria: null, ano_fabricacao: null, ano_modelo: null, cor: null, km: null, renavam: null });
+    expect([f.reboque, f.anoFab, f.anoMod, f.cor, f.km, f.renavam]).toEqual(['', '', '', '', '', '']);
+    expect(errosDoForm(f)).toEqual({});
   });
 });

@@ -166,6 +166,8 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
 // Tipos de veículo da demo (no app real vêm do ERP, TiposVeiculo do núcleo).
 const TIPOS_VEICULO: Array<[string, string]> = [['caminhao', 'Caminhão'], ['caminhao_basculante', 'Caminhão basculante'], ['cavalo', 'Cavalo mecânico'],
   ['utilitario', 'Utilitário'], ['picape', 'Picape'], ['furgao', 'Furgão'], ['carro', 'Carro']];
+// Chassi e RENAVAM da demo (o item da lista não traz; só o GET do veículo para editar).
+const EXTRA_VEICULO: Record<number, { chassi: string | null; renavam: string | null }> = {};
 const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | null; descricao: string | null; ano: string | null;
   cliente: string | null; cliente_id: number | null; km: number | null; cor: string | null }> = [
   { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 48312, cor: 'Branco' },
@@ -818,6 +820,39 @@ export const demo = {
     if (metodo === 'GET' && caminho === '/api/app/veiculos/opcoes') {
       return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })), consulta_placa: true });
     }
+    if ((metodo === 'GET' || metodo === 'PUT') && /^\/api\/app\/veiculos\/[0-9]+$/.test(caminho)) {
+      const v = VEICULOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
+      const extra = EXTRA_VEICULO[v.id] ?? { chassi: null, renavam: null };
+      if (metodo === 'GET') {
+        const [anoF, anoM] = (v.ano ?? '').split('/').map((t) => (t ? Number(t) : null));
+        return r({ id: v.id, placa: v.placa, placa_secundaria: v.placa_secundaria, tipo: TIPOS_VEICULO.find((t) => t[1] === v.descricao)?.[0] ?? '',
+          ano_fabricacao: anoF ?? null, ano_modelo: anoM ?? null, cor: v.cor, km: v.km, chassi: extra.chassi, renavam: extra.renavam,
+          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true });
+      }
+      const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
+        cor: string | null; km: number | null; chassi: string | null; renavam: string | null; contact_id: number | null };
+      const placa = (p.placa ?? '').toUpperCase();
+      const reb = (p.placa_secundaria ?? '').toUpperCase();
+      const outros = VEICULOS.filter((x) => x.id !== v.id);
+      const campos: Record<string, string> = {};
+      // A regra de placa ativa vale na edição, mas só se a placa MUDAR (ERP #8708).
+      const existe = placa && placa !== v.placa ? outros.find((x) => x.placa === placa || x.placa_secundaria === placa) : undefined;
+      if (!placa) campos.placa = 'A placa do veículo é obrigatória.';
+      else if (existe) campos.placa = 'Esta placa já está em outro veículo ativo.';
+      const existeReb = reb && reb !== v.placa_secundaria ? outros.find((x) => x.placa === reb || x.placa_secundaria === reb) : undefined;
+      if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
+      else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
+      if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
+      await espera(500);
+      const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
+      const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
+      Object.assign(v, { placa, placa_secundaria: reb || null, descricao: TIPOS_VEICULO.find((t) => t[0] === p.tipo)?.[1] ?? p.tipo,
+        ano: anoF ? anoF + '/' + anoM : null, cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor });
+      EXTRA_VEICULO[v.id] = { chassi: p.chassi, renavam: p.renavam };
+      return r({ ...v });
+    }
     if (metodo === 'POST' && caminho === '/api/app/veiculos') {
       const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
         cor: string | null; km: number | null; contact_id: number | null };
@@ -845,7 +880,7 @@ export const demo = {
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos')) {
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
       const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
-      return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true });
+      return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true, pode_editar: true });
     }
     if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
       const partes = caminho.split('/');
