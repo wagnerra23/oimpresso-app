@@ -703,7 +703,7 @@ export const demo = {
         // Como o ERP (#8597): na v1 a quantidade é inteira ("3.00" vale, "2.50" não).
         if (qC === null || qC <= 0 || qC % 100 !== 0) { campos[`itens.${k}.quantidade`] = 'Quantidade inválida.'; return; }
         const q = qC / 100;
-        if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque})`; return; }
+        if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque}).`; return; }
         const precoC = Math.round(p.preco * 100);
         if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`; return; }
         totalC += precoC * q; baixas.push({ p, q });

@@ -39,7 +39,7 @@ describe('venda na demo', () => {
     const cartao = achar(await produtos(), 'Cartão');
     const mais = { ...cartao, estoque: null };
     await expect(vender(corpoVenda([{ produto: mais, qtd: (cartao.estoque as number) + 1 }], 'pix'), novaChave()))
-      .rejects.toMatchObject({ status: 422, campos: { 'itens.0.quantidade': `Estoque insuficiente (disponível ${cartao.estoque})` } });
+      .rejects.toMatchObject({ status: 422, campos: { 'itens.0.quantidade': `Estoque insuficiente (disponível ${cartao.estoque}).` } });
     await expect(vender(corpoVenda([{ produto: { ...cartao, preco: 1 }, qtd: 1 }], 'pix'), novaChave()))
       .rejects.toMatchObject({ status: 422, campos: { 'itens.0.preco_unitario': expect.stringMatching(/^O preço mudou para R\$/) } });
     expect(achar(await produtos(), 'Cartão').estoque).toBe(cartao.estoque);
