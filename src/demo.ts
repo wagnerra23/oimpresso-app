@@ -828,7 +828,7 @@ export const demo = {
         const [anoF, anoM] = (v.ano ?? '').split('/').map((t) => (t ? Number(t) : null));
         return r({ id: v.id, placa: v.placa, placa_secundaria: v.placa_secundaria, tipo: TIPOS_VEICULO.find((t) => t[1] === v.descricao)?.[0] ?? '',
           ano_fabricacao: anoF ?? null, ano_modelo: anoM ?? null, cor: v.cor, km: v.km, chassi: extra.chassi, renavam: extra.renavam,
-          contact_id: v.cliente_id, cliente: v.cliente });
+          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true });
       }
       const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
         cor: string | null; km: number | null; chassi: string | null; renavam: string | null; contact_id: number | null };
@@ -836,11 +836,11 @@ export const demo = {
       const reb = (p.placa_secundaria ?? '').toUpperCase();
       const outros = VEICULOS.filter((x) => x.id !== v.id);
       const campos: Record<string, string> = {};
-      // A regra de placa ativa vale na edição também, sem contar o próprio veículo (ERP #8697).
-      const existe = placa ? outros.find((x) => x.placa === placa || x.placa_secundaria === placa) : undefined;
+      // A regra de placa ativa vale na edição, mas só se a placa MUDAR (ERP #8708).
+      const existe = placa && placa !== v.placa ? outros.find((x) => x.placa === placa || x.placa_secundaria === placa) : undefined;
       if (!placa) campos.placa = 'A placa do veículo é obrigatória.';
       else if (existe) campos.placa = 'Esta placa já está em outro veículo ativo.';
-      const existeReb = reb ? outros.find((x) => x.placa === reb || x.placa_secundaria === reb) : undefined;
+      const existeReb = reb && reb !== v.placa_secundaria ? outros.find((x) => x.placa === reb || x.placa_secundaria === reb) : undefined;
       if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
       else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
