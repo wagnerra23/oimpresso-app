@@ -121,7 +121,7 @@ const AVANCO_OS: Record<string, Array<[string, string, boolean, string]>> = {
   em_execucao: [['concluir_servico', 'Concluir serviço', true, 'pronto_retirada']],
   pronto_retirada: [['entregar', 'Entregar ao cliente', false, 'entregue']],
 };
-const ORDENS = [
+const ORDENS: Array<{ id: number; numero: string; placa: string | null; veiculo: string | null; cliente: string; valor: number | null; etapa: string }> = [
   { id: 1046, numero: 'OS-01046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
   { id: 1045, numero: 'OS-01045', placa: 'MLK4109', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
   { id: 1044, numero: 'OS-01044', placa: 'QJT8A21', veiculo: 'Utilitário', cliente: 'Auto Center Rota', valor: 1380, etapa: 'aguardando_aprovacao' },
@@ -154,10 +154,10 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
 
 // Veículos da demo (tela 08). Placas fictícias; o histórico sai das OS da demo pela placa.
 const VEICULOS = [
-  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', km: 48312, cor: 'Branco' },
-  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', km: 312040, cor: 'Prata' },
-  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', km: 161880, cor: null },
-  { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, km: 72415, cor: null },
+  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 48312, cor: 'Branco' },
+  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 312040, cor: 'Prata' },
+  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null },
+  { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, cliente_id: null, km: 72415, cor: null },
 ];
 const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>> = {
   RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460 }],
@@ -801,6 +801,18 @@ export const demo = {
       o.etapa = acao[3];
       return demo.chamar<T>('GET', '/api/app/os/' + o.id);
     }
+    if (metodo === 'POST' && caminho === '/api/app/os') {
+      const p = corpo as { vehicle_id: number; contact_id: number | null; mileage_at_service: number | null; box_label: string | null; notes: string | null };
+      const v = VEICULOS.find((x) => x.id === p.vehicle_id);
+      if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 422, campos: { vehicle_id: 'Veículo não encontrado.' } });
+      if (p.mileage_at_service !== null && p.mileage_at_service < 0) throw Object.assign(new Error('Km inválido.'), { status: 422, campos: { mileage_at_service: 'O km não pode ser negativo.' } });
+      await espera(500);
+      const cliente = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
+      const id = Math.max(...ORDENS.map((o) => o.id)) + 1;
+      ORDENS.push({ id, numero: 'OS-' + String(id).padStart(5, '0'), placa: v.placa, veiculo: v.descricao, cliente: cliente ?? 'Sem cliente', valor: null, etapa: 'recepcao' });
+      DETALHE_OS[id] = { local: p.box_label, km: p.mileage_at_service, observacoes: p.notes, vistoria: null, fotos: 0, itens: [] };
+      return demo.chamar<T>('GET', '/api/app/os/' + id);
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
       const idOs = Number(caminho.split('/')[4]);
       // OS antigas do histórico dos veículos (tela 08) também abrem, já entregues.
@@ -836,7 +848,7 @@ export const demo = {
         id: o.id, numero: o.numero, placa: o.placa, veiculo: o.veiculo, cliente: o.cliente, valor: o.valor, travada: OS_TRAVA.includes(o.etapa),
         etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
       const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ativas.filter((o) => o.etapa === chave).length }));
-      return r({ itens, etapas, total: ativas.length, travadas: ativas.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
+      return r({ itens, etapas, total: ativas.length, travadas: ativas.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false, pode_criar: true });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);
