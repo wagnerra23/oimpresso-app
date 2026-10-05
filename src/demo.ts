@@ -855,9 +855,9 @@ export const demo = {
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos,
         // Gate de exemplo: sem item lançado não dá para mandar o orçamento (como o StageGateEvaluator do ERP).
-        acoes: [...(AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, tipo: 'avanco' as const, destino: { chave: para, rotulo: ETAPAS_OS.find((e) => e[0] === para)?.[1] ?? TERMINAIS_OS[para] ?? para },
+        acoes: [...(AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, tipo: 'avanco' as const, motivo_obrigatorio: false, destino: { chave: para, rotulo: ETAPAS_OS.find((e) => e[0] === para)?.[1] ?? TERMINAIS_OS[para] ?? para },
           bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })),
-          ...(ENCERRA_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, bloqueio: null, tipo: 'encerra' as const, destino: { chave: para, rotulo: TERMINAIS_OS[para] ?? para } }))] });
+          ...(ENCERRA_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, bloqueio: null, tipo: 'encerra' as const, motivo_obrigatorio: chave === 'acionar_garantia', destino: { chave: para, rotulo: TERMINAIS_OS[para] ?? para } }))] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');

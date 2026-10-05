@@ -47,8 +47,8 @@ export const acoesEncerrar = (acoes: OsAcao[] | undefined, ligado = ESCRITA_OS &
 /** Motivo digitado: em branco não vai; o resto vai sem os espaços das pontas, até 500 caracteres. */
 export const motivoParaEnvio = (t: string): string | null => (t.trim() ? t.trim().slice(0, 500) : null);
 
-/** Acionar garantia exige motivo (a garantia é auditada depois); cancelar e recusar, não. */
-export const exigeMotivo = (a: Pick<OsAcao, 'chave'>): boolean => a.chave === 'acionar_garantia';
+/** Motivo obrigatório: como o ERP manda em cada ação; sem o campo, só a garantia exige (é auditada depois). */
+export const exigeMotivo = (a: Pick<OsAcao, 'chave' | 'motivo_obrigatorio'>): boolean => a.motivo_obrigatorio ?? a.chave === 'acionar_garantia';
 
 /** Para onde a ação leva, como o ERP manda; sem o campo, o texto padrão de cada ação que encerra. */
 export function destinoDaAcao(a: Pick<OsAcao, 'chave' | 'destino'>): string {

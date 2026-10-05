@@ -74,7 +74,11 @@ describe('tela 03 · cancelar OS e recusar orçamento', () => {
 });
 
 describe('tela 03 · acionar garantia', () => {
-  it('só a garantia exige motivo', () => {
+  it('motivo obrigatório segue o ERP quando ele manda o campo', () => {
+    expect(exigeMotivo({ chave: 'cancelar_os', motivo_obrigatorio: true })).toBe(true);
+    expect(exigeMotivo({ chave: 'acionar_garantia', motivo_obrigatorio: false })).toBe(false);
+  });
+  it('sem o campo, só a garantia exige motivo', () => {
     expect(exigeMotivo({ chave: 'acionar_garantia' })).toBe(true);
     expect(exigeMotivo({ chave: 'cancelar_os' })).toBe(false);
     expect(exigeMotivo({ chave: 'recusar_orcamento' })).toBe(false);
