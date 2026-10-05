@@ -199,13 +199,13 @@ const FISCAIS = [
   { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },
 ] as const;
 
-// Links de pagamento de demonstração (tela 15), como o protótipo. Clientes fictícios; o link aponta para um domínio
+// Links de pagamento de demonstração (tela 15), como o protótipo, com o valor do pedido/orçamento da demo. Clientes fictícios; o link aponta para um domínio
 // de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
-const PAGAMENTOS = [
-  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 1260, dias: -7, metodo: 'boleto', status: 'vencido', pago: null },
-  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 2315, dias: 3, metodo: 'pix', status: 'pendente', pago: null },
-  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 3420, dias: -5, metodo: 'pix', status: 'pago', pago: -5 },
-  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 640, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null },
+const PAGAMENTOS: Array<{ id: number; descricao: string; valor: number; dias: number; metodo: string; status: string; pago: number | null; ref?: string }> = [
+  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 890, dias: -7, metodo: 'boleto', status: 'vencido', pago: null, ref: 'pedido:107' },
+  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 155, dias: 3, metodo: 'pix', status: 'pendente', pago: null, ref: 'pedido:109' },
+  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 1190.5, dias: -5, metodo: 'pix', status: 'pago', pago: -5, ref: 'pedido:105' },
+  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 1290, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null, ref: 'orcamento:205' },
 ];
 
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
@@ -539,6 +539,51 @@ export const demo = {
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
     }
+    if (metodo === 'GET' && caminho === '/api/app/pagamentos/referencias') {
+      // Pedidos não concluídos e orçamentos enviados/aprovados. `valor` = saldo em aberto (na demo nada foi pago em parte, então é o total).
+      const itens = [
+        ...PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido').map((x) => ({ tipo: 'pedido', id: x.id, rotulo: 'Pedido #' + x.numero, cliente: x.cliente, valor: x.valor })),
+        ...ORCAMENTOS.filter((x) => x.status === 'enviado' || x.status === 'aprovado').map((x) => ({ tipo: 'orcamento', id: x.id, rotulo: 'Orçamento ' + x.numero, cliente: x.cliente, valor: x.valor })),
+      ];
+      return r({ itens });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/pagamentos') {
+      const n = (corpo ?? {}) as { referencia?: { tipo?: string; id?: number }; metodo?: string; vencimento_dias?: number };
+      // Como o ERP: o valor sai do documento; um "valor" no corpo seria ignorado.
+      const ped = n.referencia?.tipo === 'pedido' ? PEDIDOS.find((x) => x.id === n.referencia?.id) : undefined;
+      const orc = n.referencia?.tipo === 'orcamento' ? ORCAMENTOS.find((x) => x.id === n.referencia?.id) : undefined;
+      if (!ped && !orc) throw Object.assign(new Error('Escolha um pedido ou orçamento.'), { status: 422, codigo: 'validacao', campos: { referencia: 'Escolha um pedido ou orçamento.' } });
+      if (![3, 7, 15].includes(Number(n.vencimento_dias))) throw Object.assign(new Error('Prazo inválido.'), { status: 422, codigo: 'validacao', campos: { vencimento_dias: 'Prazo inválido.' } });
+      const ref = `${n.referencia!.tipo}:${n.referencia!.id}`;
+      if (n.metodo === 'cartao') throw Object.assign(new Error('Cartão não pode ser cobrado pelo app.'), { status: 422, codigo: 'validacao', campos: { metodo: 'Cartão não pode ser cobrado pelo app.' } });
+      // Como o ERP (§10.6): bloqueia a 2ª cobrança se já há uma em aberto no prazo ou se já foi paga (o gateway não baixa a venda).
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pendente')) {
+        throw Object.assign(new Error('Já existe uma cobrança em aberto para este documento.'), { status: 409, codigo: 'ja_existe' });
+      }
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pago')) {
+        throw Object.assign(new Error('Este documento já tem cobrança paga: registre o pagamento na venda antes de cobrar de novo.'), { status: 409, codigo: 'ja_existe' });
+      }
+      const id = 1 + Math.max(...PAGAMENTOS.map((x) => x.id));
+      const novo = { id, descricao: ped ? `Pedido #${ped.numero} · ${ped.cliente}` : `Orçamento ${orc!.numero} · ${orc!.cliente}`,
+        valor: ped ? ped.valor : orc!.valor, dias: Number(n.vencimento_dias), metodo: String(n.metodo ?? 'qualquer'), status: 'pendente', pago: null, ref };
+      PAGAMENTOS.unshift(novo);
+      return r({ id, descricao: novo.descricao, valor: novo.valor, vencimento: diaRel(novo.dias), metodo: novo.metodo, status: 'pendente', pago_em: null,
+        link: `https://pagamento.exemplo/c/${id}` });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/pagamentos\/\d+\/(consultar|cancelar)$/.test(caminho)) {
+      const [, , , , idTxt, acao] = caminho.split('/');
+      const p = PAGAMENTOS.find((x) => x.id === Number(idTxt));
+      if (!p) throw Object.assign(new Error('Cobrança não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      if (acao === 'cancelar') {
+        if (p.status === 'pago') throw Object.assign(new Error('Cobrança já paga não pode ser cancelada.'), { status: 409, codigo: 'nao_cancelavel' });
+        p.status = 'cancelado';
+      } else if (p.status === 'pendente' || p.status === 'vencido') {
+        // Demo: o provedor confirma o pagamento hoje, como no protótipo.
+        p.status = 'pago'; p.pago = 0;
+      }
+      return r({ id: p.id, descricao: p.descricao, valor: p.valor, vencimento: diaRel(p.dias), metodo: p.metodo, status: p.status,
+        pago_em: p.pago === null ? null : diaRel(p.pago), link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
       // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
@@ -597,6 +642,15 @@ export const demo = {
           producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
         pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
         meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
