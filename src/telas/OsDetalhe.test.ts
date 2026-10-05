@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acoesEncerrar, acoesVisiveis, erroDaAcao, motivoParaEnvio, ETIQUETA_ITEM, textoFotos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
+import { acoesEncerrar, acoesVisiveis, confirmarEncerrar, destinoDaAcao, erroDaAcao, exigeMotivo, motivoParaEnvio, ETIQUETA_ITEM, textoFotos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
 import { ErroApi } from '../api';
 
 describe('tela 03 · Detalhe da OS — textos', () => {
@@ -70,5 +70,28 @@ describe('tela 03 · cancelar OS e recusar orçamento', () => {
     expect(motivoParaEnvio('   ')).toBeNull();
     expect(motivoParaEnvio('  cliente desistiu ')).toBe('cliente desistiu');
     expect(motivoParaEnvio('x'.repeat(600))).toHaveLength(500);
+  });
+});
+
+describe('tela 03 · acionar garantia', () => {
+  it('motivo obrigatório segue o ERP quando ele manda o campo', () => {
+    expect(exigeMotivo({ chave: 'cancelar_os', motivo_obrigatorio: true })).toBe(true);
+    expect(exigeMotivo({ chave: 'acionar_garantia', motivo_obrigatorio: false })).toBe(false);
+  });
+  it('sem o campo, só a garantia exige motivo', () => {
+    expect(exigeMotivo({ chave: 'acionar_garantia' })).toBe(true);
+    expect(exigeMotivo({ chave: 'cancelar_os' })).toBe(false);
+    expect(exigeMotivo({ chave: 'recusar_orcamento' })).toBe(false);
+  });
+  it('destino vem do ERP; sem o campo, o texto padrão de cada ação', () => {
+    expect(destinoDaAcao({ chave: 'acionar_garantia', destino: { chave: 'garantia_acionada', rotulo: 'Garantia acionada' } })).toBe('Garantia acionada');
+    expect(destinoDaAcao({ chave: 'acionar_garantia' })).toBe('Garantia acionada');
+    expect(destinoDaAcao({ chave: 'cancelar_os' })).toBe('Cancelado');
+    expect(destinoDaAcao({ chave: 'cancelar_os', destino: { chave: 'x', rotulo: 'Outro destino' } })).toBe('Outro destino');
+  });
+  it('botão de confirmar diz o que vai acontecer', () => {
+    expect(confirmarEncerrar('acionar_garantia')).toBe('Acionar garantia');
+    expect(confirmarEncerrar('recusar_orcamento')).toBe('Recusar');
+    expect(confirmarEncerrar('cancelar_os')).toBe('Cancelar OS');
   });
 });
