@@ -688,3 +688,12 @@ button.db-kpi { cursor: pointer; }
 .man-kpi.danger b { color: var(--danger); }
 .man-kpi.ok b { color: var(--ok-text, var(--text)); }
 .man-kpi.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* Tela 03 · avançar etapa (rodapé e confirmação) */
+.osd-acoes { gap: 8px; }
+.osd-acao { display: flex; flex-direction: column; gap: 4px; }
+.osd-bloqueio { font-size: 12px; color: var(--text-dim); text-align: center; }
+.osd-folha { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.osd-conf { margin: 0; font-size: 14px; line-height: 1.5; }
+.osd-conf-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.osd-conf-bts .oi-btn, .osd-conf-bts .p4-cta { min-height: 48px; height: 48px; }
