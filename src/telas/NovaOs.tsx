@@ -72,7 +72,7 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
     } finally { setSalvando(false); }
   };
 
-  if (modo === 'novoVeiculo') return <NovoVeiculo rotulo="Nova OS" avisar={avisar} aoVoltar={() => setModo('veiculo')} aoCriar={escolherVeiculo} />;
+  if (modo === 'novoVeiculo') return <NovoVeiculo rotulo="Nova OS" avisar={avisar} aoVoltar={() => setModo('veiculo')} aoCriar={escolherVeiculo} aoUsarExistente={escolherVeiculo} />;
   if (modo === 'veiculo') return <BuscaVeiculo aoEscolher={escolherVeiculo} aoVoltar={veiculo ? () => setModo('form') : aoVoltar}
     aoNovo={NOVO_VEICULO ? () => setModo('novoVeiculo') : undefined} />;
   if (modo === 'cliente') return <BuscaCliente aoEscolher={(c) => { setCliente(c); setModo('form'); }} aoVoltar={() => setModo('form')} />;

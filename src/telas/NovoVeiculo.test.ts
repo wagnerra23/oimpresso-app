@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ErroApi, veiculoExistenteDoErro } from '../api';
 import { anoDigitado, errosDoForm, normalizarPlaca, placaValida } from './NovoVeiculo';
 
 const form = (o: Partial<Record<string, string>> = {}) => ({ placa: 'RBA2H78', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', ...o });
@@ -34,5 +35,17 @@ describe('Novo veículo — conferência antes de enviar', () => {
   it('placa, reboque, anos, km e RENAVAM inválidos vão para o campo certo', () => {
     const e = errosDoForm(form({ placa: 'XX1', reboque: 'AB1', anoFab: '19', anoMod: 'abcd', km: '48,3', renavam: '123456789012' }));
     expect(Object.keys(e).sort()).toEqual(['ano_fabricacao', 'ano_modelo', 'km', 'placa', 'placa_secundaria', 'renavam']);
+  });
+});
+
+describe('Novo veículo — regras do ERP #8687', () => {
+  it('reboque igual à placa principal é recusado antes de enviar', () => {
+    expect(errosDoForm(form({ reboque: 'rba-2h78' })).placa_secundaria).toBe('A placa do reboque não pode ser igual à principal.');
+  });
+  it('placa repetida: o id do veículo existente sai do erro do ERP (ou da demo)', () => {
+    expect(veiculoExistenteDoErro(new ErroApi(422, 'validacao', 'x', { placa: 'y' }, { veiculo_existente_id: 7 }))).toBe(7);
+    expect(veiculoExistenteDoErro(Object.assign(new Error('x'), { veiculo_existente_id: 3 }))).toBe(3);
+    expect(veiculoExistenteDoErro(new ErroApi(422, 'validacao', 'x', { placa: 'y' }))).toBeNull();
+    expect(veiculoExistenteDoErro(null)).toBeNull();
   });
 });

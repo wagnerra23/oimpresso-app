@@ -1,10 +1,11 @@
 // Cadastrar veículo — escrita da Onda D. Abre pelo "+ Veículo" da aba Veículos (tela 08) e pelo "Cadastrar
-// veículo" da busca da Nova OS (o veículo novo volta já escolhido). Rota PROVISÓRIA POST /api/app/veiculos
-// (pedida ao ERP), ligada por NOVO_VEICULO. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
+// veículo" da busca da Nova OS (o veículo novo volta já escolhido). Rota POST /api/app/veiculos (contrato tela-08,
+// ERP #8687), ligada por NOVO_VEICULO. Placa já em outro veículo ativo: o ERP recusa e manda o id; na Nova OS o app
+// oferece usar esse veículo. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
 // cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito: consulta de placa externa,
 // motor, combustível, chassi do reboque e observações (ficam na web).
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, type OpcoesVeiculo, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type OpcoesVeiculo, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -39,6 +40,7 @@ export function errosDoForm(f: Form): Record<string, string> {
   else if (!placaValida(placa)) e.placa = 'Placa inválida: use ABC1234 ou ABC1D23.';
   const reboque = normalizarPlaca(f.reboque);
   if (reboque && !placaValida(reboque)) e.placa_secundaria = 'Placa do reboque inválida.';
+  else if (reboque && reboque === placa) e.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
   if (!f.tipo) e.tipo = 'Selecione o tipo do veículo.';
   if (anoDigitado(f.anoFab) === 'invalido') e.ano_fabricacao = 'Ano com 4 dígitos, ex.: 2019.';
   if (anoDigitado(f.anoMod) === 'invalido') e.ano_modelo = 'Ano com 4 dígitos, ex.: 2020.';
@@ -52,9 +54,11 @@ interface Props {
   avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
   /** Rótulo do topo ("Oficina" na aba Veículos, "Nova OS" quando vem da busca da OS). */
   rotulo?: string;
+  /** Placa repetida: usar o veículo que já existe (só na Nova OS). */
+  aoUsarExistente?: (v: VeiculoResumo) => void;
 }
 
-export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: Props) {
+export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoUsarExistente }: Props) {
   const [opcoes, setOpcoes] = useState<OpcoesVeiculo | null>(null);
   const [erroOpcoes, setErroOpcoes] = useState<string | null>(null);
   const [f, setF] = useState<Form>(VAZIO);
@@ -62,6 +66,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: P
   const [escolhendoDono, setEscolhendoDono] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
+  const [existente, setExistente] = useState<VeiculoResumo | null>(null);
 
   useEffect(() => {
     api.opcoesVeiculo().then(setOpcoes).catch((e) => setErroOpcoes(e instanceof Error ? e.message : 'Não foi possível carregar os tipos.'));
@@ -75,7 +80,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: P
   const salvar = async () => {
     const e = errosDoForm(f);
     if (Object.values(e).some(Boolean)) { setErros(e); return; }
-    setSalvando(true); setErros({});
+    setSalvando(true); setErros({}); setExistente(null);
     const ano = (t: string) => { const a = anoDigitado(t); return a === 'invalido' ? null : a; };
     const km = kmDigitado(f.km);
     try {
@@ -89,7 +94,14 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: P
     } catch (x) {
       const campos = camposDoErro(x);
       setErros(campos);
-      if (!Object.keys(campos).length) avisar?.(x instanceof ErroApi && x.status === 403 ? 'Seu usuário não pode cadastrar veículo.' : x instanceof Error ? x.message : 'Não foi possível cadastrar.', 'erro');
+      // Placa repetida: busca o veículo que já tem a placa para oferecer usá-lo (só na Nova OS).
+      const idExistente = veiculoExistenteDoErro(x);
+      if (idExistente !== null && aoUsarExistente) {
+        api.veiculos(1, normalizarPlaca(f.placa)).then((r) => setExistente(r.itens.find((v) => v.id === idExistente) ?? null)).catch(() => {});
+      }
+      if (!Object.keys(campos).length) avisar?.(x instanceof ErroApi && x.status === 403 ? 'Seu usuário não pode cadastrar veículo.'
+        : x instanceof ErroApi && x.status === 503 ? 'A oficina ainda não está configurada nesta empresa.'
+        : x instanceof Error ? x.message : 'Não foi possível cadastrar.', 'erro');
     } finally { setSalvando(false); }
   };
 
@@ -119,7 +131,14 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: P
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
-          {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 8 })}
+          {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10 })}
+          {existente && aoUsarExistente && (
+            <button className="pd-cartao nos-escolha" onClick={() => aoUsarExistente(existente)}>
+              <Placa placa={existente.placa} />
+              <span className="os-texto"><b>{existente.descricao ?? 'Veículo'}</b><small>{existente.cliente ?? 'Sem dono cadastrado'}</small></span>
+              <span className="nos-trocar">Usar este</span>
+            </button>
+          )}
           <div className="p4-campo">
             <label htmlFor="nve-tipo">Tipo</label>
             {erroOpcoes ? <span className="np-erro">{erroOpcoes}</span> : (
@@ -148,7 +167,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina' }: P
           </div>
           {campo('km', 'Km atual (opcional)', 'km', { inputMode: 'numeric', placeholder: 'Ex.: 48312' })}
           {campo('cor', 'Cor (opcional)', 'cor', { placeholder: 'Ex.: Branco', maxLength: 30, className: 'nos-texto-livre' })}
-          {campo('reboque', 'Placa do reboque (opcional)', 'placa_secundaria', { autoCapitalize: 'characters', placeholder: 'Só se tiver reboque', maxLength: 8 })}
+          {campo('reboque', 'Placa do reboque (opcional)', 'placa_secundaria', { autoCapitalize: 'characters', placeholder: 'Só se tiver reboque', maxLength: 10 })}
           {campo('chassi', 'Chassi (opcional)', 'chassi', { autoCapitalize: 'characters', maxLength: 30 })}
           {campo('renavam', 'RENAVAM (opcional)', 'renavam', { inputMode: 'numeric', maxLength: 11 })}
           <p className="np-ajuda">Motor, combustível e observações ficam no oimpresso web.</p>

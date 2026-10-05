@@ -815,11 +815,14 @@ export const demo = {
       const campos: Record<string, string> = {};
       if (!placa) campos.placa = 'A placa do veículo é obrigatória.';
       // Decisão [W]: o ERP recusa placa que já esteja em outro veículo ativo (principal ou reboque).
-      else if (VEICULOS.some((v) => v.placa === placa || v.placa_secundaria === placa)) campos.placa = 'Esta placa já está em outro veículo ativo.';
+      const existe = placa ? VEICULOS.find((v) => v.placa === placa || v.placa_secundaria === placa) : undefined;
+      if (existe) campos.placa = 'Esta placa já está em outro veículo ativo.';
       const reb = (p.placa_secundaria ?? '').toUpperCase();
-      if (reb && VEICULOS.some((v) => v.placa === reb || v.placa_secundaria === reb)) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
+      const existeReb = reb ? VEICULOS.find((v) => v.placa === reb || v.placa_secundaria === reb) : undefined;
+      if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
+      else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
-      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos });
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
       await espera(500);
       const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
       const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
