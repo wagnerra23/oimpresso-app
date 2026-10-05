@@ -271,6 +271,28 @@ export interface ListaOs {
   total: number; travadas: number; pagina: number; tem_mais: boolean;
 }
 
+/** Tela 03 · Detalhe da OS. Formato fechado pela sessão ERP da Onda D. Totais calculados pelo ERP, nunca pelo app. */
+export type TipoItemOs = 'peca' | 'mao_obra' | 'servico_terceiro';
+export interface OsDetalhe {
+  id: number; numero: string;
+  /** Box/elevador como texto livre da OS (ex.: "Elevador 1"); null quando vazio. */
+  local: string | null;
+  /** Etapa terminal (entregue, cancelado…): indice null e terminal true. OS fora do fluxo da oficina: null. */
+  etapa: { chave: string; rotulo: string; indice: number | null; total_etapas: number; terminal?: boolean } | null;
+  travada: boolean;
+  /** km = na entrada da OS. */
+  veiculo: { placa: string | null; descricao: string | null; km: number | null } | null;
+  cliente: { id: number; nome: string } | null;
+  /** Observações da OS. O ERP não tem queixa nem diagnóstico separados. */
+  observacoes: string | null;
+  /** Vistoria digital: quantos itens em cada severidade. */
+  vistoria: { ok: number; atencao: number; critico: number } | null;
+  itens: Array<{ tipo: TipoItemOs; descricao: string; quantidade: number; valor_unitario: number; valor: number }>;
+  totais: { pecas: number; mao_de_obra: number; terceiros: number; total: number };
+  /** Fotos do laudo: só a contagem; o app não mostra nem tira foto (ADR 0383). */
+  fotos_laudo: number;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
 export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
@@ -613,6 +635,8 @@ export const api = {
    *  Sem oficinaauto.service_order.view ou sem o módulo no pacote → 403 sem_permissao. */
   os: (etapa: string, pagina = 1) =>
     chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
+  /** Tela 03 · Detalhe da OS. OS de outra empresa ou inexistente → 404 nao_encontrado. */
+  osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
