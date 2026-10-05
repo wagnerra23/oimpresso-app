@@ -282,8 +282,8 @@ export interface NovaOs {
   /** km inteiro ≥ 0 · box até 60 caracteres · observações até 2000. */
   mileage_at_service: number | null; box_label: string | null; notes: string | null;
 }
-/** Liga "+ Nova OS". Só a demo, até o ERP #8639 estar em produção. */
-export const NOVA_OS = DEMO;
+/** Liga "+ Nova OS". Rota do ERP #8639 em produção desde 2026-10-05. */
+export const NOVA_OS = true;
 
 /** Tela 03 · Detalhe da OS. Formato fechado pela sessão ERP da Onda D. Totais calculados pelo ERP, nunca pelo app. */
 export type TipoItemOs = 'peca' | 'mao_obra' | 'servico_terceiro';
