@@ -349,7 +349,11 @@ export interface ListaVeiculos {
   pode_criar?: boolean;
 }
 /** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
-export interface OpcoesVeiculo { tipos: Array<{ chave: string; rotulo: string }> }
+export interface OpcoesVeiculo {
+  tipos: Array<{ chave: string; rotulo: string }>;
+  /** A empresa tem consulta de placa com fornecedor real (ERP #8695). Ausente = false: o app esconde o "Buscar". */
+  consulta_placa?: boolean;
+}
 /** Corpo do POST /api/app/veiculos (contrato tela-08, ERP #8687). O ERP normaliza as placas e grava na empresa do token;
  *  recusa placa que já esteja em outro veículo ativo (decisão [W]). Só insere o veículo: sem OS, valor, estoque nem cobrança. */
 export interface NovoVeiculo {
@@ -361,6 +365,14 @@ export interface NovoVeiculo {
 }
 /** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
 export const NOVO_VEICULO = true;
+/** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
+export interface ConsultaPlaca {
+  encontrado: boolean; mensagem?: string | null;
+  dados?: { placa: string; ano_fabricacao: number | null; ano_modelo: number | null; cor: string | null;
+    chassi: string | null; renavam: string | null; marca_modelo: string | null } | null;
+  /** A placa já está em outro veículo ativo da empresa: o app oferece usá-lo em vez de cadastrar. */
+  veiculo_existente_id?: number | null;
+}
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
@@ -766,6 +778,10 @@ export const api = {
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
   /** Cadastrar veículo. 201 = o item no formato da lista · 422 { erro: "validacao", campos, veiculo_existente_id? } ·
    *  403 sem_permissao · 503 sem_configuracao. Contrato tela-08 (ERP #8687). */
+  /** Consulta de placa (ERP #8695). Só é chamada quando opcoes.consulta_placa é true.
+   *  200 encontrado / não encontrado / placa já ativa (veiculo_existente_id) · 422 validacao · 429 throttle 10/min ·
+   *  502 indisponivel · 503 sem_configuracao · 403 sem_permissao. */
+  consultaPlaca: (placa: string) => chamar<ConsultaPlaca>('GET', `/api/app/veiculos/consulta-placa/${encodeURIComponent(placa)}`),
   criarVeiculo: (v: NovoVeiculo) => (NOVO_VEICULO
     ? chamar<VeiculoResumo>('POST', '/api/app/veiculos', v)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Cadastrar veículo pelo app ainda não está disponível.'))),
