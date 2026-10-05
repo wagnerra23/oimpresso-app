@@ -45,6 +45,14 @@ export const previa = (itens: ItemCarrinho[]): number => itens.reduce((a, i) => 
 /** Quantidade total de unidades no carrinho. */
 export const unidades = (itens: ItemCarrinho[]): number => itens.reduce((a, i) => a + i.qtd, 0);
 
+/** true quando o preço, em centavos, é maior que zero. */
+export const temPreco = (produto: ProdutoVenda): boolean => centavos(produto.preco) > 0;
+
+/** Pode entrar no carrinho? Com o ajuste da empresa "bloqueia_preco_zero" ligado, produto com preço R$ 0,00 (ou
+ *  negativo, ou que arredonda a 0 centavo) não entra: a correção é feita na web. Desligado (o padrão, decisão [W]
+ *  em 2026-10-05, porque há quem venda brinde a preço zero), entra normalmente. */
+export const vendavel = (produto: ProdutoVenda, bloqueiaPrecoZero: boolean): boolean => !bloqueiaPrecoZero || temPreco(produto);
+
 /** Soma `delta` à quantidade do produto; entra no fim se é novo; sai se chega a 0. Não passa do estoque. */
 export function mudarQtd(itens: ItemCarrinho[], produto: ProdutoVenda, delta: number): ItemCarrinho[] {
   const atual = itens.find((i) => i.produto.id === produto.id);

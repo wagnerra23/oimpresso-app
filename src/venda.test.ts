@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assinatura, centavos, corpoVenda, errosPorItem, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
+import { assinatura, centavos, corpoVenda, errosPorItem, temPreco, vendavel, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
 
 // Valores fictícios do protótipo (s11).
 const banner: ProdutoVenda = { id: 1, nome: 'Banner lona 0,80 × 1,20 m', categoria: 'Comunicação visual', preco: 89, estoque: 10 };
@@ -107,5 +107,26 @@ describe('erros do 422 por item', () => {
   });
   it('ignora índice fora do carrinho', () => {
     expect(errosPorItem({ 'itens.9.quantidade': 'x' }, [])).toEqual({});
+  });
+});
+
+describe('preço zero segue o ajuste da empresa (decisão [W] 2026-10-05, padrão desligado)', () => {
+  const semPreco: ProdutoVenda = { id: 9, nome: 'Brinde', categoria: null, preco: 0, estoque: 10 };
+  it('ajuste desligado: produto de R$ 0,00 vende (brinde) e soma zero ao total', () => {
+    expect(vendavel(semPreco, false)).toBe(true);
+    const c = mudarQtd(mudarQtd([], semPreco, 2), banner, 1);
+    expect(c).toHaveLength(2);
+    expect(texto2(previa(c))).toBe('89.00');
+    expect(corpoVenda(c, 'pix').itens[0]).toEqual({ variacao_id: 9, quantidade: '2.00', preco_unitario: '0.00' });
+  });
+  it('ajuste ligado: R$ 0,00, valor que arredonda a 0 e negativo não são vendáveis; 1 centavo é', () => {
+    expect(vendavel(semPreco, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: 0.004 }, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: -5 }, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: 0.01 }, true)).toBe(true);
+  });
+  it('temPreco mede em centavos', () => {
+    expect(temPreco(semPreco)).toBe(false);
+    expect(temPreco({ ...semPreco, preco: 0.01 })).toBe(true);
   });
 });

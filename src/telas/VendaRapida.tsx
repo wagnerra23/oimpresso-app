@@ -10,7 +10,7 @@ import { api, camposDoErro, type VendaCriada } from '../api';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import {
-  assinatura, corpoVenda, errosPorItem, METODOS, mudarQtd, novaChave, podeSomar, previa, subtotal, unidades,
+  assinatura, corpoVenda, errosPorItem, METODOS, mudarQtd, novaChave, podeSomar, previa, subtotal, unidades, vendavel,
   type ItemCarrinho, type MetodoPagamento, type ProdutoVenda,
 } from '../venda';
 
@@ -189,13 +189,14 @@ function Folha({ titulo, aoFechar, travada = false, children }: { titulo: string
 function Busca({ itens, aoFechar, aoEscolher }: { itens: ItemCarrinho[]; aoFechar: () => void; aoEscolher: (p: ProdutoVenda) => void }) {
   const [q, setQ] = useState('');
   const [lista, setLista] = useState<ProdutoVenda[] | null>(null);
+  const [bloqueiaZero, setBloqueiaZero] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
     let vivo = true;
     setErro(null);
     const t = window.setTimeout(() => {
       api.produtosVenda(q.trim())
-        .then((r) => { if (vivo) setLista(r.itens); })
+        .then((r) => { if (vivo) { setLista(r.itens); setBloqueiaZero(r.bloqueia_preco_zero === true); } })
         .catch((e) => { if (vivo) { setLista([]); setErro(statusDe(e) === 403 || codigoDe(e) === 'sem_permissao' ? 'Seu usuário não pode vender.' : e instanceof Error ? e.message : 'Não foi possível buscar.'); } });
     }, q ? 300 : 0);
     return () => { vivo = false; window.clearTimeout(t); };
@@ -212,12 +213,15 @@ function Busca({ itens, aoFechar, aoEscolher }: { itens: ItemCarrinho[]; aoFecha
         {erro && <p className="np-erro">{erro}</p>}
         {lista && !erro && !lista.length && <p className="p4-legal">Nenhum produto encontrado.</p>}
         {lista?.map((p) => {
-          const pode = podeSomar(itens, p);
+          const liberado = vendavel(p, bloqueiaZero);
+          const pode = liberado && podeSomar(itens, p);
           return (
             <button key={p.id} className="vr-prod" onClick={() => aoEscolher(p)} disabled={!pode}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <b>{p.nome}</b>
-                <small>{[p.categoria, p.estoque === null ? null : p.estoque > 0 ? `${p.estoque} em estoque` : 'sem estoque'].filter(Boolean).join(' · ')}</small>
+                <small>{liberado
+                  ? [p.categoria, p.estoque === null ? null : p.estoque > 0 ? `${p.estoque} em estoque` : 'sem estoque'].filter(Boolean).join(' · ')
+                  : 'Sem preço · corrija o cadastro na web'}</small>
               </span>
               <span className="vr-prod-v">{reais(p.preco)}</span>
             </button>

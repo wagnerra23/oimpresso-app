@@ -281,9 +281,13 @@ const CATALOGO = [
   { id: 4, nome: 'Placa PS 30 × 40 cm', categoria: 'Sinalização', preco: 38, estoque: 0 as number | null },
   { id: 5, nome: 'Lona impressa (m²)', categoria: 'Comunicação visual', preco: 42, estoque: null as number | null },
   { id: 6, nome: 'Caneca personalizada', categoria: 'Brindes', preco: 29.9, estoque: 5 as number | null },
+  // Sem preço: o app não deixa vender (decisão [W] 2026-10-05).
+  { id: 7, nome: 'Chaveiro acrílico', categoria: 'Brindes', preco: 0, estoque: 10 as number | null },
 ];
 const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito', debito: 'Débito', dinheiro: 'Dinheiro' };
 let numeroVenda = 4820;
+/** Ajuste "bloqueia_preco_zero" da empresa na demo. Padrão desligado, como no ERP (decisão [W] 2026-10-05). */
+let bloqueiaPrecoZeroDemo = false;
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -303,6 +307,8 @@ export const demo = {
     semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
+  /** Só para teste: liga/desliga o ajuste de preço zero da empresa da demo. */
+  definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
     const r = (v: unknown) => v as T;
@@ -747,7 +753,7 @@ export const demo = {
     if (metodo === 'GET' && caminho.startsWith('/api/app/venda/produtos')) {
       const q = semAcento(decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').trim());
       const itens = CATALOGO.filter((p) => !q || semAcento(p.nome).includes(q) || semAcento(p.categoria).includes(q)).slice(0, 20);
-      return r({ itens: itens.map((p) => ({ ...p })) });
+      return r({ itens: itens.map((p) => ({ ...p })), bloqueia_preco_zero: bloqueiaPrecoZeroDemo });
     }
     if (metodo === 'POST' && caminho === '/api/app/vendas') {
       // Como o ERP (sessão ERP da tela 11): sem chave → 422; mesma chave e mesmo corpo → a mesma venda; corpo diferente → 422.
@@ -773,6 +779,7 @@ export const demo = {
         const q = qC / 100;
         if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque}).`; return; }
         const precoC = Math.round(p.preco * 100);
+        if (bloqueiaPrecoZeroDemo && precoC <= 0) { campos[`itens.${k}.preco_unitario`] = 'Produto sem preço. Corrija o cadastro na web.'; return; }
         if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`; return; }
         totalC += precoC * q; baixas.push({ p, q });
       });

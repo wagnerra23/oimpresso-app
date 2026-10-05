@@ -446,7 +446,12 @@ export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pa
 //    rascunho. Mexe em VALOR e ESTOQUE (regra mestre Tier 0). A venda nasce pelo TransactionUtil como venda direta
 //    (status final, fora da FSM), no 1º local ativo do usuário, e baixa o estoque na criação. ──
 /** GET /api/app/venda/produtos?q=: até 20 itens; `id` é a variação; `estoque` null = o produto não controla estoque. */
-export interface ListaProdutosVenda { itens: ProdutoVenda[] }
+export interface ListaProdutosVenda {
+  itens: ProdutoVenda[];
+  /** Ajuste da empresa (configurações de venda na web). true = produto com preço R$ 0,00 não se vende pelo app.
+   *  Padrão false (decisão [W] 2026-10-05). Ausente (ERP antigo) = false. */
+  bloqueia_preco_zero?: boolean;
+}
 /** 201 do POST /api/app/vendas. Repetir a mesma Idempotency-Key com o mesmo corpo devolve 200 com a MESMA venda. */
 export interface VendaCriada {
   id: number;
