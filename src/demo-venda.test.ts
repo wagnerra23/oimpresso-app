@@ -61,3 +61,24 @@ describe('regras do ERP #8597 na demo', () => {
       .rejects.toMatchObject({ status: 422, campos: { metodo: expect.any(String) } });
   });
 });
+
+describe('ajuste de preço zero na demo (igual ao ERP)', () => {
+  it('padrão desligado: a busca manda false e o chaveiro de R$ 0,00 vende', async () => {
+    demo.definirBloqueioPrecoZero(false);
+    const r = await demo.chamar<ListaProdutosVenda>('GET', '/api/app/venda/produtos?q=chaveiro');
+    expect(r.bloqueia_preco_zero).toBe(false);
+    const v = await vender(corpoVenda([{ produto: r.itens[0], qtd: 1 }], 'dinheiro'), novaChave());
+    expect(v.total).toBe(0);
+  });
+  it('ligado: a busca manda true e a venda com o chaveiro volta 422 no item, sem gravar', async () => {
+    demo.definirBloqueioPrecoZero(true);
+    try {
+      const r = await demo.chamar<ListaProdutosVenda>('GET', '/api/app/venda/produtos?q=chaveiro');
+      expect(r.bloqueia_preco_zero).toBe(true);
+      const antes = r.itens[0].estoque;
+      await expect(vender(corpoVenda([{ produto: r.itens[0], qtd: 1 }], 'dinheiro'), novaChave()))
+        .rejects.toMatchObject({ status: 422, campos: { 'itens.0.preco_unitario': 'Produto sem preço. Corrija o cadastro na web.' } });
+      expect((await demo.chamar<ListaProdutosVenda>('GET', '/api/app/venda/produtos?q=chaveiro')).itens[0].estoque).toBe(antes);
+    } finally { demo.definirBloqueioPrecoZero(false); }
+  });
+});

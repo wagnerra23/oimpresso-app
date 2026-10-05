@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assinatura, centavos, corpoVenda, errosPorItem, temPreco, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
+import { assinatura, centavos, corpoVenda, errosPorItem, temPreco, vendavel, mudarQtd, novaChave, podeSomar, previa, texto2, unidades, type ProdutoVenda } from './venda';
 
 // Valores fictícios do protótipo (s11).
 const banner: ProdutoVenda = { id: 1, nome: 'Banner lona 0,80 × 1,20 m', categoria: 'Comunicação visual', preco: 89, estoque: 10 };
@@ -110,19 +110,23 @@ describe('erros do 422 por item', () => {
   });
 });
 
-describe('preço zero (decisão [W] 2026-10-05)', () => {
-  const semPreco: ProdutoVenda = { id: 9, nome: 'Sem preço', categoria: null, preco: 0, estoque: 10 };
-  it('produto com R$ 0,00 não entra no carrinho e o "+" fica travado', () => {
+describe('preço zero segue o ajuste da empresa (decisão [W] 2026-10-05, padrão desligado)', () => {
+  const semPreco: ProdutoVenda = { id: 9, nome: 'Brinde', categoria: null, preco: 0, estoque: 10 };
+  it('ajuste desligado: produto de R$ 0,00 vende (brinde) e soma zero ao total', () => {
+    expect(vendavel(semPreco, false)).toBe(true);
+    const c = mudarQtd(mudarQtd([], semPreco, 2), banner, 1);
+    expect(c).toHaveLength(2);
+    expect(texto2(previa(c))).toBe('89.00');
+    expect(corpoVenda(c, 'pix').itens[0]).toEqual({ variacao_id: 9, quantidade: '2.00', preco_unitario: '0.00' });
+  });
+  it('ajuste ligado: R$ 0,00, valor que arredonda a 0 e negativo não são vendáveis; 1 centavo é', () => {
+    expect(vendavel(semPreco, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: 0.004 }, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: -5 }, true)).toBe(false);
+    expect(vendavel({ ...semPreco, preco: 0.01 }, true)).toBe(true);
+  });
+  it('temPreco mede em centavos', () => {
     expect(temPreco(semPreco)).toBe(false);
-    expect(mudarQtd([], semPreco, 1)).toEqual([]);
-    expect(podeSomar([], semPreco)).toBe(false);
-  });
-  it('meio centavo arredonda para 0 e também é sem preço; 1 centavo vende', () => {
-    expect(temPreco({ ...semPreco, preco: 0.004 })).toBe(false);
     expect(temPreco({ ...semPreco, preco: 0.01 })).toBe(true);
-    expect(mudarQtd([], { ...semPreco, preco: 0.01 }, 1)).toHaveLength(1);
-  });
-  it('preço negativo também não entra', () => {
-    expect(mudarQtd([], { ...semPreco, preco: -5 }, 1)).toEqual([]);
   });
 });
