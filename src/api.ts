@@ -244,9 +244,36 @@ export interface NovoProduto {
 /** Liga a tela 20. Só a demo, até o #8582 estar em produção. */
 export const ESCRITA_PRODUTO = DEMO;
 
+// ── Ordens de serviço (tela 07, Onda D). Formato fechado pela sessão ERP da Onda D: service_orders do
+//    OficinaAuto, pipeline FSM oficina_mecanica_os. Lista = OS ativas (etapas terminais não entram). ──
+export interface EtapaOs {
+  chave: string; rotulo: string;
+  /** Posição da etapa entre as não-terminais do pipeline (1 = primeira) e quantas são: desenha a barra de progresso. */
+  indice: number; total_etapas: number;
+}
+export interface OsResumo {
+  /** numero vem pronto do ERP, ex.: "OS-00042". */
+  id: number; numero: string;
+  placa: string | null;
+  /** Tipo do veículo (o ERP não guarda marca/modelo); null quando não informado. */
+  veiculo: string | null;
+  cliente: string;
+  /** Soma dos itens (peças + mão de obra), como o card da web; null quando a OS não tem item. */
+  valor: number | null;
+  etapa: EtapaOs;
+  /** Aguardando aprovação ou aguardando peças. */
+  travada: boolean;
+}
+export interface ListaOs {
+  itens: OsResumo[];
+  /** As etapas não-terminais do pipeline, sempre todas, na ordem do ERP, com a contagem (inclusive 0). */
+  etapas: Array<{ chave: string; rotulo: string; total: number }>;
+  total: number; travadas: number; pagina: number; tem_mais: boolean;
+}
+
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -582,6 +609,10 @@ export const api = {
   /** Tela 20 · Novo produto. 201 { id, codigo } · 422 { erro: "validacao", campos } (chaves aninhadas, ex. "fiscal.ncm";
    *  unidade ou categoria de outra empresa voltam em unidade_id / categoria_id) · 403 sem_permissao (product.create). */
   criarProduto: (p: NovoProduto) => escritaProduto<{ id: number; codigo: string }>('POST', '/api/app/produtos', p),
+  /** Tela 07 · Ordens de serviço. `etapa` = chave ou "todas"; 20 por página, etapa mais avançada primeiro.
+   *  Sem oficinaauto.service_order.view ou sem o módulo no pacote → 403 sem_permissao. */
+  os: (etapa: string, pagina = 1) =>
+    chamar<ListaOs>('GET', `/api/app/os?etapa=${encodeURIComponent(etapa)}&pagina=${pagina}`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
   /** Marca uma notificação como lida. Contrato §6.1 (ERP #8569): idempotente; id não-uuid, de outro usuário
    *  ou inexistente → 404 (às vezes o 404 padrão do Laravel, sem JSON — tratar pelo status). */
