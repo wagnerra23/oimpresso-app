@@ -1,6 +1,6 @@
 // Movimentações — tela 29 do v4, SÓ LEITURA: saldo e histórico de uma linha do estoque (variação × loja,
-// aberta pela tela 05). Contrato §9.3 (ERP #8581). Até o #8581 estar em produção a tela só existe na demo
-// (DETALHE_ESTOQUE). O saldo de cada linha vem do ERP; o app não soma nada.
+// aberta pela tela 05). Contrato §9.3 (ERP #8581), ligada no app de loja.
+// O saldo de cada linha vem do ERP; o app não soma nada.
 // Fora de propósito por enquanto: o bloco "Registrar movimento" do protótipo. No ERP não há movimento
 // genérico: entrada é compra (com fornecedor e custo); saída e perda são ajuste de estoque, com valor e
 // custeio FIFO; e o ajuste só diminui. Quais tipos o app pode fazer, e com qual valor, é decisão do Wagner

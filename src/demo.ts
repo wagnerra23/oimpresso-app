@@ -8,11 +8,34 @@ interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; 
 let logado = false;
 // Perfil da demo: usuário com "ponto" no nome (ex.: revisor.ponto) entra como colaborador (D6).
 let perfilDemo: 'erp' | 'colaborador' = 'erp';
+// Usuário com "vendas" no nome entra sem acesso ao Financeiro (relatórios sem indicadores nem DRE, §10.3).
+let semFinanceiro = false;
+// Usuário com "gestor" no nome vê o dashboard sem acesso a vendas: pedidos e produção vêm null (§10.4).
+let semVendas = false;
 let nsr = 348821;
 const marcacoes: MarcacaoDemo[] = [
   { id: 'd1', nsr: 348821, tipo: 'ENTRADA', origem: 'MOBILE', hora: '07:02', hash_trunc: '9f2c41ab07d3e5c1', revisar: false },
 ];
 const intercorrencias: Array<Record<string, unknown>> = [];
+// Tela 30 · escolha da barra guardada "no ERP" da demo (null = sem escolha → padrão do ERP).
+let barraDemo: string[] | null = null;
+const BARRA_PADRAO_DEMO = ['tarefas', 'pedidos', 'producao'];
+// Tela 39 · Marcações fora do geofence (nomes e números do protótipo). `min` = minutos atrás.
+const VALIDACAO = [
+  { id: 'd39a1000-0000-4000-8000-000000000001', colaborador_nome: 'Marcos Teixeira', tipo: 'ENTRADA', local_texto: 'A 84,2 km do local de trabalho', min: 95, nsr: 348821, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '295f5666', estado: 'pendente' },
+  { id: 'd39a2000-0000-4000-8000-000000000002', colaborador_nome: 'Marcos Teixeira', tipo: 'SAIDA', local_texto: 'A 84,2 km do local de trabalho', min: 960, nsr: 348809, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '27d9d853', estado: 'pendente' },
+  { id: 'd39a3000-0000-4000-8000-000000000003', colaborador_nome: 'Joana Lima', tipo: 'ENTRADA', local_texto: 'A 3,7 km do local de trabalho', min: 1500, nsr: 348715, gps_precisao_m: null, dispositivo: 'iOS 19', hash_curto: 'd1dbb32b', estado: 'pendente' },
+  { id: 'd39a4000-0000-4000-8000-000000000004', colaborador_nome: 'Felipe Andrade', tipo: 'SAIDA', local_texto: null, min: 2800, nsr: 348690, gps_precisao_m: null, dispositivo: 'Android', hash_curto: '32619e21', estado: 'validada' },
+];
+// Tela 25 · respostas simuladas da Jana (as do protótipo). Sem Date no topo do módulo.
+const conversaDemo: Array<{ de: 'eu' | 'jana'; texto: string; criada_em: string }> = [];
+const respostaJana = (t: string) => {
+  const x = t.toLowerCase();
+  if (x.includes('venda') || x.includes('pedido')) return 'Para acompanhar vendas, abra Pedidos: lá você vê o status de cada um e o que está atrasado.';
+  if (x.includes('produç') || x.includes('producao')) return 'Em Produção você vê a fila por etapa: aprovado, em produção, em espera e pronto pra faturar.';
+  if (x.includes('financ')) return 'O resumo do caixa, a receber e a pagar aparece no Início. O detalhe completo está no oimpresso no computador.';
+  return 'Posso ajudar com pedidos, produção, estoque e ponto. Toque numa sugestão ou escreva sua dúvida.';
+};
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -81,6 +104,55 @@ const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string
     { id: 9004, tipo: 'sell', rotulo: 'Venda', referencia: 'Pedido 2301 · Escola Aprender', quando: quandoRel(-7, 9, 30), qtd: -4, saldo: 2.8 },
   ],
   306: [{ id: 9101, tipo: 'opening_stock', rotulo: 'Estoque inicial', referencia: null, quando: quandoRel(-20, 8, 0), qtd: 9, saldo: 9 }],
+};
+
+// Ordens de serviço da demo (tela 07). Pipeline como o ERP fechou (FSM oficina_mecanica_os, 6 etapas
+// não-terminais; terminais não entram na lista). O veículo do ERP não tem marca/modelo: vem o tipo.
+// Placas e clientes fictícios.
+const ETAPAS_OS = [['recepcao', 'Recepção'], ['em_diagnostico', 'Diagnóstico'], ['aguardando_aprovacao', 'Aguardando aprovação'],
+  ['aguardando_pecas', 'Aguardando peças'], ['em_execucao', 'Em execução'], ['pronto_retirada', 'Pronto p/ retirar']] as const;
+const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
+const ORDENS = [
+  { id: 1046, numero: 'OS-01046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
+  { id: 1045, numero: 'OS-01045', placa: 'MLK4109', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
+  { id: 1044, numero: 'OS-01044', placa: 'QJT8A21', veiculo: 'Utilitário', cliente: 'Auto Center Rota', valor: 1380, etapa: 'aguardando_aprovacao' },
+  { id: 1042, numero: 'OS-01042', placa: 'RLV2E48', veiculo: 'Picape', cliente: 'Transportes Vale Norte', valor: 750, etapa: 'em_execucao' },
+  { id: 1039, numero: 'OS-01039', placa: 'RBA2H78', veiculo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
+  { id: 1036, numero: 'OS-01036', placa: 'QHX5B33', veiculo: null, cliente: 'Studio Forma', valor: 980, etapa: 'pronto_retirada' },
+];
+
+
+// Detalhe das OS da demo (tela 03, formato fechado). Valores somam o valor da lista (07).
+type ItemOsDemo = { tipo: 'peca' | 'mao_obra' | 'servico_terceiro'; descricao: string; quantidade: number; valor_unitario: number };
+const DETALHE_OS: Record<number, { local: string | null; km: number | null; observacoes: string | null; vistoria: { ok: number; atencao: number; critico: number } | null;
+  fotos: number; itens: ItemOsDemo[] }> = {
+  1042: { local: 'Elevador 1', km: 48312, fotos: 3, vistoria: { ok: 14, atencao: 2, critico: 1 },
+    observacoes: 'Barulho na suspensão dianteira em lombada; volante puxando para a direita.',
+    itens: [
+      { tipo: 'mao_obra', descricao: 'Troca de bieleta dianteira', quantidade: 1, valor_unitario: 180 },
+      { tipo: 'mao_obra', descricao: 'Alinhamento e balanceamento', quantidade: 1, valor_unitario: 150 },
+      { tipo: 'peca', descricao: 'Bieleta dianteira direita', quantidade: 1, valor_unitario: 138 },
+      { tipo: 'peca', descricao: 'Kit batente + coifa', quantidade: 2, valor_unitario: 141 },
+    ] },
+  1039: { local: 'Box 3', km: 312040, fotos: 0, vistoria: null, observacoes: 'Aguardando bomba injetora do fornecedor.',
+    itens: [
+      { tipo: 'peca', descricao: 'Bomba injetora', quantidade: 1, valor_unitario: 5800 },
+      { tipo: 'mao_obra', descricao: 'Troca da bomba injetora', quantidade: 1, valor_unitario: 420 },
+      { tipo: 'servico_terceiro', descricao: 'Teste em bancada', quantidade: 1, valor_unitario: 200 },
+    ] },
+  1045: { local: null, km: 161880, fotos: 0, vistoria: { ok: 0, atencao: 0, critico: 0 }, observacoes: 'Motor falhando na partida a frio.', itens: [] },
+};
+
+// Veículos da demo (tela 08). Placas fictícias; o histórico sai das OS da demo pela placa.
+const VEICULOS = [
+  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', km: 48312, cor: 'Branco' },
+  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', km: 312040, cor: 'Prata' },
+  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', km: 161880, cor: null },
+  { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, km: 72415, cor: null },
+];
+const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>> = {
+  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460 }],
+  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180 }],
 };
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
@@ -155,11 +227,21 @@ const LANCAMENTOS = [
 const FISCAIS = [
   { id: 1287, tipo: 'NFe', numero: '1287', referencia: 'Pedido #0038 · Papelaria Sol', valor: 3420, status: 'autorizado',
     chave: '0000 0000 0000 0000 0000 5500 1000 0012 8710 0000 0000', erro: null, dias: -5 },
-  { id: 342, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
+  // Mesmo id da NF-e acima de propósito: no ERP os ids vêm de tabelas diferentes (§10.2).
+  { id: 1287, tipo: 'NFSe', numero: '342', referencia: 'Pedido #0041 · Clínica Vita', valor: 980, status: 'processando', chave: null, erro: null, dias: -1 },
   { id: 9001, tipo: 'NFCe', numero: null, referencia: 'Venda balcão #V-0010', valor: 186, status: 'rejeitado', chave: null,
     erro: 'Rejeição 539: duplicidade de NF-e com diferença na chave de acesso.', dias: -1 },
   { id: 9002, tipo: 'NFe', numero: null, referencia: 'Pedido #0046 · Restaurante 88', valor: 2315, status: 'rascunho', chave: null, erro: null, dias: 0 },
 ] as const;
+
+// Links de pagamento de demonstração (tela 15), como o protótipo, com o valor do pedido/orçamento da demo. Clientes fictícios; o link aponta para um domínio
+// de exemplo (nunca o do provedor). `dias` vira data dentro do handler.
+const PAGAMENTOS: Array<{ id: number; descricao: string; valor: number; dias: number; metodo: string; status: string; pago: number | null; ref?: string }> = [
+  { id: 501, descricao: 'Pedido #0044 · Clínica Vita', valor: 890, dias: -7, metodo: 'boleto', status: 'vencido', pago: null, ref: 'pedido:107' },
+  { id: 502, descricao: 'Pedido #0046 · Restaurante 88', valor: 155, dias: 3, metodo: 'pix', status: 'pendente', pago: null, ref: 'pedido:109' },
+  { id: 503, descricao: 'Pedido #0038 · Papelaria Sol', valor: 1190.5, dias: -5, metodo: 'pix', status: 'pago', pago: -5, ref: 'pedido:105' },
+  { id: 504, descricao: 'Orçamento ORC-0114 · Clínica Vita', valor: 1290, dias: -12, metodo: 'cartao', status: 'cancelado', pago: null, ref: 'orcamento:205' },
+];
 
 // Tarefas de demonstração (API-CONTRATO-v1 §3). Urgente = atrasado (D11).
 const TAREFAS = [
@@ -181,6 +263,8 @@ export const demo = {
     if (!usuario.trim() || senha.length < 3) throw Object.assign(new Error('Usuário ou senha incorretos.'), { status: 401 });
     logado = true;
     perfilDemo = /ponto/i.test(usuario) ? 'colaborador' : 'erp';
+    semFinanceiro = /vendas/i.test(usuario);
+    semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
@@ -394,12 +478,25 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'ponto', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
-        kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: 2 },
+        kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
         financeiro: { a_receber: 8200, a_pagar: 3100 },
-        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length });
+        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, barra: barraDemo ?? BARRA_PADRAO_DEMO });
+    }
+    if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
+      const { modulos } = (corpo ?? {}) as { modulos?: string[] };
+      const liberados: string[] = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'ponto', 'ponto_gestor', 'pagamentos', 'mais'];
+      // Como o ERP #8592: [] apaga a escolha; mais de 3, repetido ou fora das áreas → 422 com campos.modulos (texto).
+      const erro = !Array.isArray(modulos) ? 'Envie a lista de módulos.'
+        : modulos.length > 3 ? 'Máximo de 3 módulos: Início e Mais são fixos.'
+        : new Set(modulos).size !== modulos.length ? 'Módulo repetido.'
+        : modulos.some((m) => !liberados.includes(m) || m === 'inicio' || m === 'mais') ? 'Há módulo que seu usuário não pode usar.' : null;
+      if (erro) throw Object.assign(new Error(erro), { status: 422, codigo: 'validacao', campos: { modulos: erro } });
+      await espera(400);
+      barraDemo = modulos!.length ? [...modulos!] : null;
+      return r({ modulos: barraDemo ?? [], barra: barraDemo ?? BARRA_PADRAO_DEMO });
     }
     if (metodo === 'POST' && caminho === '/api/app/notificacoes/lidas') {
       const marcadas = NOTIFICACOES.filter((x) => !x.lida).length;
@@ -429,11 +526,98 @@ export const demo = {
           { quando: diaRel(0) + 'T09:12:00-03:00', autor: 'Carla', texto: 'enviou a arte v3 ao cliente', detalhe: null }],
         concluida: false });
     }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/ponto/aprovacoes')) {
+      // Hora calculada aqui, nunca no topo do módulo.
+      const est = (caminho.match(/estado=(\w+)/) || [])[1] || 'pendente';
+      const itens = VALIDACAO.filter((x) => est === 'todas' || x.estado === est)
+        .map(({ min, ...x }) => ({ ...x, marcada_em: new Date(Date.now() - min * 60000).toISOString() }));
+      const conta = (e: string) => VALIDACAO.filter((x) => x.estado === e).length;
+      return r({ itens, contadores: { pendente: conta('pendente'), validada: conta('validada'), recusada: conta('recusada'), todas: VALIDACAO.length }, pode_recusar: true });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/ponto\/aprovacoes\/[^/]+\/(validar|recusar)$/.test(caminho)) {
+      const partes = caminho.split('/');
+      const m = VALIDACAO.find((x) => x.id === decodeURIComponent(partes[5]));
+      if (!m) throw Object.assign(new Error('Marcação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      if (m.estado !== 'pendente') throw Object.assign(new Error('Esta marcação já foi revisada.'), { status: 409, codigo: 'ja_revisada' });
+      // Demo: só muda o estado da fila. No ERP a recusa grava uma anulação nova; a marcação não é tocada.
+      if (partes[6] === 'validar') { m.estado = 'validada'; return r({ estado: 'validada' }); }
+      m.estado = 'recusada'; nsr += 1;
+      return r({ estado: 'recusada', nsr_anulacao: nsr });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/equipe') {
+      // Nomes do protótipo (tela 26), nas regras do ERP #8588: ordem alfabética, carga só de OS, status montado
+      // pelo ERP (Em serviço quando tem carga, Disponível sem, Inativo para usuário inativo).
+      return r({ itens: [
+        { id: 2, nome: 'André Silva', funcao: 'Impressor · plotter 1,60', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 3, nome: 'Bruno Cruz', funcao: 'Mecânico · Box 1', carga: '1 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 4, nome: 'Carla Menezes', funcao: 'Administrativo · financeiro', carga: null, status: { rotulo: 'Disponível', tom: 'livre' } },
+        { id: 1, nome: 'Jefferson Moraes', funcao: 'Mecânico · Box 2', carga: '2 OS', status: { rotulo: 'Em serviço', tom: 'ocupado' } },
+        { id: 5, nome: 'Wagner Rodrigues', funcao: 'Dono · admin', carga: null, status: { rotulo: 'Inativo', tom: 'ausente' } },
+      ] });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/chat') {
+      const { mensagem } = (corpo ?? {}) as { mensagem?: string };
+      if (!mensagem || !mensagem.trim()) throw Object.assign(new Error('Escreva uma mensagem.'), { status: 422, codigo: 'validacao' });
+      await espera(900);
+      const agora = new Date().toISOString();
+      conversaDemo.push({ de: 'eu', texto: mensagem.trim(), criada_em: agora });
+      const resposta = { de: 'jana' as const, texto: respostaJana(mensagem), criada_em: new Date().toISOString() };
+      conversaDemo.push(resposta);
+      return r({ conversa_id: 'demo-1', resposta });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/chat/')) {
+      return r({ conversa_id: 'demo-1', mensagens: conversaDemo });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
       const conta = (s: string) => ORCAMENTOS.filter((x) => x.status === s).length;
       return r({ itens: ORCAMENTOS.filter((x) => st === 'todos' || x.status === st), pagina: 1, tem_mais: false,
         contadores: { todos: ORCAMENTOS.length, rascunho: conta('rascunho'), enviado: conta('enviado'), aprovado: conta('aprovado'), convertido: conta('convertido') } });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/pagamentos/referencias') {
+      // Pedidos não concluídos e orçamentos enviados/aprovados. `valor` = saldo em aberto (na demo nada foi pago em parte, então é o total).
+      const itens = [
+        ...PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido').map((x) => ({ tipo: 'pedido', id: x.id, rotulo: 'Pedido #' + x.numero, cliente: x.cliente, valor: x.valor })),
+        ...ORCAMENTOS.filter((x) => x.status === 'enviado' || x.status === 'aprovado').map((x) => ({ tipo: 'orcamento', id: x.id, rotulo: 'Orçamento ' + x.numero, cliente: x.cliente, valor: x.valor })),
+      ];
+      return r({ itens });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/pagamentos') {
+      const n = (corpo ?? {}) as { referencia?: { tipo?: string; id?: number }; metodo?: string; vencimento_dias?: number };
+      // Como o ERP: o valor sai do documento; um "valor" no corpo seria ignorado.
+      const ped = n.referencia?.tipo === 'pedido' ? PEDIDOS.find((x) => x.id === n.referencia?.id) : undefined;
+      const orc = n.referencia?.tipo === 'orcamento' ? ORCAMENTOS.find((x) => x.id === n.referencia?.id) : undefined;
+      if (!ped && !orc) throw Object.assign(new Error('Escolha um pedido ou orçamento.'), { status: 422, codigo: 'validacao', campos: { referencia: 'Escolha um pedido ou orçamento.' } });
+      if (![3, 7, 15].includes(Number(n.vencimento_dias))) throw Object.assign(new Error('Prazo inválido.'), { status: 422, codigo: 'validacao', campos: { vencimento_dias: 'Prazo inválido.' } });
+      const ref = `${n.referencia!.tipo}:${n.referencia!.id}`;
+      if (n.metodo === 'cartao') throw Object.assign(new Error('Cartão não pode ser cobrado pelo app.'), { status: 422, codigo: 'validacao', campos: { metodo: 'Cartão não pode ser cobrado pelo app.' } });
+      // Como o ERP (§10.6): bloqueia a 2ª cobrança se já há uma em aberto no prazo ou se já foi paga (o gateway não baixa a venda).
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pendente')) {
+        throw Object.assign(new Error('Já existe uma cobrança em aberto para este documento.'), { status: 409, codigo: 'ja_existe' });
+      }
+      if (PAGAMENTOS.some((x) => x.ref === ref && x.status === 'pago')) {
+        throw Object.assign(new Error('Este documento já tem cobrança paga: registre o pagamento na venda antes de cobrar de novo.'), { status: 409, codigo: 'ja_existe' });
+      }
+      const id = 1 + Math.max(...PAGAMENTOS.map((x) => x.id));
+      const novo = { id, descricao: ped ? `Pedido #${ped.numero} · ${ped.cliente}` : `Orçamento ${orc!.numero} · ${orc!.cliente}`,
+        valor: ped ? ped.valor : orc!.valor, dias: Number(n.vencimento_dias), metodo: String(n.metodo ?? 'qualquer'), status: 'pendente', pago: null, ref };
+      PAGAMENTOS.unshift(novo);
+      return r({ id, descricao: novo.descricao, valor: novo.valor, vencimento: diaRel(novo.dias), metodo: novo.metodo, status: 'pendente', pago_em: null,
+        link: `https://pagamento.exemplo/c/${id}` });
+    }
+    if (metodo === 'POST' && /^\/api\/app\/pagamentos\/\d+\/(consultar|cancelar)$/.test(caminho)) {
+      const [, , , , idTxt, acao] = caminho.split('/');
+      const p = PAGAMENTOS.find((x) => x.id === Number(idTxt));
+      if (!p) throw Object.assign(new Error('Cobrança não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      if (acao === 'cancelar') {
+        if (p.status === 'pago') throw Object.assign(new Error('Cobrança já paga não pode ser cancelada.'), { status: 409, codigo: 'nao_cancelavel' });
+        p.status = 'cancelado';
+      } else if (p.status === 'pendente' || p.status === 'vencido') {
+        // Demo: o provedor confirma o pagamento hoje, como no protótipo.
+        p.status = 'pago'; p.pago = 0;
+      }
+      return r({ id: p.id, descricao: p.descricao, valor: p.valor, vencimento: diaRel(p.dias), metodo: p.metodo, status: p.status,
+        pago_em: p.pago === null ? null : diaRel(p.pago), link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
@@ -475,8 +659,8 @@ export const demo = {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo === 'producao');
       const etapas = [...new Set(ativos.map((x) => x.etapa.rotulo))].map((rotulo) => ({ rotulo, total: ativos.filter((x) => x.etapa.rotulo === rotulo).length }));
       return r({ periodo: { de, ate: diaRel(0) },
-        kpis: { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
-        dre: aba !== 'dre' ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
+        kpis: semFinanceiro ? null : { receitas: rec, despesas: desp, saldo: Math.round((rec - desp) * 100) / 100, margem_pct: Math.round(((rec - desp) / rec) * 1000) / 10 },
+        dre: aba !== 'dre' || semFinanceiro ? null : { receitas_por_categoria: parte(rec, [['Comunicação visual', 0.58], ['Gráfica rápida', 0.27], ['Balcão', 0.15]]),
           despesas_por_categoria: parte(desp, [['Insumos', 0.46], ['Folha', 0.31], ['Aluguel e energia', 0.14], ['Outros', 0.09]]) },
         vendas: aba !== 'vendas' ? null : {
           receita_por_dia: [4.2, 5.1, 3.8, 6.4, 7.2, 2.1, 1.4, 5.8, 6.1, 4.9, 7.8, 8.4, 3.2, 8.42].map((x, i) => ({ data: diaRel(i - 13), valor: x * 1000 })),
@@ -484,6 +668,33 @@ export const demo = {
         producao: aba !== 'producao' ? null : { por_etapa: etapas },
         estoque: aba !== 'estoque' ? null : { baixo: [{ nome: 'Lona 440 g', quantidade: 2, minimo: 5, unidade: 'un' },
           { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] } });
+    }
+    if (metodo === 'GET' && caminho === '/api/app/dashboard') {
+      // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
+      const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
+      return r({ faturamento_30d: { valor: 148230, variacao_pct: 12, serie_semanal: [92000, 104000, 98000, 121000, 117000, 133000, 148230] },
+        kpis: { pedidos_ativos: semVendas ? null : ativos.length, pedidos_novos: semVendas ? null : 4,
+          producao_em_curso: semVendas ? null : PEDIDOS.filter((x) => x.etapa.chave === 'in_production').length, a_receber: semFinanceiro ? null : 11415, vencido: semFinanceiro ? null : 1260 },
+        pedidos_por_dia: semVendas ? null : [3, 5, 4, 6, 8, 2, 1, 5, 7, 6, 9, 8, 4, 4].map((total, i) => ({ data: diaRel(i - 13), total })),
+        meta_mes: { valor: 200000, realizado_pct: 70 }, producao_concluida: semVendas ? null : { concluidas: 1, total: 5 } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/pagamentos')) {
+      const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
+      // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
+      const itens = PAGAMENTOS.map(({ dias, pago, ...p }) => ({ ...p, vencimento: diaRel(dias), pago_em: pago === null ? null : diaRel(pago),
+        link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` }));
+      const conta = (s: string) => itens.filter((p) => p.status === s).length;
+      return r({ itens: itens.filter((p) => st === 'todos' || p.status === st), pagina: 1, tem_mais: false,
+        contadores: { todos: itens.length, pendente: conta('pendente'), pago: conta('pago'), vencido: conta('vencido'), cancelado: conta('cancelado') } });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/tarefas')) {
       const origem = (caminho.match(/origem=(\w+)/) || [])[1] || 'todas';
@@ -496,6 +707,51 @@ export const demo = {
       const i = TAREFAS.findIndex((x) => x.id === id);
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/') && caminho.endsWith('/os')) {
+      const v = VEICULOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
+      const hoje = new Date().toISOString().slice(0, 10);
+      const abertas = ORDENS.filter((o) => o.placa === v.placa).map((o) => ({ os_id: o.id, numero: o.numero, data: hoje,
+        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor }));
+      return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])] });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos')) {
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
+      return r({ itens, total: itens.length, pagina: 1, tem_mais: false });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
+      const idOs = Number(caminho.split('/')[4]);
+      // OS antigas do histórico dos veículos (tela 08) também abrem, já entregues.
+      const antiga = Object.entries(HISTORICO_ANTIGO).flatMap(([placa, l]) => l.map((h) => ({ ...h, placa }))).find((h) => h.os_id === idOs);
+      const veicAntigo = antiga ? VEICULOS.find((v) => v.placa === antiga.placa) : undefined;
+      const o = ORDENS.find((x) => x.id === idOs) ?? (antiga && veicAntigo ? { id: antiga.os_id, numero: antiga.numero, placa: veicAntigo.placa,
+        veiculo: veicAntigo.descricao as string | null, cliente: antiga.cliente ?? veicAntigo.cliente ?? 'Sem cliente', valor: antiga.valor, etapa: 'entregue' } : undefined);
+      if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
+      const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
+      // OS terminal (entregue, aberta pelo histórico do veículo): indice null e terminal true, como o ERP fechou.
+      const etapaOs = pos >= 0 ? { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length }
+        : { chave: o.etapa, rotulo: 'Entregue', indice: null, total_etapas: ETAPAS_OS.length, terminal: true };
+      const d = DETALHE_OS[o.id] ?? { local: null, km: null, observacoes: null, vistoria: null, fotos: 0,
+        itens: o.valor ? [{ tipo: 'mao_obra' as const, descricao: 'Serviço', quantidade: 1, valor_unitario: o.valor }] : [] };
+      // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
+      const itens = d.itens.map((i) => ({ ...i, valor: i.quantidade * i.valor_unitario }));
+      const soma = (t: string) => itens.filter((i) => i.tipo === t).reduce((a, i) => a + i.valor, 0);
+      const totais = { pecas: soma('peca'), mao_de_obra: soma('mao_obra'), terceiros: soma('servico_terceiro'), total: itens.reduce((a, i) => a + i.valor, 0) };
+      return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
+        etapa: etapaOs,
+        veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
+        observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
+      const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
+      const pos = (k: string) => ETAPAS_OS.findIndex((e) => e[0] === k);
+      const itens = ORDENS.filter((o) => etapa === 'todas' || o.etapa === etapa).sort((a, b) => pos(b.etapa) - pos(a.etapa) || b.id - a.id).map((o) => ({
+        id: o.id, numero: o.numero, placa: o.placa, veiculo: o.veiculo, cliente: o.cliente, valor: o.valor, travada: OS_TRAVA.includes(o.etapa),
+        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
+      const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ORDENS.filter((o) => o.etapa === chave).length }));
+      return r({ itens, etapas, total: ORDENS.length, travadas: ORDENS.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);
