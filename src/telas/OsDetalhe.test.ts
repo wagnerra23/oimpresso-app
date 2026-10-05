@@ -40,12 +40,18 @@ describe('tela 03 · avançar etapa', () => {
     expect(acoesVisiveis(undefined, true)).toEqual([]);
   });
   it('ação bloqueada pelo gate continua visível (o motivo aparece embaixo)', () => {
-    expect(acoesVisiveis([a('enviar_orcamento', true, 'Falta lançar ao menos um item.')], true)).toHaveLength(1);
+    expect(acoesVisiveis([a('enviar_orcamento', true, 'Falta: Orçamento com ≥ 1 item lançado.')], true)).toHaveLength(1);
   });
   it('erro: 403 vira texto de permissão; o resto usa a mensagem do ERP', () => {
     expect(erroDaAcao(new ErroApi(403, 'sem_permissao', 'x'))).toBe('Seu usuário não pode mudar a etapa desta OS.');
     expect(erroDaAcao(new ErroApi(422, 'bloqueado', 'Falta foto da vistoria.'))).toBe('Falta foto da vistoria.');
     expect(erroDaAcao(new ErroApi(409, 'etapa_mudou', 'A OS mudou de etapa.'))).toBe('A OS mudou de etapa.');
     expect(erroDaAcao(null)).toBe('Não foi possível mudar a etapa. Tente de novo.');
+  });
+});
+
+describe('tela 03 · avançar etapa — ação recusada pelo ERP', () => {
+  it('nao_suportada (ação fora da lista ou com efeito colateral) mostra a mensagem do ERP', () => {
+    expect(erroDaAcao(new ErroApi(422, 'nao_suportada', 'Esta ação não é feita pelo app.'))).toBe('Esta ação não é feita pelo app.');
   });
 });

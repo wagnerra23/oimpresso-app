@@ -292,12 +292,14 @@ export interface OsDetalhe {
   totais: { pecas: number; mao_de_obra: number; terceiros: number; total: number };
   /** Fotos do laudo: só a contagem; o app não mostra nem tira foto (ADR 0383). */
   fotos_laudo: number;
-  /** Ações que avançam a OS a partir da etapa atual (pedido ao ERP, formato provisório; ausente = sem ações). */
+  /** Ações de avanço que saem da etapa atual (contrato tela-03, ERP #8637), na ordem do processo. OS terminal ou fora
+   *  do pipeline: []. Cancelar, recusar e garantia nunca vêm (ficam na web). Ausente = ERP sem a rota ainda. */
   acoes?: OsAcao[];
 }
-/** Uma ação de avanço da OS. `critica` = o ERP pede confirmação; `bloqueio` = motivo do gate quando barra. */
+/** Uma ação de avanço da OS. `critica` = is_critical ou requires_confirmation (o app confirma antes);
+ *  `bloqueio` = "Falta: <requisitos>." quando o gate barra, senão null. */
 export interface OsAcao { chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null }
-/** Liga "avançar etapa" na tela 03. Só a demo, até a rota POST /api/app/os/{id}/acoes/{chave} existir no ERP. */
+/** Liga "avançar etapa" na tela 03. Só a demo, até a rota do ERP #8637 estar em produção. */
 export const ESCRITA_OS = DEMO;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
@@ -691,7 +693,8 @@ export const api = {
   /** Tela 03 · Detalhe da OS. OS de outra empresa ou inexistente → 404 nao_encontrado. */
   osDetalhe: (id: number) => chamar<OsDetalhe>('GET', `/api/app/os/${id}`),
   /** Tela 03 · avançar etapa (FSM do ERP, sem efeito em estoque ou valor). 200 = a OS já na etapa nova ·
-   *  422 bloqueado (gate) · 409 etapa_mudou · 403 sem_permissao · 404 nao_encontrado. Formato provisório. */
+   *  422 bloqueado (gate) ou nao_suportada (fora das 7 ações, ou ação com efeito colateral no banco) ·
+   *  409 etapa_mudou · 403 sem_permissao · 404 nao_encontrado · throttle 30/min. Contrato tela-03 (ERP #8637). */
   executarAcaoOs: (id: number, chave: string) => (ESCRITA_OS
     ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Mudar a etapa pelo app ainda não está disponível.'))),

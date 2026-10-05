@@ -796,7 +796,7 @@ export const demo = {
       const acao = (AVANCO_OS[o.etapa] ?? []).find((a) => a[0] === decodeURIComponent(partes[6]));
       if (!acao) throw Object.assign(new Error('A OS mudou de etapa. Atualize a tela.'), { status: 409 });
       const det = DETALHE_OS[o.id];
-      if (acao[0] === 'enviar_orcamento' && (!det || det.itens.length === 0) && !o.valor) throw Object.assign(new Error('Falta lançar ao menos um item no orçamento.'), { status: 422 });
+      if (acao[0] === 'enviar_orcamento' && (!det || det.itens.length === 0) && !o.valor) throw Object.assign(new Error('Falta: Orçamento com ≥ 1 item lançado.'), { status: 422 });
       await espera(400);
       o.etapa = acao[3];
       return demo.chamar<T>('GET', '/api/app/os/' + o.id);
@@ -825,7 +825,7 @@ export const demo = {
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos,
         // Gate de exemplo: sem item lançado não dá para mandar o orçamento (como o StageGateEvaluator do ERP).
         acoes: (AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true,
-          bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta lançar ao menos um item no orçamento.' : null })) });
+          bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })) });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
