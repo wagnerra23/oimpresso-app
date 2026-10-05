@@ -5,10 +5,11 @@
 // cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito:
 // motor, combustível, chassi do reboque e observações (ficam na web). Com veiculoId vira "Editar veículo": carrega
 // GET /api/app/veiculos/{id} e salva com PUT (ERP #8708, em produção). Na edição
-// não há "Buscar": a consulta trataria a placa do próprio veículo como já ativa. "Buscar" da placa: consulta no fornecedor do
+// não há "Buscar": a consulta trataria a placa do próprio veículo como já ativa. "Excluir veículo" (pode_excluir) pede
+// confirmação e chama DELETE (ERP #8717, ligado por EXCLUIR_VEICULO). Soft delete sem restauração: definitivo para o usuário. "Buscar" da placa: consulta no fornecedor do
 // ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, EXCLUIR_VEICULO, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -83,9 +84,11 @@ interface Props {
   aoUsarExistente?: (v: VeiculoResumo) => void;
   /** Editar este veículo em vez de cadastrar um novo. */
   veiculoId?: number;
+  /** Depois de excluir (só na edição). Sem ele, não há "Excluir veículo". */
+  aoExcluir?: () => void;
 }
 
-export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoUsarExistente, veiculoId }: Props) {
+export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoUsarExistente, veiculoId, aoExcluir }: Props) {
   const editando = veiculoId !== undefined;
   const [opcoes, setOpcoes] = useState<OpcoesVeiculo | null>(null);
   const [erroOpcoes, setErroOpcoes] = useState<string | null>(null);
@@ -100,6 +103,10 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
   const [carregado, setCarregado] = useState(!editando);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [podeEditar, setPodeEditar] = useState(true);
+  const [podeExcluir, setPodeExcluir] = useState(false);
+  const [placaSalva, setPlacaSalva] = useState('');
+  const [excluindo, setExcluindo] = useState<'pergunta' | 'enviando' | null>(null);
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
 
   useEffect(() => {
     api.opcoesVeiculo().then(setOpcoes).catch((e) => setErroOpcoes(e instanceof Error ? e.message : 'Não foi possível carregar os tipos.'));
@@ -107,6 +114,8 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
     api.veiculo(veiculoId).then((v) => {
       setF(formDoVeiculo(v));
       setPodeEditar(v.pode_editar !== false);
+      setPodeExcluir(v.pode_excluir === true);
+      setPlacaSalva(v.placa);
       setDono(v.contact_id === null ? null : { id: v.contact_id, nome: v.cliente ?? 'Cliente' });
       setCarregado(true);
     }).catch((e) => setErroCarga(e instanceof ErroApi && e.status === 404 ? 'Este veículo não existe mais.'
@@ -180,6 +189,23 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
         : x instanceof ErroApi && x.status === 503 ? 'A oficina ainda não está configurada nesta empresa.'
         : x instanceof Error ? x.message : (editando ? 'Não foi possível salvar.' : 'Não foi possível cadastrar.'), 'erro');
     } finally { setSalvando(false); }
+  };
+
+  const excluir = async () => {
+    if (veiculoId === undefined || !aoExcluir) return;
+    setExcluindo('enviando'); setErroExcluir(null);
+    try {
+      await api.excluirVeiculo(veiculoId);
+      avisar?.(`Veículo ${placaSalva} excluído`);
+      aoExcluir();
+    } catch (x) {
+      const st = x instanceof ErroApi ? x.status : (x as { status?: number } | null)?.status;
+      setExcluindo('pergunta');
+      setErroExcluir(st === 409 ? (x instanceof Error ? x.message : 'Este veículo tem OS em andamento.')
+        : st === 403 ? 'Seu usuário não pode excluir veículo.'
+        : st === 404 ? 'Este veículo já não existe.'
+        : x instanceof Error ? x.message : 'Não foi possível excluir.');
+    }
   };
 
   if (escolhendoDono) return <BuscaCliente rotulo={editando ? 'Editar veículo' : 'Novo veículo'} aoEscolher={(c) => { setDono(c); setEscolhendoDono(false); }} aoVoltar={() => setEscolhendoDono(false)} />;
@@ -260,6 +286,9 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
           <p className="np-ajuda">Motor, combustível e observações ficam no oimpresso web.</p>
           {editando && <p className="np-ajuda">As OS já abertas mantêm o dono e o km que tinham; a placa e o tipo novos aparecem nelas também.</p>}
           {editando && !podeEditar && <p className="np-erro" role="status">Seu usuário pode ver, mas não editar este veículo.</p>}
+          {editando && EXCLUIR_VEICULO && aoExcluir && podeExcluir && (
+            <button className="oi-btn block pg-perigo nve-excluir" disabled={salvando} onClick={() => { setErroExcluir(null); setExcluindo('pergunta'); }}>Excluir veículo</button>
+          )}
           </>}
         </div>
       </div>
@@ -267,6 +296,22 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando} onClick={aoVoltar}>Cancelar</button>
         <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando || !opcoes || !carregado || !podeEditar} onClick={salvar}>{salvando ? 'Salvando…' : editando ? 'Salvar' : 'Cadastrar veículo'}</button>
       </div>
+      {excluindo && (
+        <div className="oi-sheet-backdrop" onClick={() => excluindo !== 'enviando' && setExcluindo(null)}>
+          <div className="oi-sheet" role="dialog" aria-modal="true" aria-labelledby="nve-exc-t" onClick={(e) => e.stopPropagation()}>
+            <div className="oi-sheet-grip" />
+            <div className="oi-sheet-h"><b id="nve-exc-t">Excluir o veículo {placaSalva}?</b></div>
+            <div className="osd-folha">
+              <p className="osd-conf">Ele sai da lista de veículos e a placa fica livre para outro cadastro. <b>Não dá para desfazer, nem pela web.</b></p>
+              {erroExcluir && <p className="np-erro" role="alert">{erroExcluir}</p>}
+              <div className="osd-conf-bts">
+                <button className="oi-btn" disabled={excluindo === 'enviando'} onClick={() => setExcluindo(null)}>Voltar</button>
+                <button className="oi-btn osd-perigo" disabled={excluindo === 'enviando'} onClick={excluir}>{excluindo === 'enviando' ? 'Excluindo…' : 'Excluir'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

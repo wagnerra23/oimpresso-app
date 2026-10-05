@@ -820,6 +820,15 @@ export const demo = {
     if (metodo === 'GET' && caminho === '/api/app/veiculos/opcoes') {
       return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })), consulta_placa: true });
     }
+    if (metodo === 'DELETE' && /^\/api\/app\/veiculos\/[0-9]+$/.test(caminho)) {
+      const i = VEICULOS.findIndex((x) => x.id === Number(caminho.split('/')[4]));
+      if (i < 0) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
+      const abertas = ORDENS.filter((o) => o.placa === VEICULOS[i].placa && !(o.etapa in TERMINAIS_OS)).length;
+      if (abertas) throw Object.assign(new Error(`Este veículo tem ${abertas} OS em andamento. Encerre ${abertas === 1 ? 'a OS' : 'as OS'} antes de excluir.`), { status: 409, erro: 'em_uso', os_abertas: abertas });
+      await espera(500);
+      VEICULOS.splice(i, 1);
+      return r({ ok: true });
+    }
     if ((metodo === 'GET' || metodo === 'PUT') && /^\/api\/app\/veiculos\/[0-9]+$/.test(caminho)) {
       const v = VEICULOS.find((x) => x.id === Number(caminho.split('/')[4]));
       if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
@@ -828,7 +837,7 @@ export const demo = {
         const [anoF, anoM] = (v.ano ?? '').split('/').map((t) => (t ? Number(t) : null));
         return r({ id: v.id, placa: v.placa, placa_secundaria: v.placa_secundaria, tipo: TIPOS_VEICULO.find((t) => t[1] === v.descricao)?.[0] ?? '',
           ano_fabricacao: anoF ?? null, ano_modelo: anoM ?? null, cor: v.cor, km: v.km, chassi: extra.chassi, renavam: extra.renavam,
-          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true });
+          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true, pode_excluir: true });
       }
       const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
         cor: string | null; km: number | null; chassi: string | null; renavam: string | null; contact_id: number | null };
