@@ -313,13 +313,13 @@ export interface OsDetalhe {
  *  `bloqueio` = "Falta: <requisitos>." quando o gate barra, senão null. */
 export interface OsAcao {
   chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null;
-  /** "encerra" = cancelar OS ou recusar orçamento (pedido ao ERP); ausente = avanço. */
+  /** "encerra" = cancelar OS ou recusar orçamento (ERP #8646); ausente = avanço. */
   tipo?: 'avanco' | 'encerra';
 }
 /** Liga "avançar etapa" na tela 03. Rota do ERP #8637 em produção desde 2026-10-05. */
 export const ESCRITA_OS = true;
-/** Liga cancelar OS e recusar orçamento na tela 03. Só a demo, até o ERP aceitar as duas ações na rota do app. */
-export const ENCERRAR_OS = DEMO;
+/** Liga cancelar OS e recusar orçamento na tela 03. Rota do ERP #8646 em produção desde 2026-10-05. */
+export const ENCERRAR_OS = true;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
  *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
