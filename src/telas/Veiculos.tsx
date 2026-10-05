@@ -3,6 +3,8 @@
 // Tocar no veículo abre o histórico de OS dele (busca ao expandir); tocar numa OS abre o detalhe (tela 03).
 // O ERP não guarda marca/modelo nem o desenho da placa: o título é o tipo e o desenho sai do formato da placa.
 // Tocar no veículo abre o histórico de OS dele (HISTORICO_VEICULO, rota do ERP #8635).
+// "Km registrado" (no cartão aberto): leituras do cadastro e da entrada de cada OS, da mais nova para a mais antiga,
+// com a diferença para a anterior. Aparece só quando o ERP manda km_cadastro (ERP #8732).
 // "Editar" (dentro do cartão aberto) abre o formulário do cadastro em modo edição (EDITAR_VEICULO + pode_editar).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
@@ -16,6 +18,31 @@ export function textoVeiculo(v: Pick<VeiculoResumo, 'km' | 'ano' | 'cor'>): stri
 
 /** Data curta do histórico: "12/06". */
 export const dataOs = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/** Data com ano para o km: "12/06/26". */
+export const dataKm = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
+
+export interface LeituraKm { data: string | null; origem: string; km: number; diferenca: number | null }
+
+/** Leituras de km do veículo: o cadastro e cada OS com km, em ordem de data (sem data = cadastro, a mais antiga),
+ *  devolvidas da mais nova para a mais antiga, com a diferença para a leitura anterior. Km menor que o anterior
+ *  aparece com diferença negativa (o ERP aceita; o app não corrige). */
+export function leiturasKm(h: HistoricoVeiculo): LeituraKm[] {
+  const base: Array<Omit<LeituraKm, 'diferenca'>> = [];
+  if (h.km_cadastro !== null && h.km_cadastro !== undefined) base.push({ data: h.cadastrado_em ?? null, origem: 'Cadastro', km: h.km_cadastro });
+  for (const o of h.itens) if (o.km !== null && o.km !== undefined) base.push({ data: o.data, origem: o.numero, km: o.km });
+  const ordem = base.map((l, i) => ({ l, i })).sort((a, b) => {
+    const da = a.l.data ?? '', db = b.l.data ?? '';
+    return da === db ? (a.l.origem === 'Cadastro' ? -1 : b.l.origem === 'Cadastro' ? 1 : a.i - b.i) : da < db ? -1 : 1;
+  }).map((x) => x.l);
+  return ordem.map((l, i) => ({ ...l, diferenca: i === 0 ? null : l.km - ordem[i - 1].km })).reverse();
+}
+
+/** "+3.120 km" / "−500 km" / null. */
+export function textoDiferenca(d: number | null): string | null {
+  if (d === null) return null;
+  return (d >= 0 ? '+' : '−') + Math.abs(d).toLocaleString('pt-BR') + ' km';
+}
 
 /** Desenho da placa pelo formato: antiga = 3 letras + 4 números (com ou sem hífen); o resto ganha o desenho Mercosul. */
 export function placaAntiga(placa: string): boolean {
@@ -131,6 +158,21 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
                         <span className="vei-os-v">{x.valor === null ? '—' : reais(x.valor)}</span>
                       </button>
                     ))}
+                    {h && h !== 'erro' && 'km_cadastro' in h && (() => {
+                      const ls = leiturasKm(h);
+                      return (
+                        <div className="vei-km">
+                          <span className="p4-rotulo">Km registrado</span>
+                          {ls.length === 0 && <p className="p4-legal">Nenhum km registrado.</p>}
+                          {ls.map((l, i) => (
+                            <div key={l.origem + i} className="vei-km-l">
+                              <span className="vei-km-d">{l.data ? dataKm(l.data) : '—'}<small>{l.origem}</small></span>
+                              <span className="vei-km-v"><b>{textoKm(l.km)}</b>{l.diferenca !== null && <small className={l.diferenca < 0 ? 'neg' : undefined}>{textoDiferenca(l.diferenca)}</small>}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

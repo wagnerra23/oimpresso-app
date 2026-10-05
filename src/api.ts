@@ -390,7 +390,13 @@ export interface ConsultaPlaca {
 /** Histórico de OS do veículo: todas, inclusive encerradas e fora do fluxo, da mais nova para a mais antiga.
  *  `cliente` é o da OS (pode não ser o dono do veículo); `etapa_rotulo` null = OS fora do fluxo da oficina. */
 export interface HistoricoVeiculo {
-  itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>;
+  itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null;
+    /** Km na entrada da OS (ERP #8732). */
+    km?: number | null }>;
+  /** Km do cadastro do veículo e o dia em que foi cadastrado (ERP #8732). Ausente = ERP
+   *  ainda sem o histórico de km: o app esconde a seção "Km registrado". */
+  km_cadastro?: number | null;
+  cadastrado_em?: string | null;
 }
 /** Liga o histórico de OS da tela 08. Rota GET /api/app/veiculos/{id}/os no ERP (#8635), até 200 OS, da mais nova para a mais antiga. */
 export const HISTORICO_VEICULO = true;
