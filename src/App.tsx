@@ -133,7 +133,7 @@ export function App() {
   function tela(k: Aba | SubMais, voltar?: ReactNode) {
     switch (k) {
       case 'tarefas': return <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} voltar={voltar} />;
-      case 'pedidos': return <Pedidos voltar={voltar} />;
+      case 'pedidos': return <Pedidos voltar={voltar} avisar={avisar} online={online} />;
       case 'producao': return <Producao voltar={voltar} />;
       case 'pessoas': return <Pessoas avisar={avisar} voltar={voltar} />;
       case 'orcamentos': return <Orcamentos voltar={voltar} />;

@@ -361,6 +361,55 @@ a.p4-link { text-decoration: none; }
 .prd-valores small.prd-apartir { font-size: 10.5px; color: var(--text-dim); margin-bottom: -2px; }
 .prd-valores small.baixo { color: var(--danger); font-weight: 600; }
 
+/* Venda rápida — tela 11 do v4 (alvos de toque ≥ 44; o −/+ do protótipo tinha 36) */
+.vr-limpar { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--danger); font: inherit; font-size: 13px; font-weight: 600; }
+.vr-item { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border-2); }
+.vr-item:last-child { border-bottom: 0; }
+.vr-item-l { min-height: 48px; display: flex; align-items: center; gap: 10px; }
+.vr-qtd { display: flex; align-items: center; gap: 4px; }
+.vr-qtd button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font: inherit; font-size: 18px; }
+.vr-qtd button.mais { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.vr-qtd button:disabled { opacity: .45; }
+.vr-qtd span { min-width: 24px; text-align: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-sub { min-width: 72px; text-align: right; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-total { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 12px 14px; display: flex; align-items: baseline; }
+.vr-total span { font-size: 13px; font-weight: 600; }
+.vr-total b { margin-left: auto; font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+.vr-feita { padding: 32px 16px 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.vr-ok { width: 72px; height: 72px; border-radius: 20px; background: var(--pos); color: var(--bg); display: grid; place-items: center; font-size: 32px; font-weight: 600; }
+.vr-feita-t { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; margin-top: 8px; }
+.vr-feita-v { font-family: var(--font-mono); font-size: 34px; font-weight: 600; }
+.vr-feita-s { font-size: 12px; color: var(--text-dim); }
+.vr-recibo { width: 100%; margin: 16px 0 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); text-align: center; }
+.vr-feita .p4-cta { width: 100%; }
+.vr-folha { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; }
+.vr-veu { flex: 1; background: rgba(0,0,0,0.55); }
+.vr-painel { max-height: 80vh; background: var(--surface); border-top: 1px solid var(--border); border-radius: 18px 18px 0 0;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.vr-alca { align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--border); }
+.vr-folha-cab { display: flex; align-items: center; }
+.vr-folha-cab span { font-size: 17px; font-weight: 600; }
+.vr-folha-cab button { margin-left: auto; min-height: 44px; padding: 0 4px 0 12px; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: 13px; }
+.vr-painel .p4-campo input { font-family: var(--font-sans); }
+.vr-catalogo { display: flex; flex-direction: column; overflow-y: auto; min-height: 120px; }
+.vr-prod { min-height: 56px; display: flex; align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--border-2); background: none;
+  color: var(--text); font: inherit; text-align: left; padding: 6px 0; }
+.vr-prod b, .vr-metodo b { display: block; font-size: 13.5px; font-weight: 600; }
+.vr-prod small, .vr-metodo small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.vr-prod:disabled b, .vr-prod:disabled .vr-prod-v { color: var(--text-dim); }
+.vr-prod-v { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-cobrar { border-radius: 12px; background: var(--bg-2); padding: 12px 14px; display: flex; align-items: baseline; }
+.vr-cobrar span { font-size: 13px; color: var(--text-dim); }
+.vr-cobrar b { margin-left: auto; font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+.vr-metodos { display: flex; flex-direction: column; gap: 6px; }
+.vr-metodo { min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  display: flex; align-items: center; gap: 10px; font: inherit; text-align: left; }
+.vr-metodo i { width: 18px; height: 18px; border-radius: 99px; border: 2px solid var(--border); flex-shrink: 0; }
+.vr-metodo.on { border-color: var(--accent); background: var(--accent-soft); }
+.vr-metodo.on i { border-color: var(--accent); background: radial-gradient(var(--accent) 45%, transparent 50%); }
+.pd-novo { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font: inherit; font-size: 13px; font-weight: 600; }
+
 /* Tela 05 · Estoque (prefixo est-) */
 .est-alerta { width: 100%; min-height: 56px; padding: 10px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
   border: 1px solid color-mix(in oklch, var(--danger) 40%, var(--border)); border-radius: 12px; background: color-mix(in oklch, var(--danger) 10%, var(--surface));

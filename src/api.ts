@@ -6,6 +6,7 @@
 import { CapacitorHttp, type HttpResponse } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { demo } from './demo';
+import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 
 export const BASE = 'https://oimpresso.com';
@@ -412,6 +413,26 @@ export interface Notificacao {
 }
 export interface ListaNotificacoes { itens: Notificacao[]; nao_lidas: number; pagina: number; tem_mais: boolean }
 
+// ── Venda rápida (tela 11, D16 Onda A). Formato fechado com a sessão ERP da tela 11 em 2026-10-02; PR do ERP ainda em
+//    rascunho. Mexe em VALOR e ESTOQUE (regra mestre Tier 0). A venda nasce pelo TransactionUtil como venda direta
+//    (status final, fora da FSM), no 1º local ativo do usuário, e baixa o estoque na criação. ──
+/** GET /api/app/venda/produtos?q=: até 20 itens; `id` é a variação; `estoque` null = o produto não controla estoque. */
+export interface ListaProdutosVenda { itens: ProdutoVenda[] }
+/** 201 do POST /api/app/vendas. Repetir a mesma Idempotency-Key com o mesmo corpo devolve 200 com a MESMA venda. */
+export interface VendaCriada {
+  id: number;
+  /** invoice_no do ERP. */
+  numero: string;
+  /** ISO com hora, do servidor. */
+  data: string;
+  /** Total recalculado e gravado pelo ERP, em reais. É o valor que a tela mostra. */
+  total: number;
+  /** Linhas como o ERP gravou. */
+  itens: Array<{ variacao_id: number; nome: string; quantidade: number; preco_unitario: number; subtotal: number }>;
+  /** Rótulo da forma de pagamento no ERP (o do PIX é configurável por empresa). */
+  metodo: string;
+}
+
 /** Tela 06 · Financeiro (D16, Onda C) — só leitura. Contrato §10.1 (ERP #8584). 20 por página; receber/pagar = em aberto
  *  (aberto + parcial, valor = valor em aberto) por vencimento; extrato = quitados com última baixa no mês (valor = baixas).
  *  `resumo` e `contas` não mudam com a aba; só `itens` e a paginação. Valor sempre positivo: o sinal vem de `tipo`. */
@@ -569,8 +590,8 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: string, corpo?: unknown): Promise<T> {
-  if (DEMO) return demo.chamar<T>(metodo, caminho, corpo);
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+  if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
   let r: HttpResponse;
   try {
     r = await CapacitorHttp.request({
@@ -580,6 +601,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT', caminho: stri
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token ?? ''}`,
+        ...extra,
       },
       data: corpo,
     });
@@ -674,6 +696,13 @@ export const api = {
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
   inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */
+  produtosVenda: (q = '') => chamar<ListaProdutosVenda>('GET', `/api/app/venda/produtos${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  /** Tela 11 · cria a venda. 201 VendaCriada (200 na repetição da chave) · 422 { erro: "validacao", campos } com
+   *  "itens.N.quantidade" (estoque insuficiente), "itens.N.preco_unitario" (o preço mudou), "total_previsto" ou "cliente_id" ·
+   *  422 { erro: "idempotencia_conflito" } (mesma chave, corpo diferente) · 409 { erro: "em_andamento" } · 403 sem_permissao
+   *  ou sem_local. `chave` = Idempotency-Key da tentativa. */
+  criarVenda: (corpo: CorpoVenda, chave: string) => chamar<VendaCriada>('POST', '/api/app/vendas', corpo, { 'Idempotency-Key': chave }),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
    *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */

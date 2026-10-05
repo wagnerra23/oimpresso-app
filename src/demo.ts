@@ -254,6 +254,23 @@ const TAREFAS = [
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hhmm = () => new Date().toTimeString().slice(0, 5);
+// Venda rápida (tela 11): catálogo e estoque fictícios do protótipo (s11). O estoque baixa a cada venda da demo.
+const CATALOGO = [
+  { id: 1, nome: 'Banner lona 0,80 × 1,20 m', categoria: 'Comunicação visual', preco: 89, estoque: 8 as number | null },
+  { id: 2, nome: 'Adesivo recorte (un)', categoria: 'Adesivos', preco: 12, estoque: null as number | null },
+  { id: 3, nome: 'Cartão de visita · 500 un', categoria: 'Gráfica rápida', preco: 145, estoque: 3 as number | null },
+  { id: 4, nome: 'Placa PS 30 × 40 cm', categoria: 'Sinalização', preco: 38, estoque: 0 as number | null },
+  { id: 5, nome: 'Lona impressa (m²)', categoria: 'Comunicação visual', preco: 42, estoque: null as number | null },
+  { id: 6, nome: 'Caneca personalizada', categoria: 'Brindes', preco: 29.9, estoque: 5 as number | null },
+];
+const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito', debito: 'Débito', dinheiro: 'Dinheiro' };
+let numeroVenda = 4820;
+/** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
+const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+/** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
+const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
+
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
 
 export const demo = {
@@ -267,7 +284,7 @@ export const demo = {
     semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
-  async chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
+  async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
     const r = (v: unknown) => v as T;
     if (metodo === 'GET' && caminho.endsWith('/marcacoes/hoje')) return r({ data: new Date().toISOString().slice(0, 10), marcacoes });
@@ -707,6 +724,48 @@ export const demo = {
       const i = TAREFAS.findIndex((x) => x.id === id);
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/venda/produtos')) {
+      const q = semAcento(decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').trim());
+      const itens = CATALOGO.filter((p) => !q || semAcento(p.nome).includes(q) || semAcento(p.categoria).includes(q)).slice(0, 20);
+      return r({ itens: itens.map((p) => ({ ...p })) });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/vendas') {
+      // Como o ERP (sessão ERP da tela 11): sem chave → 422; mesma chave e mesmo corpo → a mesma venda; corpo diferente → 422.
+      const chave = cabecalhos['Idempotency-Key'];
+      if (!chave) throw Object.assign(new Error('Falta a chave de idempotência.'), { status: 422, codigo: 'validacao', campos: { idempotency_key: 'Falta a chave de idempotência.' } });
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = VENDAS_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra venda.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r({ ...ja.venda });
+      const n = (corpo ?? {}) as { metodo?: string; itens?: Array<Record<string, unknown>>; total_previsto?: unknown };
+      const campos: Record<string, string> = {};
+      if (!n.metodo || !ROTULO_METODO[n.metodo]) campos.metodo = 'Escolha a forma de pagamento.';
+      const itens = Array.isArray(n.itens) ? n.itens : [];
+      if (!itens.length) campos.itens = 'Adicione ao menos um produto.';
+      let totalC = 0;
+      const baixas: Array<{ p: (typeof CATALOGO)[number]; q: number }> = [];
+      itens.forEach((it, k) => {
+        const p = CATALOGO.find((x) => x.id === it.variacao_id);
+        const qC = centavosDoTexto(it.quantidade), pC = centavosDoTexto(it.preco_unitario);
+        if (!p) { campos[`itens.${k}.variacao_id`] = 'Produto não encontrado.'; return; }
+        // Como o ERP (#8597): na v1 a quantidade é inteira ("3.00" vale, "2.50" não).
+        if (qC === null || qC <= 0 || qC % 100 !== 0) { campos[`itens.${k}.quantidade`] = 'Quantidade inválida.'; return; }
+        const q = qC / 100;
+        if (p.estoque !== null && q > p.estoque) { campos[`itens.${k}.quantidade`] = `Estoque insuficiente (disponível ${p.estoque}).`; return; }
+        const precoC = Math.round(p.preco * 100);
+        if (pC !== precoC) { campos[`itens.${k}.preco_unitario`] = `O preço mudou para ${(precoC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`; return; }
+        totalC += precoC * q; baixas.push({ p, q });
+      });
+      if (!Object.keys(campos).length && centavosDoTexto(n.total_previsto) !== totalC) campos.total_previsto = `O total mudou para ${(totalC / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Revise o carrinho.`;
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      for (const b of baixas) if (b.p.estoque !== null) b.p.estoque -= b.q;
+      numeroVenda += 1;
+      const venda = { id: 9000 + numeroVenda, numero: 'V-' + numeroVenda, data: new Date().toISOString(), total: totalC / 100,
+        itens: baixas.map((b) => ({ variacao_id: b.p.id, nome: b.p.nome, quantidade: b.q, preco_unitario: b.p.preco, subtotal: Math.round(b.p.preco * 100) * b.q / 100 })),
+        metodo: ROTULO_METODO[n.metodo as string] };
+      VENDAS_POR_CHAVE[chave] = { corpo: corpoTxt, venda };
+      return r({ ...venda });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/') && caminho.endsWith('/os')) {
       const v = VEICULOS.find((x) => x.id === Number(caminho.split('/')[4]));
