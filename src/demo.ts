@@ -114,7 +114,7 @@ const ETAPAS_OS = [['recepcao', 'Recepção'], ['em_diagnostico', 'Diagnóstico'
 const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
 const ORDENS = [
   { id: 1046, numero: 'OS-01046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
-  { id: 1045, numero: 'OS-01045', placa: 'MLK4C09', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
+  { id: 1045, numero: 'OS-01045', placa: 'MLK4109', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
   { id: 1044, numero: 'OS-01044', placa: 'QJT8A21', veiculo: 'Utilitário', cliente: 'Auto Center Rota', valor: 1380, etapa: 'aguardando_aprovacao' },
   { id: 1042, numero: 'OS-01042', placa: 'RLV2E48', veiculo: 'Picape', cliente: 'Transportes Vale Norte', valor: 750, etapa: 'em_execucao' },
   { id: 1039, numero: 'OS-01039', placa: 'RBA2H78', veiculo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
@@ -141,6 +141,18 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
       { tipo: 'servico_terceiro', descricao: 'Teste em bancada', quantidade: 1, valor_unitario: 200 },
     ] },
   1045: { local: null, km: 161880, fotos: 0, vistoria: { ok: 0, atencao: 0, critico: 0 }, observacoes: 'Motor falhando na partida a frio.', itens: [] },
+};
+
+// Veículos da demo (tela 08). Placas fictícias; o histórico sai das OS da demo pela placa.
+const VEICULOS = [
+  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', km: 48312, cor: 'Branco' },
+  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', km: 312040, cor: 'Prata' },
+  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', km: 161880, cor: null },
+  { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, km: 72415, cor: null },
+];
+const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>> = {
+  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460 }],
+  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180 }],
 };
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
@@ -696,10 +708,31 @@ export const demo = {
       if (i >= 0) TAREFAS.splice(i, 1);
       return r({ sucesso: true });
     }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/') && caminho.endsWith('/os')) {
+      const v = VEICULOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
+      const hoje = new Date().toISOString().slice(0, 10);
+      const abertas = ORDENS.filter((o) => o.placa === v.placa).map((o) => ({ os_id: o.id, numero: o.numero, data: hoje,
+        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor }));
+      return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])] });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos')) {
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
+      const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
+      return r({ itens, total: itens.length, pagina: 1, tem_mais: false });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
-      const o = ORDENS.find((x) => x.id === Number(caminho.split('/')[4]));
+      const idOs = Number(caminho.split('/')[4]);
+      // OS antigas do histórico dos veículos (tela 08) também abrem, já entregues.
+      const antiga = Object.entries(HISTORICO_ANTIGO).flatMap(([placa, l]) => l.map((h) => ({ ...h, placa }))).find((h) => h.os_id === idOs);
+      const veicAntigo = antiga ? VEICULOS.find((v) => v.placa === antiga.placa) : undefined;
+      const o = ORDENS.find((x) => x.id === idOs) ?? (antiga && veicAntigo ? { id: antiga.os_id, numero: antiga.numero, placa: veicAntigo.placa,
+        veiculo: veicAntigo.descricao as string | null, cliente: antiga.cliente ?? veicAntigo.cliente ?? 'Sem cliente', valor: antiga.valor, etapa: 'entregue' } : undefined);
       if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
       const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
+      // OS terminal (entregue, aberta pelo histórico do veículo): indice null e terminal true, como o ERP fechou.
+      const etapaOs = pos >= 0 ? { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length }
+        : { chave: o.etapa, rotulo: 'Entregue', indice: null, total_etapas: ETAPAS_OS.length, terminal: true };
       const d = DETALHE_OS[o.id] ?? { local: null, km: null, observacoes: null, vistoria: null, fotos: 0,
         itens: o.valor ? [{ tipo: 'mao_obra' as const, descricao: 'Serviço', quantidade: 1, valor_unitario: o.valor }] : [] };
       // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
@@ -707,7 +740,7 @@ export const demo = {
       const soma = (t: string) => itens.filter((i) => i.tipo === t).reduce((a, i) => a + i.valor, 0);
       const totais = { pecas: soma('peca'), mao_de_obra: soma('mao_obra'), terceiros: soma('servico_terceiro'), total: itens.reduce((a, i) => a + i.valor, 0) };
       return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
-        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length },
+        etapa: etapaOs,
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos });
     }

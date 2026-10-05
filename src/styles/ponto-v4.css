@@ -612,3 +612,20 @@ button.db-kpi { cursor: pointer; }
 .osd-vist b.ok { color: var(--ok-text, var(--text-dim)); } .osd-vist b.atencao { color: var(--warn-text, var(--text)); } .osd-vist b.critico { color: var(--danger); }
 .osd-sub { padding: 8px 14px; display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border-2); }
 .osd-sub span:last-child { font-family: var(--font-mono); }
+
+/* Abas da Oficina (07 · 08) e tela 08 · Veículos (prefixo vei-) */
+.ofi-abas { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+.os-placa.antiga { border-top-width: 1.5px; background: var(--bg-2); }
+.vei-card { padding: 0; gap: 0; overflow: hidden; }
+.vei-topo { min-height: 64px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; border: 0; background: none; font: inherit; color: inherit; text-align: left; width: 100%; }
+.vei-meta { font-family: var(--font-mono); font-size: 11.5px !important; color: var(--text-mute) !important; }
+.vei-chev { width: 28px; text-align: center; font-family: var(--font-mono); font-size: 18px; color: var(--text-dim); flex-shrink: 0; }
+.vei-hist { border-top: 1px solid var(--border-2); padding: 10px 14px 6px; display: flex; flex-direction: column; gap: 2px; background: var(--bg-2); }
+.vei-os { min-height: 44px; display: flex; align-items: center; gap: 10px; border: 0; background: none; font: inherit; color: var(--text); text-align: left; padding: 0; width: 100%; }
+.vei-os + .vei-os { border-top: 1px solid var(--border-2); }
+.vei-os-t { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-dim); }
+.vei-os-v { font-family: var(--font-mono); font-size: 12.5px; }
+.vei-hist .p4-rotulo, .vei-hist .pd-num { color: var(--text-dim); }
+.vei-placas { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.vei-reboque { font-weight: 500; color: var(--text-dim); font-size: 12.5px; }
+.vei-os-t small { display: block; font-size: 11.5px; color: var(--text-dim); }
