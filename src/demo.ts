@@ -120,6 +120,29 @@ const ORDENS = [
   { id: 1039, numero: 'OS-01039', placa: 'RBA2H78', veiculo: 'Caminhão basculante', cliente: 'Transportes Vale Norte', valor: 6420, etapa: 'aguardando_pecas' },
   { id: 1036, numero: 'OS-01036', placa: 'QHX5B33', veiculo: null, cliente: 'Studio Forma', valor: 980, etapa: 'pronto_retirada' },
 ];
+
+
+// Detalhe das OS da demo (tela 03, formato fechado). Valores somam o valor da lista (07).
+type ItemOsDemo = { tipo: 'peca' | 'mao_obra' | 'servico_terceiro'; descricao: string; quantidade: number; valor_unitario: number };
+const DETALHE_OS: Record<number, { local: string | null; km: number | null; observacoes: string | null; vistoria: { ok: number; atencao: number; critico: number } | null;
+  fotos: number; itens: ItemOsDemo[] }> = {
+  1042: { local: 'Elevador 1', km: 48312, fotos: 3, vistoria: { ok: 14, atencao: 2, critico: 1 },
+    observacoes: 'Barulho na suspensão dianteira em lombada; volante puxando para a direita.',
+    itens: [
+      { tipo: 'mao_obra', descricao: 'Troca de bieleta dianteira', quantidade: 1, valor_unitario: 180 },
+      { tipo: 'mao_obra', descricao: 'Alinhamento e balanceamento', quantidade: 1, valor_unitario: 150 },
+      { tipo: 'peca', descricao: 'Bieleta dianteira direita', quantidade: 1, valor_unitario: 138 },
+      { tipo: 'peca', descricao: 'Kit batente + coifa', quantidade: 2, valor_unitario: 141 },
+    ] },
+  1039: { local: 'Box 3', km: 312040, fotos: 0, vistoria: null, observacoes: 'Aguardando bomba injetora do fornecedor.',
+    itens: [
+      { tipo: 'peca', descricao: 'Bomba injetora', quantidade: 1, valor_unitario: 5800 },
+      { tipo: 'mao_obra', descricao: 'Troca da bomba injetora', quantidade: 1, valor_unitario: 420 },
+      { tipo: 'servico_terceiro', descricao: 'Teste em bancada', quantidade: 1, valor_unitario: 200 },
+    ] },
+  1045: { local: null, km: 161880, fotos: 0, vistoria: { ok: 0, atencao: 0, critico: 0 }, observacoes: 'Motor falhando na partida a frio.', itens: [] },
+};
+
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
 
@@ -731,6 +754,21 @@ export const demo = {
         metodo: ROTULO_METODO[n.metodo as string] };
       VENDAS_POR_CHAVE[chave] = { corpo: corpoTxt, venda };
       return r({ ...venda });
+    }
+    if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
+      const o = ORDENS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
+      const pos = ETAPAS_OS.findIndex((e) => e[0] === o.etapa);
+      const d = DETALHE_OS[o.id] ?? { local: null, km: null, observacoes: null, vistoria: null, fotos: 0,
+        itens: o.valor ? [{ tipo: 'mao_obra' as const, descricao: 'Serviço', quantidade: 1, valor_unitario: o.valor }] : [] };
+      // Na demo, os totais saem da soma dos itens; no app real, vêm prontos do ERP.
+      const itens = d.itens.map((i) => ({ ...i, valor: i.quantidade * i.valor_unitario }));
+      const soma = (t: string) => itens.filter((i) => i.tipo === t).reduce((a, i) => a + i.valor, 0);
+      const totais = { pecas: soma('peca'), mao_de_obra: soma('mao_obra'), terceiros: soma('servico_terceiro'), total: itens.reduce((a, i) => a + i.valor, 0) };
+      return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
+        etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos][1], indice: pos + 1, total_etapas: ETAPAS_OS.length },
+        veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
+        observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
