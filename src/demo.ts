@@ -175,10 +175,12 @@ const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | nu
   { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null },
   { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, cliente_id: null, km: 72415, cor: null },
 ];
-const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null }>> = {
-  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460 }],
-  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180 }],
+const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null; km: number | null }>> = {
+  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240, km: 41870 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460, km: null }],
+  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180, km: 152300 }],
 };
+// Km do cadastro na demo (o resto vem das OS).
+const KM_CADASTRO: Record<string, number> = { RLV2E48: 30500, MLK4109: 140000 };
 
 // Edições feitas pelo PATCH da demo, por pessoa (campos que a lista não guarda).
 const EDICOES: Record<number, Record<string, unknown>> = {};
@@ -804,8 +806,8 @@ export const demo = {
       if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
       const hoje = new Date().toISOString().slice(0, 10);
       const abertas = ORDENS.filter((o) => o.placa === v.placa).map((o) => ({ os_id: o.id, numero: o.numero, data: hoje,
-        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor }));
-      return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])] });
+        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor, km: DETALHE_OS[o.id]?.km ?? null }));
+      return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])], km_cadastro: KM_CADASTRO[v.placa] ?? null, cadastrado_em: KM_CADASTRO[v.placa] ? '2025-03-10' : null });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/consulta-placa/')) {
       // Demo: resposta fixa e marcada como demonstração; no app real os dados vêm do fornecedor do ERP.
