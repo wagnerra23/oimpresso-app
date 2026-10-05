@@ -120,9 +120,9 @@ const ENCERRA_OS: Record<string, Array<[string, string, boolean, string]>> = {
   aguardando_aprovacao: [['recusar_orcamento', 'Cliente recusou orçamento', true, 'cancelado']],
   aguardando_pecas: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
   em_execucao: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
-  pronto_retirada: [['cancelar_os', 'Cancelar OS', true, 'cancelado']],
+  pronto_retirada: [['cancelar_os', 'Cancelar OS', true, 'cancelado'], ['acionar_garantia', 'Acionar garantia', true, 'garantia_acionada']],
 };
-const TERMINAIS_OS: Record<string, string> = { entregue: 'Entregue', cancelado: 'Cancelado' };
+const TERMINAIS_OS: Record<string, string> = { entregue: 'Entregue', cancelado: 'Cancelado', garantia_acionada: 'Garantia acionada' };
 const AVANCO_OS: Record<string, Array<[string, string, boolean, string]>> = {
   recepcao: [['iniciar_diagnostico', 'Iniciar diagnóstico', false, 'em_diagnostico']],
   em_diagnostico: [['enviar_orcamento', 'Enviar orçamento pra aprovação', false, 'aguardando_aprovacao']],
@@ -812,6 +812,8 @@ export const demo = {
       if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
       const acao = [...(AVANCO_OS[o.etapa] ?? []), ...(ENCERRA_OS[o.etapa] ?? [])].find((a) => a[0] === decodeURIComponent(partes[6]));
       if (!acao) throw Object.assign(new Error('A OS mudou de etapa. Atualize a tela.'), { status: 409 });
+      const motivo = (corpo as { motivo?: string | null } | undefined)?.motivo ?? null;
+      if (acao[0] === 'acionar_garantia' && !motivo) throw Object.assign(new Error('Informe o motivo da garantia.'), { status: 422, campos: { motivo: 'Informe o motivo da garantia.' } });
       const det = DETALHE_OS[o.id];
       if (acao[0] === 'enviar_orcamento' && (!det || det.itens.length === 0) && !o.valor) throw Object.assign(new Error('Falta: Orçamento com ≥ 1 item lançado.'), { status: 422 });
       await espera(400);
@@ -853,9 +855,9 @@ export const demo = {
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
         observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos,
         // Gate de exemplo: sem item lançado não dá para mandar o orçamento (como o StageGateEvaluator do ERP).
-        acoes: [...(AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true, tipo: 'avanco' as const,
+        acoes: [...(AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, tipo: 'avanco' as const, destino: { chave: para, rotulo: ETAPAS_OS.find((e) => e[0] === para)?.[1] ?? TERMINAIS_OS[para] ?? para },
           bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })),
-          ...(ENCERRA_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true, bloqueio: null, tipo: 'encerra' as const }))] });
+          ...(ENCERRA_OS[o.etapa] ?? []).map(([chave, rotulo, critica, para]) => ({ chave, rotulo, critica, pode: true, bloqueio: null, tipo: 'encerra' as const, destino: { chave: para, rotulo: TERMINAIS_OS[para] ?? para } }))] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');

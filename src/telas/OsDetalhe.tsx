@@ -9,7 +9,7 @@
 // Cancelar OS e recusar orçamento ficam num botão vermelho à parte, sempre com confirmação e motivo opcional
 // (ligados por ENCERRAR_OS). Acionar garantia fica na web. Rota do ERP #8637 (contrato tela-03).
 import { useEffect, useState } from 'react';
-import { api, ENCERRAR_OS, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
+import { api, camposDoErro, ENCERRAR_OS, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
 import { reais } from './Pedidos';
 
 /** Quilometragem como o protótipo: "48.312 km". */
@@ -47,6 +47,19 @@ export const acoesEncerrar = (acoes: OsAcao[] | undefined, ligado = ESCRITA_OS &
 /** Motivo digitado: em branco não vai; o resto vai sem os espaços das pontas, até 500 caracteres. */
 export const motivoParaEnvio = (t: string): string | null => (t.trim() ? t.trim().slice(0, 500) : null);
 
+/** Acionar garantia exige motivo (a garantia é auditada depois); cancelar e recusar, não. */
+export const exigeMotivo = (a: Pick<OsAcao, 'chave'>): boolean => a.chave === 'acionar_garantia';
+
+/** Para onde a ação leva, como o ERP manda; sem o campo, o texto padrão de cada ação que encerra. */
+export function destinoDaAcao(a: Pick<OsAcao, 'chave' | 'destino'>): string {
+  if (a.destino?.rotulo) return a.destino.rotulo;
+  return a.chave === 'acionar_garantia' ? 'Garantia acionada' : 'Cancelado';
+}
+
+/** Texto do botão de confirmar na folha de encerrar. */
+export const confirmarEncerrar = (chave: string): string =>
+  chave === 'recusar_orcamento' ? 'Recusar' : chave === 'acionar_garantia' ? 'Acionar garantia' : 'Cancelar OS';
+
 /** Cor da etapa no detalhe: travada em vermelho, última do fluxo em verde, terminal e fora do fluxo neutros. */
 export function tintaDetalhe(o: Pick<Detalhe, 'etapa' | 'travada'>): string {
   if (!o.etapa) return 'var(--text-dim)';
@@ -62,14 +75,18 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
   const [executando, setExecutando] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState<OsAcao | null>(null);
   const [motivo, setMotivo] = useState('');
+  const [erroMotivo, setErroMotivo] = useState<string | null>(null);
 
   const executar = async (a: OsAcao, comMotivo: string | null = null) => {
     setExecutando(a.chave);
     try {
       const nova = await api.executarAcaoOs(id, a.chave, comMotivo);
-      setO(nova); setConfirmando(null); setEncerrando(null); setMotivo('');
+      setO(nova); setConfirmando(null); setEncerrando(null); setMotivo(''); setErroMotivo(null);
       avisar?.(`${nova.numero} · ${nova.etapa?.rotulo ?? 'etapa alterada'}`);
     } catch (e) {
+      // Motivo recusado pelo ERP (vazio na garantia, longo demais): a folha fica aberta com o erro no campo.
+      const campoMotivo = camposDoErro(e).motivo;
+      if (campoMotivo) { setErroMotivo(campoMotivo); return; }
       setConfirmando(null); setEncerrando(null);
       avisar?.(erroDaAcao(e), 'erro');
       // Etapa mudou por outro usuário: recarrega para mostrar as ações certas.
@@ -174,7 +191,7 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
           {acoesEncerrar(o.acoes).length > 0 && (
             <div className="osd-encerrar">
               {acoesEncerrar(o.acoes).map((a) => (
-                <button key={a.chave} className="osd-encerra" disabled={!!a.bloqueio || executando !== null} onClick={() => { setMotivo(''); setEncerrando(a); }}>
+                <button key={a.chave} className="osd-encerra" disabled={!!a.bloqueio || executando !== null} onClick={() => { setMotivo(''); setErroMotivo(null); setEncerrando(a); }}>
                   {a.rotulo}
                 </button>
               ))}
@@ -188,16 +205,18 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
             <div className="oi-sheet-grip" />
             <div className="oi-sheet-h"><b id="osd-enc-t">{encerrando.rotulo}?</b></div>
             <div className="osd-folha">
-              <p className="osd-conf">{o.numero}{o.veiculo?.placa ? ` · ${o.veiculo.placa}` : ''} sai da oficina e vai para <b>Cancelado</b>. Isso não se desfaz pelo app.</p>
+              <p className="osd-conf">{o.numero}{o.veiculo?.placa ? ` · ${o.veiculo.placa}` : ''} sai da oficina e vai para <b>{destinoDaAcao(encerrando)}</b>. Isso não se desfaz pelo app.</p>
               <div className="p4-campo">
-                <label htmlFor="osd-motivo">Motivo (opcional)</label>
-                <textarea id="osd-motivo" className="nos-obs" rows={3} maxLength={500} value={motivo} onChange={(e) => setMotivo(e.target.value)}
-                  placeholder={encerrando.chave === 'recusar_orcamento' ? 'Ex.: cliente achou caro' : 'Ex.: cliente desistiu'} />
+                <label htmlFor="osd-motivo">{exigeMotivo(encerrando) ? 'Motivo' : 'Motivo (opcional)'}</label>
+                <textarea id="osd-motivo" className="nos-obs" rows={3} maxLength={500} value={motivo} onChange={(e) => { setMotivo(e.target.value); setErroMotivo(null); }}
+                  aria-invalid={!!erroMotivo} aria-describedby={erroMotivo ? 'osd-motivo-e' : undefined}
+                  placeholder={encerrando.chave === 'recusar_orcamento' ? 'Ex.: cliente achou caro' : encerrando.chave === 'acionar_garantia' ? 'Ex.: barulho voltou na suspensão' : 'Ex.: cliente desistiu'} />
+                {erroMotivo && <span id="osd-motivo-e" className="np-erro">{erroMotivo}</span>}
               </div>
               <div className="osd-conf-bts">
                 <button className="oi-btn" disabled={executando !== null} onClick={() => setEncerrando(null)}>Voltar</button>
-                <button className="oi-btn osd-perigo" disabled={executando !== null} onClick={() => executar(encerrando, motivoParaEnvio(motivo))}>
-                  {executando ? 'Encerrando…' : encerrando.chave === 'recusar_orcamento' ? 'Recusar' : 'Cancelar OS'}
+                <button className="oi-btn osd-perigo" disabled={executando !== null} onClick={() => (exigeMotivo(encerrando) && !motivoParaEnvio(motivo) ? setErroMotivo('Informe o motivo da garantia.') : executar(encerrando, motivoParaEnvio(motivo)))}>
+                  {executando ? 'Encerrando…' : confirmarEncerrar(encerrando.chave)}
                 </button>
               </div>
             </div>

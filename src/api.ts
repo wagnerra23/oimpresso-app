@@ -313,8 +313,10 @@ export interface OsDetalhe {
  *  `bloqueio` = "Falta: <requisitos>." quando o gate barra, senão null. */
 export interface OsAcao {
   chave: string; rotulo: string; critica: boolean; pode: boolean; bloqueio: string | null;
-  /** "encerra" = cancelar OS ou recusar orçamento (ERP #8646); ausente = avanço. */
+  /** "encerra" = cancelar OS, recusar orçamento ou acionar garantia (ERP #8646); ausente = avanço. */
   tipo?: 'avanco' | 'encerra';
+  /** Etapa para onde a ação leva (pedido ao ERP); ausente = o app usa o texto padrão. */
+  destino?: { chave: string; rotulo: string };
 }
 /** Liga "avançar etapa" na tela 03. Rota do ERP #8637 em produção desde 2026-10-05. */
 export const ESCRITA_OS = true;
