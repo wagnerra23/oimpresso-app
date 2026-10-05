@@ -145,7 +145,7 @@ export function App() {
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;
       case 'ponto_gestor': return <FilaGestor avisar={avisar} voltar={voltar} />;
       case 'equipe': return <Equipe voltar={voltar} />;
-      case 'oficina': return <OrdensServico voltar={voltar} />;
+      case 'oficina': return <OrdensServico avisar={avisar} voltar={voltar} />;
       case 'assistente': return <Assistente online={online} voltar={voltar} />;
       case 'pagamentos': return <Pagamentos avisar={avisar} voltar={voltar} />;
       case 'ponto': return <Ponto avisar={avisar} online={online} voltar={voltar} />;

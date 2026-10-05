@@ -112,6 +112,15 @@ const HISTORICO: Record<number, Array<{ id: number; tipo: string; rotulo: string
 const ETAPAS_OS = [['recepcao', 'Recepção'], ['em_diagnostico', 'Diagnóstico'], ['aguardando_aprovacao', 'Aguardando aprovação'],
   ['aguardando_pecas', 'Aguardando peças'], ['em_execucao', 'Em execução'], ['pronto_retirada', 'Pronto p/ retirar']] as const;
 const OS_TRAVA = ['aguardando_aprovacao', 'aguardando_pecas'];
+// Ações de avanço por etapa (como o seeder do ERP): [chave, rótulo, crítica, etapa de destino].
+const AVANCO_OS: Record<string, Array<[string, string, boolean, string]>> = {
+  recepcao: [['iniciar_diagnostico', 'Iniciar diagnóstico', false, 'em_diagnostico']],
+  em_diagnostico: [['enviar_orcamento', 'Enviar orçamento pra aprovação', false, 'aguardando_aprovacao']],
+  aguardando_aprovacao: [['aprovar_pedir_pecas', 'Cliente aprovou — pedir peças', true, 'aguardando_pecas'], ['aprovar_executar', 'Cliente aprovou — já executar', true, 'em_execucao']],
+  aguardando_pecas: [['pecas_chegaram', 'Peças chegaram — iniciar execução', false, 'em_execucao']],
+  em_execucao: [['concluir_servico', 'Concluir serviço', true, 'pronto_retirada']],
+  pronto_retirada: [['entregar', 'Entregar ao cliente', false, 'entregue']],
+};
 const ORDENS = [
   { id: 1046, numero: 'OS-01046', placa: null, veiculo: null, cliente: 'Padaria Trigo Fino', valor: null, etapa: 'recepcao' },
   { id: 1045, numero: 'OS-01045', placa: 'MLK4109', veiculo: 'Furgão', cliente: 'Mercado Bom Preço', valor: null, etapa: 'em_diagnostico' },
@@ -780,6 +789,18 @@ export const demo = {
       const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
       return r({ itens, total: itens.length, pagina: 1, tem_mais: false });
     }
+    if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
+      const partes = caminho.split('/');
+      const o = ORDENS.find((x) => x.id === Number(partes[4]));
+      if (!o) throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404 });
+      const acao = (AVANCO_OS[o.etapa] ?? []).find((a) => a[0] === decodeURIComponent(partes[6]));
+      if (!acao) throw Object.assign(new Error('A OS mudou de etapa. Atualize a tela.'), { status: 409 });
+      const det = DETALHE_OS[o.id];
+      if (acao[0] === 'enviar_orcamento' && (!det || det.itens.length === 0) && !o.valor) throw Object.assign(new Error('Falta: Orçamento com ≥ 1 item lançado.'), { status: 422 });
+      await espera(400);
+      o.etapa = acao[3];
+      return demo.chamar<T>('GET', '/api/app/os/' + o.id);
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {
       const idOs = Number(caminho.split('/')[4]);
       // OS antigas do histórico dos veículos (tela 08) também abrem, já entregues.
@@ -801,16 +822,21 @@ export const demo = {
       return r({ id: o.id, numero: o.numero, local: d.local, travada: OS_TRAVA.includes(o.etapa),
         etapa: etapaOs,
         veiculo: o.veiculo || o.placa ? { placa: o.placa, descricao: o.veiculo, km: d.km } : null, cliente: { id: 1, nome: o.cliente },
-        observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos });
+        observacoes: d.observacoes, vistoria: d.vistoria, itens, totais, fotos_laudo: d.fotos,
+        // Gate de exemplo: sem item lançado não dá para mandar o orçamento (como o StageGateEvaluator do ERP).
+        acoes: (AVANCO_OS[o.etapa] ?? []).map(([chave, rotulo, critica]) => ({ chave, rotulo, critica, pode: true,
+          bloqueio: chave === 'enviar_orcamento' && itens.length === 0 ? 'Falta: Orçamento com ≥ 1 item lançado.' : null })) });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os?')) {
       const etapa = decodeURIComponent((caminho.match(/etapa=([^&]*)/) || [])[1] || 'todas');
       const pos = (k: string) => ETAPAS_OS.findIndex((e) => e[0] === k);
-      const itens = ORDENS.filter((o) => etapa === 'todas' || o.etapa === etapa).sort((a, b) => pos(b.etapa) - pos(a.etapa) || b.id - a.id).map((o) => ({
+      // Só OS ativas, como o ERP: etapas terminais (entregue) saem da lista.
+      const ativas = ORDENS.filter((o) => pos(o.etapa) >= 0);
+      const itens = ativas.filter((o) => etapa === 'todas' || o.etapa === etapa).sort((a, b) => pos(b.etapa) - pos(a.etapa) || b.id - a.id).map((o) => ({
         id: o.id, numero: o.numero, placa: o.placa, veiculo: o.veiculo, cliente: o.cliente, valor: o.valor, travada: OS_TRAVA.includes(o.etapa),
         etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
-      const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ORDENS.filter((o) => o.etapa === chave).length }));
-      return r({ itens, etapas, total: ORDENS.length, travadas: ORDENS.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
+      const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ativas.filter((o) => o.etapa === chave).length }));
+      return r({ itens, etapas, total: ativas.length, travadas: ativas.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false });
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);

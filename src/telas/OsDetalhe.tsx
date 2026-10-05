@@ -4,8 +4,11 @@
 // Os totais vêm prontos do ERP (o app não soma valor). Fotos: só a contagem das fotos do laudo — o app não
 // mostra nem tira foto (ADR 0383, sem câmera). Fora de propósito: sugestão da IA, "+ Adicionar" item,
 // "Link de aprovação" e "Faturar" (escritas, que mexem em valor e cobrança).
+// Avançar etapa (rodapé): as ações vêm do ERP com o motivo do bloqueio quando o gate barra; ação crítica pede
+// confirmação. Mudar de etapa não mexe em estoque nem valor (o processo da oficina não tem efeito colateral).
+// Cancelar, recusar orçamento e acionar garantia ficam na web. Rota do ERP #8637 (contrato tela-03).
 import { useEffect, useState } from 'react';
-import { api, ErroApi, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
+import { api, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
 import { reais } from './Pedidos';
 
 /** Quilometragem como o protótipo: "48.312 km". */
@@ -26,6 +29,15 @@ export function textoFotos(n: number): string | null {
   return n === 1 ? '1 foto no laudo — veja no computador' : `${n} fotos no laudo — veja no computador`;
 }
 
+/** Mensagem para o erro de uma ação: o texto do ERP quando ele explica (gate, etapa mudou); senão um genérico. */
+export function erroDaAcao(e: unknown): string {
+  if (e instanceof ErroApi && e.status === 403) return 'Seu usuário não pode mudar a etapa desta OS.';
+  return e instanceof Error && e.message ? e.message : 'Não foi possível mudar a etapa. Tente de novo.';
+}
+
+/** Ações que o rodapé mostra: só as que o usuário pode executar. */
+export const acoesVisiveis = (acoes: OsAcao[] | undefined, ligado = ESCRITA_OS): OsAcao[] => (ligado ? (acoes ?? []).filter((a) => a.pode) : []);
+
 /** Cor da etapa no detalhe: travada em vermelho, última do fluxo em verde, terminal e fora do fluxo neutros. */
 export function tintaDetalhe(o: Pick<Detalhe, 'etapa' | 'travada'>): string {
   if (!o.etapa) return 'var(--text-dim)';
@@ -35,8 +47,24 @@ export function tintaDetalhe(o: Pick<Detalhe, 'etapa' | 'travada'>): string {
   return 'var(--accent-text)';
 }
 
-export function OsDetalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => void; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [o, setO] = useState<Detalhe | null>(null);
+  const [confirmando, setConfirmando] = useState<OsAcao | null>(null);
+  const [executando, setExecutando] = useState<string | null>(null);
+
+  const executar = async (a: OsAcao) => {
+    setExecutando(a.chave);
+    try {
+      const nova = await api.executarAcaoOs(id, a.chave);
+      setO(nova); setConfirmando(null);
+      avisar?.(`${nova.numero} · ${nova.etapa?.rotulo ?? 'etapa alterada'}`);
+    } catch (e) {
+      setConfirmando(null);
+      avisar?.(erroDaAcao(e), 'erro');
+      // Etapa mudou por outro usuário: recarrega para mostrar as ações certas.
+      if (e instanceof ErroApi && e.status === 409) api.osDetalhe(id).then(setO).catch(() => {});
+    } finally { setExecutando(null); }
+  };
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
     setO(null); setErro(null);
@@ -117,10 +145,38 @@ export function OsDetalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }
             </div>
 
             {fotos && <p className="p4-legal">{fotos}</p>}
-            <p className="p4-legal">No app a OS é só consulta. Link de aprovação, mudar de etapa e faturar ficam no computador.</p>
+            <p className="p4-legal">{acoesVisiveis(o.acoes).length ? 'Link de aprovação, cancelar e faturar ficam no computador.' : 'No app a OS é só consulta. Link de aprovação, mudar de etapa e faturar ficam no computador.'}</p>
           </div>
         )}
       </div>
+      {o && acoesVisiveis(o.acoes).length > 0 && (
+        <div className="pd-rodape osd-acoes">
+          {acoesVisiveis(o.acoes).map((a) => (
+            <div key={a.chave} className="osd-acao">
+              <button className="p4-cta" disabled={!!a.bloqueio || executando !== null}
+                onClick={() => (a.critica ? setConfirmando(a) : executar(a))}>
+                {executando === a.chave ? 'Mudando…' : a.rotulo}
+              </button>
+              {a.bloqueio && <span className="osd-bloqueio">{a.bloqueio}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {confirmando && o && (
+        <div className="oi-sheet-backdrop" onClick={() => executando === null && setConfirmando(null)}>
+          <div className="oi-sheet" role="dialog" aria-modal="true" aria-labelledby="osd-conf-t" onClick={(e) => e.stopPropagation()}>
+            <div className="oi-sheet-grip" />
+            <div className="oi-sheet-h"><b id="osd-conf-t">{confirmando.rotulo}?</b></div>
+            <div className="osd-folha">
+              <p className="osd-conf">{o.numero}{o.veiculo?.placa ? ` · ${o.veiculo.placa}` : ''}<br />Sai de <b>{o.etapa?.rotulo ?? 'fora do fluxo'}</b>.</p>
+              <div className="osd-conf-bts">
+                <button className="oi-btn" disabled={executando !== null} onClick={() => setConfirmando(null)}>Voltar</button>
+                <button className="p4-cta" disabled={executando !== null} onClick={() => executar(confirmando)}>{executando ? 'Mudando…' : 'Confirmar'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

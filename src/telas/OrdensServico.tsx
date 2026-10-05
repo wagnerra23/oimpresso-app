@@ -46,11 +46,11 @@ export function kpisPatio(d: Pick<ListaOs, 'total' | 'etapas'>): Array<{ chave: 
 /** Valor da OS; sem valor ainda (antes do orçamento), travessão. */
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
-export function OrdensServico({ voltar }: { voltar?: ReactNode }) {
+export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aba, setAba] = useState<'os' | 'veiculos'>('os');
   const [aberta, setAberta] = useState<number | null>(null);
   useVoltar(aberta !== null, () => setAberta(null));
-  if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} />;
+  if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
   // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
   const abas = (
     <div className="p4-abas ofi-abas" role="tablist" aria-label="Oficina">
