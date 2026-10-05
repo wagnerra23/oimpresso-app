@@ -2,11 +2,13 @@
 // veículo" da busca da Nova OS (o veículo novo volta já escolhido). Rota POST /api/app/veiculos (contrato tela-08,
 // ERP #8687), ligada por NOVO_VEICULO. Placa já em outro veículo ativo: o ERP recusa e manda o id; na Nova OS o app
 // oferece usar esse veículo. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
-// cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito: consulta de placa externa,
-// motor, combustível, chassi do reboque e observações (ficam na web). "Buscar" da placa: consulta no fornecedor do
+// cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito:
+// motor, combustível, chassi do reboque e observações (ficam na web). Com veiculoId vira "Editar veículo": carrega
+// GET /api/app/veiculos/{id} e salva com PUT (rotas PROVISÓRIAS pedidas ao ERP, ligadas por EDITAR_VEICULO). Na edição
+// não há "Buscar": a consulta trataria a placa do próprio veículo como já ativa. "Buscar" da placa: consulta no fornecedor do
 // ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -46,6 +48,13 @@ export function aplicarConsulta(f: Form, d: NonNullable<ConsultaPlaca['dados']>)
   };
 }
 
+/** Formulário a partir do veículo salvo no ERP (editar): vazio vira "" e o km, só dígitos. */
+export function formDoVeiculo(v: VeiculoEdicao): Form {
+  const t = (x: string | number | null) => (x === null ? '' : String(x));
+  return { placa: v.placa, tipo: v.tipo ?? '', reboque: t(v.placa_secundaria), anoFab: t(v.ano_fabricacao), anoMod: t(v.ano_modelo),
+    cor: t(v.cor), km: t(v.km), chassi: t(v.chassi), renavam: t(v.renavam) };
+}
+
 /** Confere o formulário antes de enviar; devolve os erros por campo da API (vazio = pode enviar). */
 export function errosDoForm(f: Form): Record<string, string> {
   const e: Record<string, string> = {};
@@ -64,15 +73,20 @@ export function errosDoForm(f: Form): Record<string, string> {
 }
 
 interface Props {
-  aoVoltar: () => void; aoCriar: (v: VeiculoResumo) => void;
+  aoVoltar: () => void;
+  /** Depois de cadastrar ou salvar a edição, com o veículo no formato da lista. */
+  aoCriar: (v: VeiculoResumo) => void;
   avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
   /** Rótulo do topo ("Oficina" na aba Veículos, "Nova OS" quando vem da busca da OS). */
   rotulo?: string;
   /** Placa repetida: usar o veículo que já existe (só na Nova OS). */
   aoUsarExistente?: (v: VeiculoResumo) => void;
+  /** Editar este veículo em vez de cadastrar um novo. */
+  veiculoId?: number;
 }
 
-export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoUsarExistente }: Props) {
+export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoUsarExistente, veiculoId }: Props) {
+  const editando = veiculoId !== undefined;
   const [opcoes, setOpcoes] = useState<OpcoesVeiculo | null>(null);
   const [erroOpcoes, setErroOpcoes] = useState<string | null>(null);
   const [f, setF] = useState<Form>(VAZIO);
@@ -83,10 +97,20 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
   const [existente, setExistente] = useState<VeiculoResumo | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [achado, setAchado] = useState<string | null>(null);
+  const [carregado, setCarregado] = useState(!editando);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   useEffect(() => {
     api.opcoesVeiculo().then(setOpcoes).catch((e) => setErroOpcoes(e instanceof Error ? e.message : 'Não foi possível carregar os tipos.'));
-  }, []);
+    if (veiculoId === undefined) return;
+    api.veiculo(veiculoId).then((v) => {
+      setF(formDoVeiculo(v));
+      setDono(v.contact_id === null ? null : { id: v.contact_id, nome: v.cliente ?? 'Cliente' });
+      setCarregado(true);
+    }).catch((e) => setErroCarga(e instanceof ErroApi && e.status === 404 ? 'Este veículo não existe mais.'
+      : e instanceof ErroApi && e.status === 403 ? 'Seu usuário não pode editar veículo.'
+      : e instanceof Error ? e.message : 'Não foi possível carregar o veículo.'));
+  }, [veiculoId]);
 
   const mudar = (k: keyof Form, v: string, campoApi: string) => {
     setF((x) => ({ ...x, [k]: v }));
@@ -135,12 +159,13 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
     const ano = (t: string) => { const a = anoDigitado(t); return a === 'invalido' ? null : a; };
     const km = kmDigitado(f.km);
     try {
-      const v = await api.criarVeiculo({
+      const corpo = {
         placa: normalizarPlaca(f.placa), tipo: f.tipo, placa_secundaria: normalizarPlaca(f.reboque) || null,
         ano_fabricacao: ano(f.anoFab), ano_modelo: ano(f.anoMod), cor: textoOuNulo(f.cor), km: km === 'invalido' ? null : km,
         chassi: textoOuNulo(f.chassi.toUpperCase()), renavam: textoOuNulo(f.renavam), contact_id: dono?.id ?? null,
-      });
-      avisar?.(`Veículo ${v.placa} cadastrado`);
+      };
+      const v = veiculoId !== undefined ? await api.editarVeiculo(veiculoId, corpo) : await api.criarVeiculo(corpo);
+      avisar?.(editando ? `Veículo ${v.placa} atualizado` : `Veículo ${v.placa} cadastrado`);
       aoCriar(v);
     } catch (x) {
       const campos = camposDoErro(x);
@@ -148,13 +173,14 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
       // Placa repetida: busca o veículo que já tem a placa para oferecer usá-lo (só na Nova OS).
       const idExistente = veiculoExistenteDoErro(x);
       if (idExistente !== null) oferecerExistente(idExistente);
-      if (!Object.keys(campos).length) avisar?.(x instanceof ErroApi && x.status === 403 ? 'Seu usuário não pode cadastrar veículo.'
+      if (!Object.keys(campos).length) avisar?.(x instanceof ErroApi && x.status === 403 ? (editando ? 'Seu usuário não pode editar veículo.' : 'Seu usuário não pode cadastrar veículo.')
+        : x instanceof ErroApi && x.status === 404 ? 'Este veículo não existe mais.'
         : x instanceof ErroApi && x.status === 503 ? 'A oficina ainda não está configurada nesta empresa.'
-        : x instanceof Error ? x.message : 'Não foi possível cadastrar.', 'erro');
+        : x instanceof Error ? x.message : (editando ? 'Não foi possível salvar.' : 'Não foi possível cadastrar.'), 'erro');
     } finally { setSalvando(false); }
   };
 
-  if (escolhendoDono) return <BuscaCliente rotulo="Novo veículo" aoEscolher={(c) => { setDono(c); setEscolhendoDono(false); }} aoVoltar={() => setEscolhendoDono(false)} />;
+  if (escolhendoDono) return <BuscaCliente rotulo={editando ? 'Editar veículo' : 'Novo veículo'} aoEscolher={(c) => { setDono(c); setEscolhendoDono(false); }} aoVoltar={() => setEscolhendoDono(false)} />;
 
   const erro = (k: string) => erros[k] ? <span id={'nve-e-' + k} className="np-erro">{erros[k]}</span> : null;
   const campo = (k: keyof Form, rotuloCampo: string, campoApi: string, extra: InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -174,13 +200,16 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="p4-rotulo">{rotulo}</div>
-          <div className="pd-dtitulo">Novo veículo</div>
+          <div className="pd-dtitulo">{editando ? 'Editar veículo' : 'Novo veículo'}</div>
         </div>
         {placaValida(placaPrevia) && <span className="nve-previa"><Placa placa={placaPrevia} /></span>}
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
-          {opcoes?.consulta_placa ? (
+          {erroCarga && <div className="p4-vazio"><b>Não foi possível abrir</b><span>{erroCarga}</span></div>}
+          {!carregado && !erroCarga && <p className="p4-legal">Carregando…</p>}
+          {carregado && <>
+          {opcoes?.consulta_placa && !editando ? (
             <div className="np-cep">
               {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10,
                 onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); consultar(); } } })}
@@ -227,11 +256,13 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
           {campo('chassi', 'Chassi (opcional)', 'chassi', { autoCapitalize: 'characters', maxLength: 30 })}
           {campo('renavam', 'RENAVAM (opcional)', 'renavam', { inputMode: 'numeric', maxLength: 11 })}
           <p className="np-ajuda">Motor, combustível e observações ficam no oimpresso web.</p>
+          {editando && <p className="np-ajuda">As OS já abertas mantêm a placa, o dono e o km que tinham.</p>}
+          </>}
         </div>
       </div>
       <div className="np-rodape">
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando} onClick={aoVoltar}>Cancelar</button>
-        <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando || !opcoes} onClick={salvar}>{salvando ? 'Salvando…' : 'Cadastrar veículo'}</button>
+        <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando || !opcoes || !carregado} onClick={salvar}>{salvando ? 'Salvando…' : editando ? 'Salvar' : 'Cadastrar veículo'}</button>
       </div>
     </>
   );

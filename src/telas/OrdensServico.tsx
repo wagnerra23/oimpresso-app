@@ -53,9 +53,13 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   const [aberta, setAberta] = useState<number | null>(null);
   const [nova, setNova] = useState(false);
   const [novoVeiculo, setNovoVeiculo] = useState(false);
+  const [editandoVeiculo, setEditandoVeiculo] = useState<number | null>(null);
   useVoltar(aberta !== null, () => setAberta(null));
   useVoltar(nova, () => setNova(false));
   useVoltar(novoVeiculo, () => setNovoVeiculo(false));
+  useVoltar(editandoVeiculo !== null, () => setEditandoVeiculo(null));
+  if (editandoVeiculo !== null) return <NovoVeiculo key={editandoVeiculo} veiculoId={editandoVeiculo} avisar={avisar}
+    aoVoltar={() => setEditandoVeiculo(null)} aoCriar={() => { setEditandoVeiculo(null); setAba('veiculos'); }} />;
   if (novoVeiculo) return <NovoVeiculo avisar={avisar} aoVoltar={() => setNovoVeiculo(false)} aoCriar={() => { setNovoVeiculo(false); setAba('veiculos'); }} />;
   if (nova) return <NovaOs avisar={avisar} aoVoltar={() => setNova(false)} aoCriar={(os) => { setNova(false); setAba('os'); setAberta(os.id); }} />;
   if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
@@ -67,7 +71,7 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
     </div>
   );
   return aba === 'veiculos'
-    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} aoNovo={() => setNovoVeiculo(true)} />
+    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} aoNovo={() => setNovoVeiculo(true)} aoEditar={setEditandoVeiculo} />
     : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} aoNova={() => setNova(true)} />;
 }
 
