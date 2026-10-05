@@ -4,9 +4,9 @@
 // oferece usar esse veículo. Os tipos vêm do ERP. Cadastrar veículo não gera valor, estoque nem
 // cobrança: o ERP só grava o veículo na empresa do usuário. Fora de propósito: consulta de placa externa,
 // motor, combustível, chassi do reboque e observações (ficam na web). "Buscar" da placa: consulta no fornecedor do
-// ERP (sem proprietário, LGPD), preenche só campos vazios; ligado por CONSULTA_PLACA.
+// ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, CONSULTA_PLACA, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -119,10 +119,11 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
       const st = x instanceof ErroApi ? x.status : (x as { status?: number } | null)?.status;
       const msg = st === 503 ? 'Consulta de placa não configurada. Preencha abaixo.'
         : st === 502 ? 'Consulta indisponível agora. Preencha abaixo.'
-        : st === 422 ? 'Placa inválida: use ABC1234 ou ABC1D23.'
+        : st === 422 ? (camposDoErro(x).placa ?? 'Placa inválida: use ABC1234 ou ABC1D23.')
         : null;
       if (msg) setErros((e) => ({ ...e, placa: msg }));
       else if (st === 429) avisar?.('Muitas consultas seguidas. Tente de novo em um minuto.', 'warn');
+      else if (st === 403) avisar?.('Seu usuário não pode consultar placa.', 'erro');
       else avisar?.(x instanceof Error ? x.message : 'Não foi possível consultar a placa.', 'erro');
     } finally { setConsultando(false); }
   };
@@ -179,7 +180,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
-          {CONSULTA_PLACA ? (
+          {opcoes?.consulta_placa ? (
             <div className="np-cep">
               {campo('placa', 'Placa', 'placa', { autoCapitalize: 'characters', placeholder: 'ABC1D23', maxLength: 10,
                 onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); consultar(); } } })}

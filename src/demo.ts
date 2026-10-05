@@ -816,7 +816,7 @@ export const demo = {
         dados: { placa, ano_fabricacao: 2020, ano_modelo: 2021, cor: 'Branco', chassi: '9BWZZZ377VT004251', renavam: '01234567890', marca_modelo: 'Veículo de demonstração' } });
     }
     if (metodo === 'GET' && caminho === '/api/app/veiculos/opcoes') {
-      return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })) });
+      return r({ tipos: TIPOS_VEICULO.map(([chave, rotulo]) => ({ chave, rotulo })), consulta_placa: true });
     }
     if (metodo === 'POST' && caminho === '/api/app/veiculos') {
       const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
