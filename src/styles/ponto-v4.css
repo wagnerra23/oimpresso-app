@@ -758,3 +758,5 @@ button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }
 .vei-serv::before { content: '· '; color: var(--text-dim); }
 .vei-serv.mais, .vei-serv.vazio { color: var(--text-dim) !important; }
 .vei-serv.mais::before, .vei-serv.vazio::before { content: ''; }
+.vei-peca-n { font-weight: 600; font-size: 12.5px; }
+.vei-mais-pecas { min-height: 44px; margin-top: 6px; }
