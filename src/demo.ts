@@ -166,6 +166,10 @@ const DETALHE_OS: Record<number, { local: string | null; km: number | null; obse
 // Tipos de veículo da demo (no app real vêm do ERP, TiposVeiculo do núcleo).
 const TIPOS_VEICULO: Array<[string, string]> = [['caminhao', 'Caminhão'], ['caminhao_basculante', 'Caminhão basculante'], ['cavalo', 'Cavalo mecânico'],
   ['utilitario', 'Utilitário'], ['picape', 'Picape'], ['furgao', 'Furgão'], ['carro', 'Carro']];
+// Agenda da demo (criada na primeira chamada, para as datas saírem do dia de hoje).
+let AGENDA: Array<{ id: number; inicio: string; veiculo: { id: number; placa: string; descricao: string | null }; cliente: { id: number; nome: string } | null;
+  observacao: string | null; status: 'agendado' | 'atendido' | 'cancelado'; os_id: number | null }> | null = null;
+
 // Chassi e RENAVAM da demo (o item da lista não traz; só o GET do veículo para editar).
 const EXTRA_VEICULO: Record<number, { chassi: string | null; renavam: string | null }> = {};
 const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | null; descricao: string | null; ano: string | null;
@@ -917,16 +921,63 @@ export const demo = {
       o.etapa = acao[3];
       return demo.chamar<T>('GET', '/api/app/os/' + o.id);
     }
+    if (caminho.startsWith('/api/app/agendamentos')) {
+      // Agenda da demo: criada na primeira chamada, com datas a partir de hoje (data só dentro do handler).
+      if (!AGENDA) {
+        const d = new Date(); const p2 = (n: number) => String(n).padStart(2, '0');
+        const dia = (n: number) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12); return `${x.getFullYear()}-${p2(x.getMonth() + 1)}-${p2(x.getDate())}`; };
+        AGENDA = [
+          { id: 1, inicio: dia(0) + 'T08:00', veiculo: { id: 3, placa: 'MLK4109', descricao: 'Furgão' }, cliente: { id: 102, nome: 'Mercado Bom Preço' }, observacao: 'Revisão 170 mil + troca de óleo', status: 'agendado', os_id: null },
+          { id: 2, inicio: dia(0) + 'T10:30', veiculo: { id: 2, placa: 'RBA2H78', descricao: 'Caminhão basculante' }, cliente: { id: 101, nome: 'Transportes Vale Norte' }, observacao: 'Revisão atrasada — freio a ar', status: 'agendado', os_id: null },
+          { id: 3, inicio: dia(1) + 'T09:00', veiculo: { id: 1, placa: 'RLV2E48', descricao: 'Picape' }, cliente: { id: 101, nome: 'Transportes Vale Norte' }, observacao: null, status: 'agendado', os_id: null },
+        ];
+      }
+      if (metodo === 'GET') {
+        const de = (caminho.match(/[?&]de=([0-9-]+)/) || [])[1] ?? '', ate = (caminho.match(/[?&]ate=([0-9-]+)/) || [])[1] ?? '';
+        const itens = AGENDA.filter((a) => a.inicio.slice(0, 10) >= de && a.inicio.slice(0, 10) <= ate).sort((a, b) => (a.inicio < b.inicio ? -1 : 1));
+        return r({ itens, pode_criar: true });
+      }
+      if (metodo === 'POST' && caminho === '/api/app/agendamentos') {
+        const p = corpo as { vehicle_id: number; contact_id: number | null; inicio: string; observacao: string | null };
+        const v = VEICULOS.find((x) => x.id === p.vehicle_id);
+        const d = new Date(); const p2 = (n: number) => String(n).padStart(2, '0');
+        const hoje = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+        if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 422, campos: { vehicle_id: 'Veículo não encontrado.' } });
+        if ((p.inicio ?? '').slice(0, 10) < hoje) throw Object.assign(new Error('O dia já passou.'), { status: 422, campos: { inicio: 'Escolha hoje ou um dia futuro.' } });
+        await espera(400);
+        const nome = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
+        const novo = { id: Math.max(0, ...AGENDA.map((a) => a.id)) + 1, inicio: p.inicio, veiculo: { id: v.id, placa: v.placa, descricao: v.descricao },
+          cliente: nome && p.contact_id !== null ? { id: p.contact_id, nome } : null, observacao: p.observacao, status: 'agendado' as const, os_id: null };
+        AGENDA.push(novo);
+        return r(novo);
+      }
+      if (metodo === 'POST' && caminho.endsWith('/cancelar')) {
+        const a = AGENDA.find((x) => x.id === Number(caminho.split('/')[4]));
+        if (!a) throw Object.assign(new Error('Agendamento não encontrado.'), { status: 404 });
+        if (a.status !== 'agendado') throw Object.assign(new Error('Este agendamento já foi atendido ou cancelado.'), { status: 422, erro: 'estado_invalido' });
+        await espera(300);
+        a.status = 'cancelado';
+        return r(a);
+      }
+    }
     if (metodo === 'POST' && caminho === '/api/app/os') {
-      const p = corpo as { vehicle_id: number; contact_id: number | null; mileage_at_service: number | null; box_label: string | null; notes: string | null };
+      const p = corpo as { vehicle_id: number; contact_id: number | null; mileage_at_service: number | null; box_label: string | null; notes: string | null; agendamento_id?: number | null };
       const v = VEICULOS.find((x) => x.id === p.vehicle_id);
       if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 422, campos: { vehicle_id: 'Veículo não encontrado.' } });
+      if (p.agendamento_id) {
+        // Mesmas recusas do ERP #8784: nenhuma OS é criada.
+        const a = AGENDA?.find((x) => x.id === p.agendamento_id);
+        const msg = !a ? 'Agendamento não encontrado.' : a.veiculo.id !== p.vehicle_id ? 'O agendamento é de outro veículo.' : a.status !== 'agendado' ? 'Este agendamento não está mais aberto.' : null;
+        if (msg) throw Object.assign(new Error(msg), { status: 422, campos: { agendamento_id: msg } });
+      }
       if (p.mileage_at_service !== null && p.mileage_at_service < 0) throw Object.assign(new Error('Km inválido.'), { status: 422, campos: { mileage_at_service: 'O km não pode ser negativo.' } });
       await espera(500);
       const cliente = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
       const id = Math.max(...ORDENS.map((o) => o.id)) + 1;
       ORDENS.push({ id, numero: 'OS-' + String(id).padStart(5, '0'), placa: v.placa, veiculo: v.descricao, cliente: cliente ?? 'Sem cliente', valor: null, etapa: 'recepcao' });
       DETALHE_OS[id] = { local: p.box_label, km: p.mileage_at_service, observacoes: p.notes, vistoria: null, fotos: 0, itens: [] };
+      const ag = p.agendamento_id ? AGENDA?.find((a) => a.id === p.agendamento_id) : undefined;
+      if (ag) { ag.status = 'atendido'; ag.os_id = id; }
       return demo.chamar<T>('GET', '/api/app/os/' + id);
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {

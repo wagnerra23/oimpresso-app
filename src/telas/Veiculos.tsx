@@ -7,7 +7,7 @@
 // com a diferença para a anterior. Aparece só quando o ERP manda km_cadastro (ERP #8732).
 // "Editar" (dentro do cartão aberto) abre o formulário do cadastro em modo edição (EDITAR_VEICULO + pode_editar).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, REVISAO_KM, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { AGENDA_OFICINA, api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, REVISAO_KM, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -64,9 +64,9 @@ export function Placa({ placa }: { placa: string }) {
   return <span className={'os-placa' + (placaAntiga(placa) ? ' antiga' : '')} aria-label={`Placa ${placa}`}>{placa}</span>;
 }
 
-interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void; aoNovo?: () => void; aoEditar?: (id: number) => void }
+interface Props { voltar?: ReactNode; abas: ReactNode; aoAbrirOs: (id: number) => void; aoNovo?: () => void; aoEditar?: (id: number) => void; aoAgendar?: (v: VeiculoResumo) => void }
 
-export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
+export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar, aoAgendar }: Props) {
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [dados, setDados] = useState<ListaVeiculos | null>(null);
@@ -164,8 +164,11 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
                 })()}
                 {HISTORICO_VEICULO && estaAberto && (
                   <div className="vei-hist">
-                    {EDITAR_VEICULO && aoEditar && dados?.pode_editar && (
-                      <button className="oi-btn vei-editar" onClick={() => aoEditar(v.id)}>Editar veículo</button>
+                    {((EDITAR_VEICULO && aoEditar && dados?.pode_editar) || (AGENDA_OFICINA && aoAgendar)) && (
+                      <div className="vei-acoes">
+                        {AGENDA_OFICINA && aoAgendar && <button className="oi-btn vei-editar" onClick={() => aoAgendar(v)}>Agendar revisão</button>}
+                        {EDITAR_VEICULO && aoEditar && dados?.pode_editar && <button className="oi-btn vei-editar" onClick={() => aoEditar(v.id)}>Editar veículo</button>}
+                      </div>
                     )}
                     <span className="p4-rotulo">Histórico de OS</span>
                     {!h && <p className="p4-legal">Carregando…</p>}
