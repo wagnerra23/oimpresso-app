@@ -37,6 +37,34 @@ export function servicosDaOs(itens: Array<{ tipo: TipoItemOs; descricao: string;
   return { linhas, resto: Math.max(total ?? itens.length, itens.length) - linhas.length };
 }
 
+export interface PecaTrocada { descricao: string; data: string; km: number | null; os: string; quantidade: number; vezes: number }
+
+/** Peças trocadas no veículo, uma linha por peça (mesmo nome, sem diferença de maiúsculas e espaços): a última troca
+ *  (data, km, OS e quantidade) e em quantas OS ela aparece. Sai do histórico de serviços que o app já recebe, então
+ *  só vê as OS e os itens que vieram (até 200 OS e 20 itens por OS no ERP). Da troca mais recente para a mais antiga. */
+export function pecasTrocadas(h: HistoricoVeiculo): { pecas: PecaTrocada[]; cortado: boolean } {
+  const chave = (t: string) => t.trim().toLowerCase().split(/\s+/).join(' ');
+  const mapa = new Map<string, PecaTrocada>();
+  let cortado = false;
+  for (const o of h.itens) {
+    if (!o.itens) continue;
+    if ((o.itens_total ?? o.itens.length) > o.itens.length) cortado = true;
+    const vistas = new Set<string>();
+    for (const i of o.itens) {
+      if (i.tipo !== 'peca') continue;
+      const k = chave(i.descricao);
+      const atual = mapa.get(k);
+      const contar = !vistas.has(k);
+      vistas.add(k);
+      if (!atual || o.data > atual.data) {
+        mapa.set(k, { descricao: i.descricao.trim(), data: o.data, km: o.km ?? null, os: o.numero, quantidade: i.quantidade, vezes: (atual?.vezes ?? 0) + (contar ? 1 : 0) });
+      } else if (contar) atual.vezes += 1;
+    }
+  }
+  const pecas = [...mapa.values()].sort((a, b) => (a.data === b.data ? a.descricao.localeCompare(b.descricao, 'pt-BR') : a.data < b.data ? 1 : -1));
+  return { pecas, cortado };
+}
+
 /** Aviso de revisão do cartão (ERP #8750): atrasada (passou do km), próxima (dentro do aviso do ERP) ou nada. Sem km conhecido
  *  não há como saber: nada. Conta só pelo km real anotado (decisão [W]). */
 export function situacaoRevisao(v: Pick<VeiculoResumo, 'km' | 'proxima_revisao_km'>, aviso: number): { tom: 'danger' | 'warn'; texto: string } | null {
@@ -90,6 +118,7 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar, aoAgendar 
   const [aberto, setAberto] = useState<number | null>(null);
   const [historico, setHistorico] = useState<Record<number, HistoricoVeiculo | 'erro'>>({});
   const [soRevisao, setSoRevisao] = useState(false);
+  const [todasPecas, setTodasPecas] = useState<Record<number, boolean>>({});
 
   useEffect(() => { const t = setTimeout(() => setQ(texto.trim()), 350); return () => clearTimeout(t); }, [texto]);
 
@@ -205,6 +234,30 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar, aoAgendar 
                         </button>
                       );
                     })}
+                    {h && h !== 'erro' && h.itens.some((x) => x.itens !== undefined) && (() => {
+                      const { pecas, cortado } = pecasTrocadas(h);
+                      const MAX = 6;
+                      const mostrar = todasPecas[v.id] ? pecas : pecas.slice(0, MAX);
+                      return (
+                        <div className="vei-km vei-pecas">
+                          <span className="p4-rotulo">Peças trocadas</span>
+                          {pecas.length === 0 && <p className="p4-legal">Nenhuma peça lançada nas OS deste veículo.</p>}
+                          {mostrar.map((p) => (
+                            <div key={p.descricao + p.os} className="vei-km-l">
+                              <span className="vei-km-d"><b className="vei-peca-n">{p.quantidade !== 1 ? `${p.quantidade.toLocaleString('pt-BR')}× ` : ''}{p.descricao}</b>
+                                <small>{p.vezes === 1 ? '1 vez' : `${p.vezes} vezes`} · última na {p.os}</small></span>
+                              <span className="vei-km-v"><b>{dataKm(p.data)}</b>{p.km !== null && <small>{textoKm(p.km)}</small>}</span>
+                            </div>
+                          ))}
+                          {pecas.length > MAX && (
+                            <button className="oi-btn block vei-mais-pecas" onClick={() => setTodasPecas((x) => ({ ...x, [v.id]: !x[v.id] }))}>
+                              {todasPecas[v.id] ? 'Mostrar menos' : `Ver todas as ${pecas.length} peças`}
+                            </button>
+                          )}
+                          {cortado && <p className="p4-legal">Algumas OS têm mais itens do que aparecem aqui; abra a OS para ver tudo.</p>}
+                        </div>
+                      );
+                    })()}
                     {h && h !== 'erro' && 'km_cadastro' in h && (() => {
                       const ls = leiturasKm(h);
                       return (

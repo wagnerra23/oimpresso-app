@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dataOs, leiturasKm, linhaServico, placaAntiga, servicosDaOs, situacaoRevisao, textoDiferenca, textoVeiculo } from './Veiculos';
+import { dataOs, leiturasKm, linhaServico, pecasTrocadas, placaAntiga, servicosDaOs, situacaoRevisao, textoDiferenca, textoVeiculo } from './Veiculos';
 
 describe('tela 08 · Veículos — textos', () => {
   it('linha de km, ano e cor pula o que vier vazio', () => {
@@ -85,5 +85,40 @@ describe('Veículos — histórico de serviços', () => {
     const itens = [{ tipo: 'mao_obra' as const, descricao: 'A', quantidade: 1 }];
     expect(servicosDaOs(itens, 25)).toEqual({ linhas: ['A'], resto: 24 });
     expect(servicosDaOs([], 0)).toEqual({ linhas: [], resto: 0 });
+  });
+});
+
+describe('Veículos — peças trocadas', () => {
+  type It = { tipo: 'peca' | 'mao_obra' | 'servico_terceiro'; descricao: string; quantidade: number };
+  const os = (numero: string, data: string, km: number | null, itens: It[] | undefined, total?: number) =>
+    ({ os_id: 1, numero, data, etapa_rotulo: null, cliente: null, valor: null, km, itens, itens_total: total });
+  const p = (descricao: string, quantidade = 1): It => ({ tipo: 'peca', descricao, quantidade });
+
+  it('uma linha por peça, com a última troca e quantas vezes', () => {
+    const r = pecasTrocadas({ itens: [
+      os('OS-3', '2026-10-06', 48312, [p('Bieleta dianteira'), { tipo: 'mao_obra', descricao: 'Troca de bieleta', quantidade: 1 }]),
+      os('OS-2', '2026-06-12', 41870, [p('Filtro de óleo'), p('Óleo 5W30', 4)]),
+      os('OS-1', '2026-02-03', 35000, [p('filtro  de óleo '), p('Óleo 5W30', 4)]),
+    ] });
+    expect(r.cortado).toBe(false);
+    expect(r.pecas.map((x) => [x.descricao, x.data, x.km, x.os, x.quantidade, x.vezes])).toEqual([
+      ['Bieleta dianteira', '2026-10-06', 48312, 'OS-3', 1, 1],
+      ['Filtro de óleo', '2026-06-12', 41870, 'OS-2', 1, 2],
+      ['Óleo 5W30', '2026-06-12', 41870, 'OS-2', 4, 2],
+    ]);
+  });
+
+  it('a mesma peça duas vezes na mesma OS conta uma vez', () => {
+    const r = pecasTrocadas({ itens: [os('OS-1', '2026-01-01', null, [p('Pastilha'), p('Pastilha')])] });
+    expect(r.pecas[0].vezes).toBe(1);
+  });
+
+  it('serviços não entram; OS sem itens não quebra; corte do ERP é avisado', () => {
+    const r = pecasTrocadas({ itens: [
+      os('OS-2', '2026-02-01', null, [{ tipo: 'mao_obra', descricao: 'Revisão', quantidade: 1 }], 25),
+      os('OS-1', '2026-01-01', null, undefined),
+    ] });
+    expect(r.pecas).toEqual([]);
+    expect(r.cortado).toBe(true);
   });
 });
