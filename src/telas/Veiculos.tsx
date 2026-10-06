@@ -22,7 +22,7 @@ export const dataOs = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(
 /** Data com ano para o km: "12/06/26". */
 export const dataKm = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
 
-/** Aviso de revisão do cartão: atrasada (passou do km), próxima (dentro do aviso do ERP) ou nada. Sem km conhecido
+/** Aviso de revisão do cartão (ERP #8750): atrasada (passou do km), próxima (dentro do aviso do ERP) ou nada. Sem km conhecido
  *  não há como saber: nada. Conta só pelo km real anotado (decisão [W]). */
 export function situacaoRevisao(v: Pick<VeiculoResumo, 'km' | 'proxima_revisao_km'>, aviso: number): { tom: 'danger' | 'warn'; texto: string } | null {
   if (v.proxima_revisao_km == null || v.km == null) return null;

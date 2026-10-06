@@ -855,13 +855,15 @@ export const demo = {
       if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
       else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      { const rev = (corpo as { proxima_revisao_km?: number | null }).proxima_revisao_km; if (rev != null && rev < 0) campos.proxima_revisao_km = 'O km da próxima revisão não pode ser negativo.'; }
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
       await espera(500);
       const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
       const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
       Object.assign(v, { placa, placa_secundaria: reb || null, descricao: TIPOS_VEICULO.find((t) => t[0] === p.tipo)?.[1] ?? p.tipo,
         ano: anoF ? anoF + '/' + anoM : null, cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor,
-        proxima_revisao_km: p.proxima_revisao_km ?? null });
+        // Chave ausente mantém o valor (pedido ao ERP no #8750); null apaga.
+        proxima_revisao_km: 'proxima_revisao_km' in p ? p.proxima_revisao_km ?? null : v.proxima_revisao_km ?? null });
       EXTRA_VEICULO[v.id] = { chassi: p.chassi, renavam: p.renavam };
       return r({ ...v });
     }
@@ -879,6 +881,7 @@ export const demo = {
       if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
       else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      { const rev = (corpo as { proxima_revisao_km?: number | null }).proxima_revisao_km; if (rev != null && rev < 0) campos.proxima_revisao_km = 'O km da próxima revisão não pode ser negativo.'; }
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
       await espera(500);
       const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
