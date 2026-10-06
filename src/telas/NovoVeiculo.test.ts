@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ErroApi, veiculoExistenteDoErro } from '../api';
 import { aplicarConsulta, anoDigitado, errosDoForm, formDoVeiculo, normalizarPlaca, placaValida, type Form } from './NovoVeiculo';
 
-const form = (o: Partial<Record<string, string>> = {}) => ({ placa: 'RBA2H78', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', ...o });
+const form = (o: Partial<Record<string, string>> = {}) => ({ placa: 'RBA2H78', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', revisao: '', ...o });
 
 describe('Novo veículo — placa e anos', () => {
   it('placa sai em maiúsculas, sem hífen nem espaço', () => {
@@ -51,7 +51,7 @@ describe('Novo veículo — regras do ERP #8687', () => {
 });
 
 describe('Novo veículo — consulta de placa', () => {
-  const vazio: Form = { placa: 'ABC1D23', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', km: '', cor: '', chassi: '', renavam: '' };
+  const vazio: Form = { placa: 'ABC1D23', tipo: 'caminhao', reboque: '', anoFab: '', anoMod: '', km: '', cor: '', chassi: '', renavam: '', revisao: '' };
   const dados = { placa: 'ABC1D23', ano_fabricacao: 2020, ano_modelo: 2021, cor: 'Branco', chassi: 'CH1', renavam: 'RN1', marca_modelo: 'X' };
 
   it('preenche os campos vazios com o resultado', () => {
@@ -79,12 +79,20 @@ describe('Editar veículo — formulário a partir do ERP', () => {
 
   it('carrega todos os campos como texto', () => {
     expect(formDoVeiculo(base)).toEqual({ placa: 'RBA2H78', tipo: 'caminhao_basculante', reboque: 'RBC3J10', anoFab: '2019', anoMod: '2020',
-      cor: 'Prata', km: '312040', chassi: '', renavam: '01234567890' });
+      cor: 'Prata', km: '312040', chassi: '', renavam: '01234567890', revisao: '' });
   });
 
   it('o que vier nulo do ERP fica vazio e o formulário segue válido', () => {
     const f = formDoVeiculo({ ...base, placa_secundaria: null, ano_fabricacao: null, ano_modelo: null, cor: null, km: null, renavam: null });
-    expect([f.reboque, f.anoFab, f.anoMod, f.cor, f.km, f.renavam]).toEqual(['', '', '', '', '', '']);
+    expect([f.reboque, f.anoFab, f.anoMod, f.cor, f.km, f.renavam, f.revisao]).toEqual(['', '', '', '', '', '', '']);
     expect(errosDoForm(f)).toEqual({});
+  });
+});
+
+describe('Novo veículo — próxima revisão', () => {
+  it('km da próxima revisão: vazio passa, só números', () => {
+    expect(errosDoForm(form({ revisao: '' })).proxima_revisao_km).toBeUndefined();
+    expect(errosDoForm(form({ revisao: '60000' })).proxima_revisao_km).toBeUndefined();
+    expect(errosDoForm(form({ revisao: '60.000,5' })).proxima_revisao_km).toBe('Digite só números, ex.: 60000.');
   });
 });

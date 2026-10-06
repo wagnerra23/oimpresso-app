@@ -29,6 +29,11 @@ export function textoMeta(p: Pick<ProdutoResumo, 'codigo' | 'categoria' | 'calcu
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 
+/** Rótulo do topo, curto para caber numa linha ao lado do "+ Produto" a 360 px: "6 produtos · 2 em baixa". */
+export function rotuloProdutos(total: number, baixo: number): string {
+  return `${total} ${total === 1 ? 'produto' : 'produtos'}` + (baixo ? ` · ${baixo} em baixa` : '');
+}
+
 export function Produtos({ voltar, avisar }: { voltar?: ReactNode; avisar: Aviso }) {
   const [novo, setNovo] = useState(false);
   // Muda depois de um cadastro: o catálogo volta recarregado, com o produto novo.
@@ -74,9 +79,7 @@ function Catalogo({ voltar, aoNovo }: { voltar?: ReactNode; aoNovo?: () => void 
     finally { setCarregandoMais(false); }
   };
 
-  const rotulo = dados
-    ? `${dados.total} no catálogo${dados.baixo_estoque ? ` · ${dados.baixo_estoque} com estoque baixo` : ''}`
-    : 'Catálogo';
+  const rotulo = dados ? rotuloProdutos(dados.total, dados.baixo_estoque) : 'Catálogo';
   return (
     <>
       <div className="pd-head">

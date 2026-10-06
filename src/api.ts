@@ -281,7 +281,25 @@ export interface NovaOs {
   contact_id: number | null;
   /** km inteiro ≥ 0 · box até 60 caracteres · observações até 2000. */
   mileage_at_service: number | null; box_label: string | null; notes: string | null;
+  /** OS aberta a partir de um agendamento (ERP #8784): na mesma transação o ERP marca o agendamento como atendido e liga à OS.
+   *  422 campos.agendamento_id se for de outro veículo, não existir ou não estiver mais aberto (nenhuma OS é criada). */
+  agendamento_id?: number | null;
 }
+/** Agendamento de revisão da Oficina (ERP #8784). "inicio" = "AAAA-MM-DDTHH:MM" no fuso da empresa. */
+export interface Agendamento {
+  id: number; inicio: string;
+  veiculo: { id: number; placa: string; descricao: string | null };
+  cliente: { id: number; nome: string } | null;
+  observacao: string | null;
+  status: 'agendado' | 'atendido' | 'cancelado';
+  /** OS aberta a partir dele (status atendido). */
+  os_id: number | null;
+}
+export interface ListaAgendamentos { itens: Agendamento[]; pode_criar?: boolean }
+/** Corpo do POST /api/app/agendamentos. Mais de um no mesmo horário é permitido; dia passado é recusado (o próprio dia vale). */
+export interface NovoAgendamento { vehicle_id: number; contact_id: number | null; inicio: string; observacao: string | null }
+/** Liga a Agenda da Oficina (decisões [W] 2026-10-06). ERP #8784 em produção desde 2026-10-06. */
+export const AGENDA_OFICINA = true;
 /** Liga "+ Nova OS". Rota do ERP #8639 em produção desde 2026-10-05. */
 export const NOVA_OS = true;
 
@@ -342,6 +360,8 @@ export interface VeiculoResumo {
   /** Último km conhecido (cadastro ou OS). */
   km: number | null;
   cor: string | null;
+  /** Km da próxima revisão (ERP #8750, marcada à mão). Ausente ou null = sem lembrete. */
+  proxima_revisao_km?: number | null;
 }
 export interface ListaVeiculos {
   itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean;
@@ -349,6 +369,10 @@ export interface ListaVeiculos {
   pode_criar?: boolean;
   /** Pode editar veículo (oficinaauto.vehicle.update, ERP #8708). Ausente = não mostra "Editar". */
   pode_editar?: boolean;
+  /** Quantos veículos estão com revisão próxima ou atrasada (ERP #8750), independente do filtro e da busca. */
+  revisao_proxima?: number;
+  /** A partir de quantos km antes da revisão o ERP considera "próxima" (o app só mostra). */
+  revisao_aviso_km?: number;
 }
 /** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
 export interface OpcoesVeiculo {
@@ -364,6 +388,9 @@ export interface NovoVeiculo {
   cor: string | null; km: number | null; chassi: string | null; renavam: string | null;
   /** Dono do veículo (contato da empresa); null = sem dono. */
   contact_id: number | null;
+  /** Km da próxima revisão (ERP #8750): inteiro ≥ 0 (pode ser menor que o km: revisão atrasada é válida) ou null.
+   *  Só vai no corpo com REVISAO_KM ligado; aí vai SEMPRE, com o valor atual do formulário (o PUT substitui o cadastro). */
+  proxima_revisao_km?: number | null;
 }
 /** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
 export const NOVO_VEICULO = true;
@@ -377,6 +404,9 @@ export interface VeiculoEdicao extends NovoVeiculo {
 }
 /** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
 export const EDITAR_VEICULO = true;
+/** Liga o lembrete de revisão por km (decisão [W] 2026-10-06: só a oficina é avisada, no app; conta pelo km real
+ *  anotado; próxima revisão manual, aviso 1.000 km antes). ERP #8750 em produção desde 2026-10-06. */
+export const REVISAO_KM = true;
 /** Liga excluir veículo. Rota do ERP #8717 em produção desde 2026-10-05. */
 export const EXCLUIR_VEICULO = true;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
@@ -821,8 +851,22 @@ export const api = {
   excluirVeiculo: (id: number) => (EXCLUIR_VEICULO
     ? chamar<unknown>('DELETE', `/api/app/veiculos/${id}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Excluir veículo pelo app ainda não está disponível.'))),
-  veiculos: (pagina = 1, q = '') =>
-    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Lista de veículos. revisao = só os com revisão próxima ou atrasada (?revisao=1, ERP #8750). */
+  /** Agenda da Oficina entre dois dias (inclusive), por horário (ERP #8784; janela máxima 92 dias). 403 sem ver OS. */
+  agendamentos: (de: string, ate: string) => (AGENDA_OFICINA
+    ? chamar<ListaAgendamentos>('GET', `/api/app/agendamentos?de=${de}&ate=${ate}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
+  /** Agendar revisão. 201 = o item · 422 { erro: "validacao", campos } (inicio no passado, vehicle_id…) · 403 · 503. */
+  criarAgendamento: (a: NovoAgendamento) => (AGENDA_OFICINA
+    ? chamar<Agendamento>('POST', '/api/app/agendamentos', a)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
+  /** Cancelar agendamento (motivo opcional). 200 = o item · 422 { erro: "estado_invalido", mensagem } se já foi atendido ou
+   *  cancelado · 404 nao_encontrado (outra empresa ou inexistente) · 403. */
+  cancelarAgendamento: (id: number, motivo: string | null) => (AGENDA_OFICINA
+    ? chamar<Agendamento>('POST', `/api/app/agendamentos/${id}/cancelar`, { motivo })
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
+  veiculos: (pagina = 1, q = '', revisao = false) =>
+    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}${revisao ? '&revisao=1' : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */
   veiculoOs: (id: number) => chamar<HistoricoVeiculo>('GET', `/api/app/veiculos/${id}/os`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),
