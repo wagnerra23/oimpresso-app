@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dataOs, leiturasKm, placaAntiga, situacaoRevisao, textoDiferenca, textoVeiculo } from './Veiculos';
+import { dataOs, leiturasKm, linhaServico, placaAntiga, servicosDaOs, situacaoRevisao, textoDiferenca, textoVeiculo } from './Veiculos';
 
 describe('tela 08 · Veículos — textos', () => {
   it('linha de km, ano e cor pula o que vier vazio', () => {
@@ -60,5 +60,30 @@ describe('Veículos — lembrete de revisão por km', () => {
     expect(situacaoRevisao({ km: 1000, proxima_revisao_km: null }, 1000)).toBeNull();
     expect(situacaoRevisao({ km: null, proxima_revisao_km: 5000 }, 1000)).toBeNull();
     expect(situacaoRevisao({ km: 1000 }, 1000)).toBeNull();
+  });
+});
+
+describe('Veículos — histórico de serviços', () => {
+  it('linha: serviço pelo nome, terceiro marcado, peça com quantidade só quando passa de 1', () => {
+    expect(linhaServico({ tipo: 'mao_obra', descricao: 'Troca de óleo e filtro', quantidade: 1 })).toBe('Troca de óleo e filtro');
+    expect(linhaServico({ tipo: 'servico_terceiro', descricao: 'Alinhamento', quantidade: 1 })).toBe('Alinhamento (terceiro)');
+    expect(linhaServico({ tipo: 'peca', descricao: 'Óleo 5W30', quantidade: 4 })).toBe('4× Óleo 5W30');
+    expect(linhaServico({ tipo: 'peca', descricao: 'Filtro de óleo', quantidade: 1 })).toBe('Filtro de óleo');
+    expect(linhaServico({ tipo: 'peca', descricao: 'Graxa', quantidade: 1.5 })).toBe('1,5× Graxa');
+  });
+
+  it('serviços antes das peças, até 4, o resto vira "e mais N"', () => {
+    const itens = [
+      { tipo: 'peca' as const, descricao: 'Óleo', quantidade: 4 }, { tipo: 'mao_obra' as const, descricao: 'Troca de óleo', quantidade: 1 },
+      { tipo: 'peca' as const, descricao: 'Filtro', quantidade: 1 }, { tipo: 'servico_terceiro' as const, descricao: 'Alinhamento', quantidade: 1 },
+      { tipo: 'peca' as const, descricao: 'Pastilha', quantidade: 1 },
+    ];
+    expect(servicosDaOs(itens)).toEqual({ linhas: ['Troca de óleo', 'Alinhamento (terceiro)', '4× Óleo', 'Filtro'], resto: 1 });
+  });
+
+  it('o resto conta o que o ERP cortou (itens_total)', () => {
+    const itens = [{ tipo: 'mao_obra' as const, descricao: 'A', quantidade: 1 }];
+    expect(servicosDaOs(itens, 25)).toEqual({ linhas: ['A'], resto: 24 });
+    expect(servicosDaOs([], 0)).toEqual({ linhas: [], resto: 0 });
   });
 });

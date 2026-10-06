@@ -179,9 +179,15 @@ const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | nu
   { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null, proxima_revisao_km: 180000 },
   { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, cliente_id: null, km: 72415, cor: null },
 ];
-const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null; km: number | null }>> = {
-  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240, km: 41870 }, { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460, km: null }],
-  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180, km: 152300 }],
+const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null; km: number | null;
+  itens: Array<{ tipo: 'peca' | 'mao_obra' | 'servico_terceiro'; descricao: string; quantidade: number }> }>> = {
+  RLV2E48: [{ os_id: 998, numero: 'OS-00998', data: '2026-06-12', etapa_rotulo: 'Entregue', cliente: 'Transportes Vale Norte', valor: 1240, km: 41870,
+    itens: [{ tipo: 'mao_obra', descricao: 'Troca de óleo e filtro', quantidade: 1 }, { tipo: 'peca', descricao: 'Óleo 5W30', quantidade: 4 },
+      { tipo: 'peca', descricao: 'Filtro de óleo', quantidade: 1 }, { tipo: 'mao_obra', descricao: 'Pastilha de freio dianteira', quantidade: 1 },
+      { tipo: 'peca', descricao: 'Jogo de pastilhas dianteiras', quantidade: 1 }, { tipo: 'servico_terceiro', descricao: 'Alinhamento', quantidade: 1 }] },
+    { os_id: 941, numero: 'OS-00941', data: '2026-02-03', etapa_rotulo: null, cliente: 'Auto Center Rota', valor: 460, km: null,
+      itens: [{ tipo: 'mao_obra', descricao: 'Revisão elétrica', quantidade: 1 }] }],
+  MLK4109: [{ os_id: 902, numero: 'OS-00902', data: '2025-11-18', etapa_rotulo: 'Entregue', cliente: null, valor: 2180, km: 152300, itens: [] }],
 };
 // Km do cadastro na demo (o resto vem das OS).
 const KM_CADASTRO: Record<string, number> = { RLV2E48: 30500, MLK4109: 140000 };
@@ -810,7 +816,8 @@ export const demo = {
       if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 404 });
       const hoje = new Date().toISOString().slice(0, 10);
       const abertas = ORDENS.filter((o) => o.placa === v.placa).map((o) => ({ os_id: o.id, numero: o.numero, data: hoje,
-        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor, km: DETALHE_OS[o.id]?.km ?? null }));
+        etapa_rotulo: ETAPAS_OS[ETAPAS_OS.findIndex((e) => e[0] === o.etapa)][1], cliente: o.cliente, valor: o.valor, km: DETALHE_OS[o.id]?.km ?? null,
+        itens: (DETALHE_OS[o.id]?.itens ?? []).map((i) => ({ tipo: i.tipo, descricao: i.descricao, quantidade: i.quantidade })) }));
       return r({ itens: [...abertas, ...(HISTORICO_ANTIGO[v.placa] ?? [])], km_cadastro: KM_CADASTRO[v.placa] ?? null, cadastrado_em: KM_CADASTRO[v.placa] ? '2025-03-10' : null });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos/consulta-placa/')) {
