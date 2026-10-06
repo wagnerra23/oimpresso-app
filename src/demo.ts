@@ -169,10 +169,10 @@ const TIPOS_VEICULO: Array<[string, string]> = [['caminhao', 'Caminhão'], ['cam
 // Chassi e RENAVAM da demo (o item da lista não traz; só o GET do veículo para editar).
 const EXTRA_VEICULO: Record<number, { chassi: string | null; renavam: string | null }> = {};
 const VEICULOS: Array<{ id: number; placa: string; placa_secundaria: string | null; descricao: string | null; ano: string | null;
-  cliente: string | null; cliente_id: number | null; km: number | null; cor: string | null }> = [
-  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 48312, cor: 'Branco' },
-  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 312040, cor: 'Prata' },
-  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null },
+  cliente: string | null; cliente_id: number | null; km: number | null; cor: string | null; proxima_revisao_km?: number | null }> = [
+  { id: 1, placa: 'RLV2E48', placa_secundaria: null, descricao: 'Picape', ano: '2022/2022', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 48312, cor: 'Branco', proxima_revisao_km: 50000 },
+  { id: 2, placa: 'RBA2H78', placa_secundaria: 'RBC3J10', descricao: 'Caminhão basculante', ano: '2019/2020', cliente: 'Transportes Vale Norte', cliente_id: 101, km: 312040, cor: 'Prata', proxima_revisao_km: 310000 },
+  { id: 3, placa: 'MLK4109', placa_secundaria: null, descricao: 'Furgão', ano: '2018/2018', cliente: 'Mercado Bom Preço', cliente_id: 102, km: 161880, cor: null, proxima_revisao_km: 180000 },
   { id: 4, placa: 'QHX5B33', placa_secundaria: null, descricao: null, ano: null, cliente: null, cliente_id: null, km: 72415, cor: null },
 ];
 const HISTORICO_ANTIGO: Record<string, Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null; km: number | null }>> = {
@@ -839,10 +839,10 @@ export const demo = {
         const [anoF, anoM] = (v.ano ?? '').split('/').map((t) => (t ? Number(t) : null));
         return r({ id: v.id, placa: v.placa, placa_secundaria: v.placa_secundaria, tipo: TIPOS_VEICULO.find((t) => t[1] === v.descricao)?.[0] ?? '',
           ano_fabricacao: anoF ?? null, ano_modelo: anoM ?? null, cor: v.cor, km: v.km, chassi: extra.chassi, renavam: extra.renavam,
-          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true, pode_excluir: true });
+          contact_id: v.cliente_id, cliente: v.cliente, pode_editar: true, pode_excluir: true, proxima_revisao_km: v.proxima_revisao_km ?? null });
       }
       const p = corpo as { placa: string; tipo: string; placa_secundaria: string | null; ano_fabricacao: number | null; ano_modelo: number | null;
-        cor: string | null; km: number | null; chassi: string | null; renavam: string | null; contact_id: number | null };
+        cor: string | null; km: number | null; chassi: string | null; renavam: string | null; contact_id: number | null; proxima_revisao_km?: number | null };
       const placa = (p.placa ?? '').toUpperCase();
       const reb = (p.placa_secundaria ?? '').toUpperCase();
       const outros = VEICULOS.filter((x) => x.id !== v.id);
@@ -855,12 +855,15 @@ export const demo = {
       if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
       else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      { const rev = (corpo as { proxima_revisao_km?: number | null }).proxima_revisao_km; if (rev != null && rev < 0) campos.proxima_revisao_km = 'O km da próxima revisão não pode ser negativo.'; }
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
       await espera(500);
       const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
       const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
       Object.assign(v, { placa, placa_secundaria: reb || null, descricao: TIPOS_VEICULO.find((t) => t[0] === p.tipo)?.[1] ?? p.tipo,
-        ano: anoF ? anoF + '/' + anoM : null, cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor });
+        ano: anoF ? anoF + '/' + anoM : null, cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor,
+        // Chave ausente mantém o valor (pedido ao ERP no #8750); null apaga.
+        proxima_revisao_km: 'proxima_revisao_km' in p ? p.proxima_revisao_km ?? null : v.proxima_revisao_km ?? null });
       EXTRA_VEICULO[v.id] = { chassi: p.chassi, renavam: p.renavam };
       return r({ ...v });
     }
@@ -878,20 +881,27 @@ export const demo = {
       if (reb && reb === placa) campos.placa_secundaria = 'A placa do reboque não pode ser igual à principal.';
       else if (existeReb) campos.placa_secundaria = 'Esta placa já está em outro veículo ativo.';
       if (!p.tipo) campos.tipo = 'Selecione o tipo do veículo.';
+      { const rev = (corpo as { proxima_revisao_km?: number | null }).proxima_revisao_km; if (rev != null && rev < 0) campos.proxima_revisao_km = 'O km da próxima revisão não pode ser negativo.'; }
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, campos, veiculo_existente_id: (existe ?? existeReb)?.id ?? null });
       await espera(500);
       const dono = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
       const anoF = p.ano_fabricacao ?? p.ano_modelo, anoM = p.ano_modelo ?? p.ano_fabricacao;
       const novoV = { id: Math.max(...VEICULOS.map((v) => v.id)) + 1, placa, placa_secundaria: p.placa_secundaria,
         descricao: TIPOS_VEICULO.find((t) => t[0] === p.tipo)?.[1] ?? p.tipo, ano: anoF ? anoF + '/' + anoM : null,
-        cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor };
+        cliente: dono, cliente_id: dono ? p.contact_id : null, km: p.km, cor: p.cor, proxima_revisao_km: (p as { proxima_revisao_km?: number | null }).proxima_revisao_km ?? null };
       VEICULOS.push(novoV);
       return r(novoV);
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/veiculos')) {
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '').toLowerCase();
-      const itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
-      return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true, pode_editar: true });
+      // Revisão próxima: tem próxima revisão e o km já chegou a AVISO km dela (ou passou), do mais atrasado ao que falta mais.
+      const AVISO = 1000;
+      const falta = (v: (typeof VEICULOS)[number]) => (v.proxima_revisao_km ?? 0) - (v.km ?? 0);
+      const proxima = (v: (typeof VEICULOS)[number]) => v.proxima_revisao_km != null && v.km != null && falta(v) <= AVISO;
+      let itens = VEICULOS.filter((v) => !q || [v.placa, v.placa_secundaria, v.descricao, v.cliente].some((t) => (t ?? '').toLowerCase().includes(q)));
+      if (/[?&]revisao=1/.test(caminho)) itens = itens.filter(proxima).sort((a, b) => falta(a) - falta(b));
+      return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true, pode_editar: true,
+        revisao_proxima: VEICULOS.filter(proxima).length, revisao_aviso_km: AVISO });
     }
     if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
       const partes = caminho.split('/');

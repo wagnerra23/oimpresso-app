@@ -7,7 +7,7 @@
 // com a diferença para a anterior. Aparece só quando o ERP manda km_cadastro (ERP #8732).
 // "Editar" (dentro do cartão aberto) abre o formulário do cadastro em modo edição (EDITAR_VEICULO + pode_editar).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, REVISAO_KM, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -21,6 +21,16 @@ export const dataOs = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(
 
 /** Data com ano para o km: "12/06/26". */
 export const dataKm = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
+
+/** Aviso de revisão do cartão (ERP #8750): atrasada (passou do km), próxima (dentro do aviso do ERP) ou nada. Sem km conhecido
+ *  não há como saber: nada. Conta só pelo km real anotado (decisão [W]). */
+export function situacaoRevisao(v: Pick<VeiculoResumo, 'km' | 'proxima_revisao_km'>, aviso: number): { tom: 'danger' | 'warn'; texto: string } | null {
+  if (v.proxima_revisao_km == null || v.km == null) return null;
+  const falta = v.proxima_revisao_km - v.km;
+  if (falta <= 0) return { tom: 'danger', texto: falta === 0 ? 'Revisão agora' : `Revisão atrasada ${Math.abs(falta).toLocaleString('pt-BR')} km` };
+  if (falta <= aviso) return { tom: 'warn', texto: `Revisão em ${falta.toLocaleString('pt-BR')} km` };
+  return null;
+}
 
 export interface LeituraKm { data: string | null; origem: string; km: number; diferenca: number | null }
 
@@ -64,21 +74,22 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [aberto, setAberto] = useState<number | null>(null);
   const [historico, setHistorico] = useState<Record<number, HistoricoVeiculo | 'erro'>>({});
+  const [soRevisao, setSoRevisao] = useState(false);
 
   useEffect(() => { const t = setTimeout(() => setQ(texto.trim()), 350); return () => clearTimeout(t); }, [texto]);
 
-  const carregar = useCallback(async (busca: string) => {
+  const carregar = useCallback(async (busca: string, revisao: boolean) => {
     setDados(null); setErro(null);
-    try { setDados(await api.veiculos(1, busca)); }
+    try { setDados(await api.veiculos(1, busca, revisao)); }
     catch (e) { setErro(e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não tem acesso aos veículos.' : e instanceof Error ? e.message : 'Não foi possível carregar.'); }
   }, []);
-  useEffect(() => { carregar(q); }, [q, carregar]);
+  useEffect(() => { carregar(q, soRevisao); }, [q, soRevisao, carregar]);
 
   const mais = async () => {
     if (!dados) return;
     setCarregandoMais(true);
     try {
-      const prox = await api.veiculos(dados.pagina + 1, q);
+      const prox = await api.veiculos(dados.pagina + 1, q, soRevisao);
       setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
     } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
     finally { setCarregandoMais(false); }
@@ -111,15 +122,26 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <input type="search" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Placa, tipo ou dono" aria-label="Buscar veículo" enterKeyHint="search" />
           </label>
+          {REVISAO_KM && (soRevisao || (dados?.revisao_proxima ?? 0) > 0) && (
+            <div className="pd-chips" role="tablist" aria-label="Filtro de revisão">
+              <button role="tab" aria-selected={!soRevisao} className={'pd-chip' + (!soRevisao ? ' on' : '')} onClick={() => setSoRevisao(false)}>Todos</button>
+              <button role="tab" aria-selected={soRevisao} className={'pd-chip' + (soRevisao ? ' on' : '')} onClick={() => setSoRevisao(true)}>
+                Revisão próxima{dados?.revisao_proxima !== undefined && <span>{dados.revisao_proxima}</span>}
+              </button>
+            </div>
+          )}
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
           {!dados && !erro && <p className="p4-legal">Carregando…</p>}
           {dados && dados.itens.length === 0 && (
-            <div className="p4-vazio"><b>Nenhum veículo encontrado</b><span>{q ? 'Tente outra placa, modelo ou cliente.' : 'Os veículos atendidos pela oficina aparecem aqui.'}</span></div>
+            soRevisao
+              ? <div className="p4-vazio"><b>Nenhuma revisão próxima</b><span>Os veículos perto do km da próxima revisão aparecem aqui.</span></div>
+              : <div className="p4-vazio"><b>Nenhum veículo encontrado</b><span>{q ? 'Tente outra placa, modelo ou cliente.' : 'Os veículos atendidos pela oficina aparecem aqui.'}</span></div>
           )}
           {dados?.itens.map((v) => {
             const estaAberto = aberto === v.id;
             const h = historico[v.id];
             const meta = textoVeiculo(v);
+            const rev = REVISAO_KM ? situacaoRevisao(v, dados.revisao_aviso_km ?? 1000) : null;
             return (
               <div key={v.id} className="pd-card vei-card">
                 {(() => {
@@ -132,6 +154,7 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar }: Props) {
                     <b>{v.descricao ?? 'Veículo'}{v.placa_secundaria && <span className="vei-reboque"> + reboque</span>}</b>
                     <small>{v.cliente ?? 'Sem dono cadastrado'}</small>
                     {meta && <small className="vei-meta">{meta}</small>}
+                    {rev && <span className={'p4-pill vei-rev ' + rev.tom}>{rev.texto}</span>}
                   </span>
                   {HISTORICO_VEICULO && <span className="vei-chev" aria-hidden="true">{estaAberto ? '−' : '+'}</span>}
                   </>);
