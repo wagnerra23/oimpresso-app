@@ -4,13 +4,15 @@
 // pipeline do ERP: o app não conhece a lista de etapas. Fora desta tela de propósito: "+ Nova OS", "→ próxima etapa" e
 // "Link" (são escritas, cada uma num PR próprio). Tocar no cartão abre o detalhe (tela 03).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, NOVA_OS, type ListaOs, type OsResumo } from '../api';
+import { AGENDA_OFICINA, api, ErroApi, NOVA_OS, type Agendamento, type ListaOs, type OsResumo, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { useVoltar } from '../voltar';
 import { OsDetalhe } from './OsDetalhe';
 import { Veiculos } from './Veiculos';
 import { NovaOs } from './NovaOs';
 import { NovoVeiculo } from './NovoVeiculo';
+import { Agenda, diaLocal } from './Agenda';
+import { NovoAgendamento } from './NovoAgendamento';
 
 /** Cor da etapa: travada em vermelho, última etapa do pipeline em verde, o resto no acento. */
 export function tintaOs(o: Pick<OsResumo, 'travada' | 'etapa'>): string {
@@ -45,11 +47,20 @@ export function kpisPatio(d: Pick<ListaOs, 'total' | 'etapas'>): Array<{ chave: 
   ];
 }
 
+/** Veículo do agendamento no formato da lista, para a Nova OS (o dono vem do cliente do agendamento). */
+export function veiculoDoAgendamento(a: Agendamento): VeiculoResumo {
+  return { id: a.veiculo.id, placa: a.veiculo.placa, placa_secundaria: null, descricao: a.veiculo.descricao, ano: null,
+    cliente: a.cliente?.nome ?? null, cliente_id: a.cliente?.id ?? null, km: null, cor: null };
+}
+
 /** Valor da OS; sem valor ainda (antes do orçamento), travessão. */
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
 export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
-  const [aba, setAba] = useState<'os' | 'veiculos'>('os');
+  const [aba, setAba] = useState<'os' | 'agenda' | 'veiculos'>('os');
+  const [agendando, setAgendando] = useState<{ dia: string; veiculo: VeiculoResumo | null } | null>(null);
+  const [diaAgenda, setDiaAgenda] = useState<string | undefined>(undefined);
+  const [doAgendamento, setDoAgendamento] = useState<Agendamento | null>(null);
   const [aberta, setAberta] = useState<number | null>(null);
   const [nova, setNova] = useState(false);
   const [novoVeiculo, setNovoVeiculo] = useState(false);
@@ -58,6 +69,13 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   useVoltar(nova, () => setNova(false));
   useVoltar(novoVeiculo, () => setNovoVeiculo(false));
   useVoltar(editandoVeiculo !== null, () => setEditandoVeiculo(null));
+  useVoltar(agendando !== null, () => setAgendando(null));
+  useVoltar(doAgendamento !== null, () => setDoAgendamento(null));
+  if (agendando) return <NovoAgendamento avisar={avisar} diaInicial={agendando.dia} veiculoInicial={agendando.veiculo}
+    aoVoltar={() => setAgendando(null)} aoCriar={(a) => { setAgendando(null); setDiaAgenda(a.inicio.slice(0, 10)); setAba('agenda'); }} />;
+  if (doAgendamento) return <NovaOs avisar={avisar} aoVoltar={() => setDoAgendamento(null)}
+    inicial={{ veiculo: veiculoDoAgendamento(doAgendamento), cliente: doAgendamento.cliente, obs: doAgendamento.observacao ?? '', agendamentoId: doAgendamento.id }}
+    aoCriar={(os) => { setDoAgendamento(null); setAberta(os.id); }} />;
   if (editandoVeiculo !== null) return <NovoVeiculo key={editandoVeiculo} veiculoId={editandoVeiculo} avisar={avisar}
     aoVoltar={() => setEditandoVeiculo(null)} aoCriar={() => { setEditandoVeiculo(null); setAba('veiculos'); }}
     aoExcluir={() => { setEditandoVeiculo(null); setAba('veiculos'); }} />;
@@ -66,13 +84,18 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
   if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
   // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
   const abas = (
-    <div className="p4-abas ofi-abas" role="tablist" aria-label="Oficina">
-      <button role="tab" aria-selected={aba === 'os'} className={aba === 'os' ? 'on' : undefined} onClick={() => setAba('os')}>Ordens de serviço</button>
+    <div className={"p4-abas ofi-abas" + (AGENDA_OFICINA ? " tres" : "")} role="tablist" aria-label="Oficina">
+      <button role="tab" aria-selected={aba === 'os'} className={aba === 'os' ? 'on' : undefined} onClick={() => setAba('os')}>{AGENDA_OFICINA ? 'OS' : 'Ordens de serviço'}</button>
+      {AGENDA_OFICINA && <button role="tab" aria-selected={aba === 'agenda'} className={aba === 'agenda' ? 'on' : undefined} onClick={() => setAba('agenda')}>Agenda</button>}
       <button role="tab" aria-selected={aba === 'veiculos'} className={aba === 'veiculos' ? 'on' : undefined} onClick={() => setAba('veiculos')}>Veículos</button>
     </div>
   );
+  const hoje = diaLocal(new Date());
+  if (aba === 'agenda') return <Agenda key={diaAgenda ?? hoje} voltar={voltar} abas={abas} avisar={avisar} diaInicial={diaAgenda}
+    aoAgendar={(dia) => setAgendando({ dia: dia < hoje ? hoje : dia, veiculo: null })} aoAbrirOs={setDoAgendamento} aoVerOs={setAberta} />;
   return aba === 'veiculos'
-    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} aoNovo={() => setNovoVeiculo(true)} aoEditar={setEditandoVeiculo} />
+    ? <Veiculos voltar={voltar} abas={abas} aoAbrirOs={setAberta} aoNovo={() => setNovoVeiculo(true)} aoEditar={setEditandoVeiculo}
+      aoAgendar={(v) => setAgendando({ dia: hoje, veiculo: v })} />
     : <Lista voltar={voltar} abas={abas} aoAbrir={setAberta} aoNova={() => setNova(true)} />;
 }
 

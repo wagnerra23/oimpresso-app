@@ -281,7 +281,24 @@ export interface NovaOs {
   contact_id: number | null;
   /** km inteiro ≥ 0 · box até 60 caracteres · observações até 2000. */
   mileage_at_service: number | null; box_label: string | null; notes: string | null;
+  /** OS aberta a partir de um agendamento: o ERP marca o agendamento como atendido e liga à OS (PROVISÓRIO, pedido ao ERP). */
+  agendamento_id?: number | null;
 }
+/** Agendamento de revisão da Oficina (FORMATO PROVISÓRIO, pedido ao ERP). "inicio" = "AAAA-MM-DDTHH:MM" no fuso da empresa. */
+export interface Agendamento {
+  id: number; inicio: string;
+  veiculo: { id: number; placa: string; descricao: string | null };
+  cliente: { id: number; nome: string } | null;
+  observacao: string | null;
+  status: 'agendado' | 'atendido' | 'cancelado';
+  /** OS aberta a partir dele (status atendido). */
+  os_id: number | null;
+}
+export interface ListaAgendamentos { itens: Agendamento[]; pode_criar?: boolean }
+/** Corpo do POST /api/app/agendamentos. Mais de um no mesmo horário é permitido; dia passado é recusado (o próprio dia vale). */
+export interface NovoAgendamento { vehicle_id: number; contact_id: number | null; inicio: string; observacao: string | null }
+/** Liga a Agenda da Oficina (decisões [W] 2026-10-06). Só a demo, até as rotas /api/app/agendamentos existirem no ERP. */
+export const AGENDA_OFICINA = DEMO;
 /** Liga "+ Nova OS". Rota do ERP #8639 em produção desde 2026-10-05. */
 export const NOVA_OS = true;
 
@@ -834,6 +851,19 @@ export const api = {
     ? chamar<unknown>('DELETE', `/api/app/veiculos/${id}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Excluir veículo pelo app ainda não está disponível.'))),
   /** Lista de veículos. revisao = só os com revisão próxima ou atrasada (?revisao=1, ERP #8750). */
+  /** Agenda da Oficina entre dois dias (inclusive), por horário (rota PROVISÓRIA, pedida ao ERP). */
+  agendamentos: (de: string, ate: string) => (AGENDA_OFICINA
+    ? chamar<ListaAgendamentos>('GET', `/api/app/agendamentos?de=${de}&ate=${ate}`)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
+  /** Agendar revisão. 201 = o item · 422 { erro: "validacao", campos } (inicio no passado, vehicle_id…) · 403 · 503. */
+  criarAgendamento: (a: NovoAgendamento) => (AGENDA_OFICINA
+    ? chamar<Agendamento>('POST', '/api/app/agendamentos', a)
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
+  /** Cancelar agendamento (motivo opcional). 200 = o item · 422 { erro: "estado_invalido", mensagem } se já foi atendido ou
+   *  cancelado · 404 de outra empresa · 403. */
+  cancelarAgendamento: (id: number, motivo: string | null) => (AGENDA_OFICINA
+    ? chamar<Agendamento>('POST', `/api/app/agendamentos/${id}/cancelar`, { motivo })
+    : Promise.reject(new ErroApi(0, 'indisponivel', 'A agenda da oficina ainda não está disponível no app.'))),
   veiculos: (pagina = 1, q = '', revisao = false) =>
     chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}${revisao ? '&revisao=1' : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */

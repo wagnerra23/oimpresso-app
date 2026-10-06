@@ -732,3 +732,23 @@ button.nos-escolha { cursor: pointer; }
 .vei-rev { align-self: flex-start; margin-top: 4px; font-size: 12px; }
 .vei-rev.warn { color: color-mix(in oklch, var(--warn) 62%, var(--text)); }
 .vei-rev.danger { color: color-mix(in oklch, var(--danger) 78%, var(--text)); }
+.vei-acoes { display: flex; gap: 8px; }
+.vei-acoes .vei-editar { flex: 1; }
+.age-dia { display: flex; align-items: center; gap: 8px; }
+.age-seta { min-width: 44px; min-height: 44px; padding: 0; font-size: 20px; }
+.age-rotulo { flex: 1; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0; background: none; color: var(--text); font: inherit; }
+.age-rotulo small { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.age-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.age-card.cancelado .age-hora { text-decoration: line-through; color: var(--text-dim); }
+.age-topo { display: flex; align-items: center; gap: 10px; }
+.age-hora { font-family: var(--font-mono); font-size: 16px; font-weight: 600; min-width: 46px; }
+.age-obs { margin: 0; font-size: 13px; color: var(--text-dim); }
+.age-pe { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.age-bts { display: flex; align-items: center; gap: 4px; }
+.age-abrir { min-height: 44px; }
+button.age-pill { border: 0; min-height: 32px; cursor: pointer; }
+.ofi-abas.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.age-pill.warn { color: color-mix(in oklch, var(--warn) 62%, var(--text)); }
+.age-pill.ok { color: color-mix(in oklch, var(--ok) 78%, var(--text)); }
+button.age-pill { position: relative; }
+button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }

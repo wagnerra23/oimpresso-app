@@ -29,15 +29,17 @@ type Modo = 'form' | 'veiculo' | 'cliente' | 'novoVeiculo';
 interface Props {
   aoVoltar: () => void; aoCriar: (os: OsDetalhe) => void;
   avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
+  /** OS aberta pelo "Abrir OS" da Agenda: veículo, cliente e observação já preenchidos; o agendamento vai junto. */
+  inicial?: { veiculo: VeiculoResumo; cliente: Cliente; obs: string; agendamentoId: number };
 }
 
-export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
-  const [modo, setModo] = useState<Modo>('veiculo');
-  const [veiculo, setVeiculo] = useState<VeiculoResumo | null>(null);
-  const [cliente, setCliente] = useState<Cliente>(null);
+export function NovaOs({ aoVoltar, aoCriar, avisar, inicial }: Props) {
+  const [modo, setModo] = useState<Modo>(inicial ? 'form' : 'veiculo');
+  const [veiculo, setVeiculo] = useState<VeiculoResumo | null>(inicial?.veiculo ?? null);
+  const [cliente, setCliente] = useState<Cliente>(inicial?.cliente ?? null);
   const [km, setKm] = useState('');
   const [box, setBox] = useState('');
-  const [obs, setObs] = useState('');
+  const [obs, setObs] = useState(inicial?.obs ?? '');
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
 
@@ -60,7 +62,7 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
     setSalvando(true); setErros({});
     try {
       const os = await api.criarOs({ vehicle_id: veiculo.id, contact_id: cliente?.id ?? null, mileage_at_service: k,
-        box_label: textoOuNulo(box), notes: textoOuNulo(obs) });
+        box_label: textoOuNulo(box), notes: textoOuNulo(obs), ...(inicial ? { agendamento_id: inicial.agendamentoId } : {}) });
       avisar?.(`${os.numero} aberta na ${os.etapa?.rotulo ?? 'oficina'}`);
       aoCriar(os);
     } catch (e) {
@@ -132,6 +134,8 @@ export function NovaOs({ aoVoltar, aoCriar, avisar }: Props) {
             <textarea id="nos-obs" className="nos-obs" rows={4} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="O que o cliente relatou" maxLength={2000} />
             {erro('notes')}
           </div>
+          {inicial && <p className="np-ajuda">Vem do agendamento: ao abrir a OS, ele fica como atendido.</p>}
+          {erro('agendamento_id')}
           <p className="np-ajuda">A OS abre na Recepção, sem itens. Orçamento, peças e serviços se lançam no computador.</p>
         </div>
       </div>
@@ -158,7 +162,7 @@ export function Cabecalho({ titulo, aoVoltar, rotulo = 'Nova OS' }: { titulo: st
 }
 
 /** Busca de veículo (mesma rota da tela 08). Veículo novo continua sendo cadastrado na web. */
-function BuscaVeiculo({ aoEscolher, aoVoltar, aoNovo }: { aoEscolher: (v: VeiculoResumo) => void; aoVoltar: () => void; aoNovo?: () => void }) {
+export function BuscaVeiculo({ aoEscolher, aoVoltar, aoNovo, rotulo }: { aoEscolher: (v: VeiculoResumo) => void; aoVoltar: () => void; aoNovo?: () => void; rotulo?: string }) {
   const [texto, setTexto] = useState('');
   const [itens, setItens] = useState<VeiculoResumo[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -171,7 +175,7 @@ function BuscaVeiculo({ aoEscolher, aoVoltar, aoNovo }: { aoEscolher: (v: Veicul
   }, [texto]);
   return (
     <>
-      <Cabecalho titulo="Escolher veículo" aoVoltar={aoVoltar} />
+      <Cabecalho titulo="Escolher veículo" aoVoltar={aoVoltar} rotulo={rotulo} />
       <div className="oi-scroll">
         <div className="pd-corpo">
           <label className="ps-busca">
