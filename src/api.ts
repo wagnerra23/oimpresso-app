@@ -342,6 +342,8 @@ export interface VeiculoResumo {
   /** Último km conhecido (cadastro ou OS). */
   km: number | null;
   cor: string | null;
+  /** Km da próxima revisão (FORMATO PROVISÓRIO, pedido ao ERP). Ausente ou null = sem lembrete. */
+  proxima_revisao_km?: number | null;
 }
 export interface ListaVeiculos {
   itens: VeiculoResumo[]; total: number; pagina: number; tem_mais: boolean;
@@ -349,6 +351,10 @@ export interface ListaVeiculos {
   pode_criar?: boolean;
   /** Pode editar veículo (oficinaauto.vehicle.update, ERP #8708). Ausente = não mostra "Editar". */
   pode_editar?: boolean;
+  /** Quantos veículos estão com revisão próxima ou atrasada (FORMATO PROVISÓRIO, pedido ao ERP), independente do filtro. */
+  revisao_proxima?: number;
+  /** A partir de quantos km antes da revisão o ERP considera "próxima" (o app só mostra). */
+  revisao_aviso_km?: number;
 }
 /** Tipos de veículo do ERP (TiposVeiculo do núcleo), na ordem dele. */
 export interface OpcoesVeiculo {
@@ -364,6 +370,8 @@ export interface NovoVeiculo {
   cor: string | null; km: number | null; chassi: string | null; renavam: string | null;
   /** Dono do veículo (contato da empresa); null = sem dono. */
   contact_id: number | null;
+  /** Km da próxima revisão (FORMATO PROVISÓRIO, pedido ao ERP). Só vai no corpo com REVISAO_KM ligado. */
+  proxima_revisao_km?: number | null;
 }
 /** Liga o cadastro de veículo. Rota do ERP #8687 em produção desde 2026-10-05. */
 export const NOVO_VEICULO = true;
@@ -377,6 +385,9 @@ export interface VeiculoEdicao extends NovoVeiculo {
 }
 /** Liga editar veículo. Rotas do ERP #8708 em produção desde 2026-10-05. */
 export const EDITAR_VEICULO = true;
+/** Liga o lembrete de revisão por km (decisão [W] 2026-10-06: só a oficina é avisada, no app; conta pelo km real
+ *  anotado). Só a demo, até o ERP ter o campo da próxima revisão e o filtro ?revisao=1. */
+export const REVISAO_KM = DEMO;
 /** Liga excluir veículo. Rota do ERP #8717 em produção desde 2026-10-05. */
 export const EXCLUIR_VEICULO = true;
 /** Resposta da consulta de placa (ERP #8695). Só dados técnicos, sem proprietário (LGPD); marca_modelo é só para mostrar. */
@@ -821,8 +832,9 @@ export const api = {
   excluirVeiculo: (id: number) => (EXCLUIR_VEICULO
     ? chamar<unknown>('DELETE', `/api/app/veiculos/${id}`)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Excluir veículo pelo app ainda não está disponível.'))),
-  veiculos: (pagina = 1, q = '') =>
-    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  /** Lista de veículos. revisao = só os com revisão próxima ou atrasada (?revisao=1, pedido ao ERP). */
+  veiculos: (pagina = 1, q = '', revisao = false) =>
+    chamar<ListaVeiculos>('GET', `/api/app/veiculos?pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}${revisao ? '&revisao=1' : ''}`),
   /** Histórico de OS do veículo (tela 08, ao expandir). Pede permissão de veículo e de OS. */
   veiculoOs: (id: number) => chamar<HistoricoVeiculo>('GET', `/api/app/veiculos/${id}/os`),
   notificacoes: (pagina = 1) => chamar<ListaNotificacoes>('GET', `/api/app/notificacoes?pagina=${pagina}`),

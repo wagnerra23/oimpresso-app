@@ -729,3 +729,6 @@ button.nos-escolha { cursor: pointer; }
 .vei-km-v { align-items: flex-end; font-family: var(--font-mono); font-size: 12.5px; }
 .vei-km-d small, .vei-km-v small { color: var(--text-dim); font-size: 12px; }
 .vei-km-v small.neg { color: var(--danger); }
+.vei-rev { align-self: flex-start; margin-top: 4px; font-size: 12px; }
+.vei-rev.warn { color: color-mix(in oklch, var(--warn) 62%, var(--text)); }
+.vei-rev.danger { color: color-mix(in oklch, var(--danger) 78%, var(--text)); }

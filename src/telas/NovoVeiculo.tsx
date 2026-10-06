@@ -9,7 +9,7 @@
 // confirmação e chama DELETE (ERP #8717, ligado por EXCLUIR_VEICULO). Soft delete sem restauração: definitivo para o usuário. "Buscar" da placa: consulta no fornecedor do
 // ERP #8695 (sem proprietário, LGPD), preenche só campos vazios; aparece só com opcoes.consulta_placa.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
-import { api, camposDoErro, ErroApi, EXCLUIR_VEICULO, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
+import { api, camposDoErro, ErroApi, EXCLUIR_VEICULO, REVISAO_KM, veiculoExistenteDoErro, type ConsultaPlaca, type OpcoesVeiculo, type VeiculoEdicao, type VeiculoResumo } from '../api';
 import { BuscaCliente, type Cliente } from './NovaOs';
 import { kmDigitado, textoOuNulo } from './NovaOs';
 import { Placa } from './Veiculos';
@@ -33,8 +33,8 @@ export function anoDigitado(t: string): number | null | 'invalido' {
   return n >= 1900 && n <= 2100 ? n : 'invalido';
 }
 
-export interface Form { placa: string; tipo: string; reboque: string; anoFab: string; anoMod: string; cor: string; km: string; chassi: string; renavam: string }
-const VAZIO: Form = { placa: '', tipo: '', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '' };
+export interface Form { placa: string; tipo: string; reboque: string; anoFab: string; anoMod: string; cor: string; km: string; chassi: string; renavam: string; revisao: string }
+const VAZIO: Form = { placa: '', tipo: '', reboque: '', anoFab: '', anoMod: '', cor: '', km: '', chassi: '', renavam: '', revisao: '' };
 
 /** Preenche com o resultado da consulta só os campos que ainda estão vazios (o que a pessoa digitou fica). */
 export function aplicarConsulta(f: Form, d: NonNullable<ConsultaPlaca['dados']>): Form {
@@ -53,7 +53,7 @@ export function aplicarConsulta(f: Form, d: NonNullable<ConsultaPlaca['dados']>)
 export function formDoVeiculo(v: VeiculoEdicao): Form {
   const t = (x: string | number | null) => (x === null ? '' : String(x));
   return { placa: v.placa, tipo: v.tipo ?? '', reboque: t(v.placa_secundaria), anoFab: t(v.ano_fabricacao), anoMod: t(v.ano_modelo),
-    cor: t(v.cor), km: t(v.km), chassi: t(v.chassi), renavam: t(v.renavam) };
+    cor: t(v.cor), km: t(v.km), chassi: t(v.chassi), renavam: t(v.renavam), revisao: t(v.proxima_revisao_km ?? null) };
 }
 
 /** Confere o formulário antes de enviar; devolve os erros por campo da API (vazio = pode enviar). */
@@ -70,6 +70,7 @@ export function errosDoForm(f: Form): Record<string, string> {
   if (anoDigitado(f.anoMod) === 'invalido') e.ano_modelo = 'Ano com 4 dígitos, ex.: 2020.';
   if (kmDigitado(f.km) === 'invalido') e.km = 'Digite só números, ex.: 48312.';
   if (f.renavam.trim().length > 11) e.renavam = 'RENAVAM tem no máximo 11 dígitos.';
+  if (kmDigitado(f.revisao) === 'invalido') e.proxima_revisao_km = 'Digite só números, ex.: 60000.';
   return e;
 }
 
@@ -174,6 +175,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
         placa: normalizarPlaca(f.placa), tipo: f.tipo, placa_secundaria: normalizarPlaca(f.reboque) || null,
         ano_fabricacao: ano(f.anoFab), ano_modelo: ano(f.anoMod), cor: textoOuNulo(f.cor), km: km === 'invalido' ? null : km,
         chassi: textoOuNulo(f.chassi.toUpperCase()), renavam: textoOuNulo(f.renavam), contact_id: dono?.id ?? null,
+        ...(REVISAO_KM ? { proxima_revisao_km: ((r) => (r === 'invalido' ? null : r))(kmDigitado(f.revisao)) } : {}),
       };
       const v = veiculoId !== undefined ? await api.editarVeiculo(veiculoId, corpo) : await api.criarVeiculo(corpo);
       avisar?.(editando ? `Veículo ${v.placa} atualizado` : `Veículo ${v.placa} cadastrado`);
@@ -279,6 +281,7 @@ export function NovoVeiculo({ aoVoltar, aoCriar, avisar, rotulo = 'Oficina', aoU
             {campo('anoMod', 'Ano modelo (opcional)', 'ano_modelo', { inputMode: 'numeric', placeholder: '2020', maxLength: 4 })}
           </div>
           {campo('km', 'Km atual (opcional)', 'km', { inputMode: 'numeric', placeholder: 'Ex.: 48312' })}
+          {REVISAO_KM && campo('revisao', 'Próxima revisão em km (opcional)', 'proxima_revisao_km', { inputMode: 'numeric', placeholder: 'Ex.: 60000' })}
           {campo('cor', 'Cor (opcional)', 'cor', { placeholder: 'Ex.: Branco', maxLength: 30, className: 'nos-texto-livre' })}
           {campo('reboque', 'Placa do reboque (opcional)', 'placa_secundaria', { autoCapitalize: 'characters', placeholder: 'Só se tiver reboque', maxLength: 10 })}
           {campo('chassi', 'Chassi (opcional)', 'chassi', { autoCapitalize: 'characters', maxLength: 30 })}

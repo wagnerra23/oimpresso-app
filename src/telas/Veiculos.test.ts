@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dataOs, leiturasKm, placaAntiga, textoDiferenca, textoVeiculo } from './Veiculos';
+import { dataOs, leiturasKm, placaAntiga, situacaoRevisao, textoDiferenca, textoVeiculo } from './Veiculos';
 
 describe('tela 08 · Veículos — textos', () => {
   it('linha de km, ano e cor pula o que vier vazio', () => {
@@ -41,5 +41,24 @@ describe('Veículos — km registrado', () => {
   it('cadastro sem data conta como a leitura mais antiga', () => {
     const ls = leiturasKm({ km_cadastro: 1000, cadastrado_em: null, itens: [os('OS-1', '2026-01-01', 2000)] });
     expect(ls.map((l) => l.origem)).toEqual(['OS-1', 'Cadastro']);
+  });
+});
+
+describe('Veículos — lembrete de revisão por km', () => {
+  it('dentro do aviso: revisão próxima, com quanto falta', () => {
+    expect(situacaoRevisao({ km: 48312, proxima_revisao_km: 50000 }, 1000)).toBeNull();
+    expect(situacaoRevisao({ km: 49200, proxima_revisao_km: 50000 }, 1000)).toEqual({ tom: 'warn', texto: 'Revisão em 800 km' });
+    expect(situacaoRevisao({ km: 49000, proxima_revisao_km: 50000 }, 1000)).toEqual({ tom: 'warn', texto: 'Revisão em 1.000 km' });
+  });
+
+  it('passou do km: atrasada; no km exato: agora', () => {
+    expect(situacaoRevisao({ km: 312040, proxima_revisao_km: 310000 }, 1000)).toEqual({ tom: 'danger', texto: 'Revisão atrasada 2.040 km' });
+    expect(situacaoRevisao({ km: 50000, proxima_revisao_km: 50000 }, 1000)).toEqual({ tom: 'danger', texto: 'Revisão agora' });
+  });
+
+  it('sem próxima revisão ou sem km conhecido: nada', () => {
+    expect(situacaoRevisao({ km: 1000, proxima_revisao_km: null }, 1000)).toBeNull();
+    expect(situacaoRevisao({ km: null, proxima_revisao_km: 5000 }, 1000)).toBeNull();
+    expect(situacaoRevisao({ km: 1000 }, 1000)).toBeNull();
   });
 });
