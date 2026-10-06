@@ -752,3 +752,9 @@ button.age-pill { border: 0; min-height: 32px; cursor: pointer; }
 .age-pill.ok { color: color-mix(in oklch, var(--ok) 78%, var(--text)); }
 button.age-pill { position: relative; }
 button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }
+.vei-os.com-servicos { align-items: flex-start; padding: 8px 0; }
+.vei-os.com-servicos .pd-num, .vei-os.com-servicos .vei-os-v { padding-top: 1px; }
+.vei-serv { display: block; font-size: 12.5px !important; color: var(--text) !important; padding-left: 9px; text-indent: -9px; }
+.vei-serv::before { content: '· '; color: var(--text-dim); }
+.vei-serv.mais, .vei-serv.vazio { color: var(--text-dim) !important; }
+.vei-serv.mais::before, .vei-serv.vazio::before { content: ''; }

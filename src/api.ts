@@ -422,7 +422,12 @@ export interface ConsultaPlaca {
 export interface HistoricoVeiculo {
   itens: Array<{ os_id: number; numero: string; data: string; etapa_rotulo: string | null; cliente: string | null; valor: number | null;
     /** Km na entrada da OS (ERP #8732). */
-    km?: number | null }>;
+    km?: number | null;
+    /** O que foi feito na OS: serviços e peças, sem valor (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = ERP ainda sem
+     *  o histórico de serviços: o app mostra só a linha da OS. */
+    itens?: Array<{ tipo: TipoItemOs; descricao: string; quantidade: number }>;
+    /** Total de itens da OS quando o ERP corta a lista (teto por OS); ausente = vieram todos. */
+    itens_total?: number }>;
   /** Km do cadastro do veículo e o dia em que foi cadastrado (ERP #8732). Ausente = ERP
    *  ainda sem o histórico de km: o app esconde a seção "Km registrado". */
   km_cadastro?: number | null;

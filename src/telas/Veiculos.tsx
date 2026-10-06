@@ -7,7 +7,7 @@
 // com a diferença para a anterior. Aparece só quando o ERP manda km_cadastro (ERP #8732).
 // "Editar" (dentro do cartão aberto) abre o formulário do cadastro em modo edição (EDITAR_VEICULO + pode_editar).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { AGENDA_OFICINA, api, EDITAR_VEICULO, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, REVISAO_KM, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
+import { AGENDA_OFICINA, api, EDITAR_VEICULO, type TipoItemOs, ErroApi, HISTORICO_VEICULO, NOVO_VEICULO, REVISAO_KM, type HistoricoVeiculo, type ListaVeiculos, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { textoKm } from './OsDetalhe';
 
@@ -21,6 +21,21 @@ export const dataOs = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(
 
 /** Data com ano para o km: "12/06/26". */
 export const dataKm = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
+
+/** Uma linha do que foi feito na OS: serviço pelo nome; terceiro com "(terceiro)"; peça com a quantidade quando passa de 1. */
+export function linhaServico(i: { tipo: TipoItemOs; descricao: string; quantidade: number }): string {
+  if (i.tipo === 'servico_terceiro') return `${i.descricao} (terceiro)`;
+  if (i.tipo === 'peca' && i.quantidade !== 1) return `${i.quantidade.toLocaleString('pt-BR')}× ${i.descricao}`;
+  return i.descricao;
+}
+
+/** Até "max" linhas; serviços antes das peças (é o que se procura: "quando trocou o óleo?"). O resto vira "e mais N",
+ *  contando também o que o ERP cortou (itens_total). */
+export function servicosDaOs(itens: Array<{ tipo: TipoItemOs; descricao: string; quantidade: number }>, total?: number, max = 4): { linhas: string[]; resto: number } {
+  const ordem = [...itens.filter((i) => i.tipo !== 'peca'), ...itens.filter((i) => i.tipo === 'peca')];
+  const linhas = ordem.slice(0, max).map(linhaServico);
+  return { linhas, resto: Math.max(total ?? itens.length, itens.length) - linhas.length };
+}
 
 /** Aviso de revisão do cartão (ERP #8750): atrasada (passou do km), próxima (dentro do aviso do ERP) ou nada. Sem km conhecido
  *  não há como saber: nada. Conta só pelo km real anotado (decisão [W]). */
@@ -170,20 +185,26 @@ export function Veiculos({ voltar, abas, aoAbrirOs, aoNovo, aoEditar, aoAgendar 
                         {EDITAR_VEICULO && aoEditar && dados?.pode_editar && <button className="oi-btn vei-editar" onClick={() => aoEditar(v.id)}>Editar veículo</button>}
                       </div>
                     )}
-                    <span className="p4-rotulo">Histórico de OS</span>
+                    <span className="p4-rotulo">{h && h !== 'erro' && h.itens.some((x) => x.itens !== undefined) ? 'Histórico de serviços' : 'Histórico de OS'}</span>
                     {!h && <p className="p4-legal">Carregando…</p>}
                     {h === 'erro' && <p className="p4-legal">Não foi possível carregar o histórico.</p>}
                     {h && h !== 'erro' && h.itens.length === 0 && <p className="p4-legal">Nenhuma OS para este veículo.</p>}
-                    {h && h !== 'erro' && h.itens.map((x) => (
-                      <button key={x.os_id} className="vei-os" onClick={() => aoAbrirOs(x.os_id)}>
-                        <span className="pd-num">{x.numero}</span>
-                        <span className="vei-os-t">
-                          {dataOs(x.data)} · {x.etapa_rotulo ?? 'fora do fluxo'}
-                          {x.cliente && x.cliente !== v.cliente && <small>{x.cliente}</small>}
-                        </span>
-                        <span className="vei-os-v">{x.valor === null ? '—' : reais(x.valor)}</span>
-                      </button>
-                    ))}
+                    {h && h !== 'erro' && h.itens.map((x) => {
+                      const sv = x.itens ? servicosDaOs(x.itens, x.itens_total) : null;
+                      return (
+                        <button key={x.os_id} className={'vei-os' + (sv ? ' com-servicos' : '')} onClick={() => aoAbrirOs(x.os_id)}>
+                          <span className="pd-num">{x.numero}</span>
+                          <span className="vei-os-t">
+                            {dataOs(x.data)} · {x.etapa_rotulo ?? 'fora do fluxo'}{sv && x.km != null && ` · ${textoKm(x.km)}`}
+                            {x.cliente && x.cliente !== v.cliente && <small>{x.cliente}</small>}
+                            {sv && sv.linhas.length === 0 && <small className="vei-serv vazio">Nada lançado</small>}
+                            {sv && sv.linhas.map((l, i) => <small key={i} className="vei-serv">{l}</small>)}
+                            {sv && sv.resto > 0 && <small className="vei-serv mais">e mais {sv.resto}</small>}
+                          </span>
+                          <span className="vei-os-v">{x.valor === null ? '—' : reais(x.valor)}</span>
+                        </button>
+                      );
+                    })}
                     {h && h !== 'erro' && 'km_cadastro' in h && (() => {
                       const ls = leiturasKm(h);
                       return (
