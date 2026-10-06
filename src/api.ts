@@ -298,8 +298,8 @@ export interface Agendamento {
 export interface ListaAgendamentos { itens: Agendamento[]; pode_criar?: boolean }
 /** Corpo do POST /api/app/agendamentos. Mais de um no mesmo horário é permitido; dia passado é recusado (o próprio dia vale). */
 export interface NovoAgendamento { vehicle_id: number; contact_id: number | null; inicio: string; observacao: string | null }
-/** Liga a Agenda da Oficina (decisões [W] 2026-10-06). Só a demo, até o ERP #8784 estar em produção. */
-export const AGENDA_OFICINA = DEMO;
+/** Liga a Agenda da Oficina (decisões [W] 2026-10-06). ERP #8784 em produção desde 2026-10-06. */
+export const AGENDA_OFICINA = true;
 /** Liga "+ Nova OS". Rota do ERP #8639 em produção desde 2026-10-05. */
 export const NOVA_OS = true;
 
