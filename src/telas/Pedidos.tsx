@@ -1,10 +1,11 @@
 // Pedidos — desenho v4 (telas 21 Pedidos · 22 Detalhe do pedido), dados pelo contrato
 // API-CONTRATO-v1 §2 (Pedido = venda do ERP; etapas = grupos da FSM). Só leitura na v1:
 // o botão da etapa fica desabilitado com "Abrir no computador" (ações mexem em estoque/cobrança).
-// Fora do v4 de propósito: "+ Venda" (Venda rápida é v2) e "Link de aprovação" (não está no contrato).
-import { useCallback, useEffect, useState } from 'react';
+// "+ Venda" abre a Venda rápida (tela 11, D16 Onda A). Fora do v4 de propósito: "Link de aprovação" (não está no contrato).
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPedidos, type GrupoEtapa, type ListaPedidos, type PedidoDetalheApi } from '../api';
 import { useVoltar } from '../voltar';
+import { VendaRapida } from './VendaRapida';
 
 const FILTROS: Array<{ id: FiltroPedidos; label: string }> = [
   { id: 'ativos', label: 'Ativos' }, { id: 'atrasados', label: 'Atrasados' },
@@ -16,13 +17,17 @@ const TINTA: Record<GrupoEtapa, string> = {
 export const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 
-export function Pedidos() {
+/** `voltar`: botão para Mais, quando Pedidos não está na barra (tela 30). */
+export function Pedidos({ voltar, avisar, online }: { voltar?: ReactNode; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online: boolean }) {
   const [aberto, setAberto] = useState<number | null>(null);
+  const [vendendo, setVendendo] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
-  return aberto !== null ? <Detalhe id={aberto} aoVoltar={() => setAberto(null)} /> : <Lista aoAbrir={setAberto} />;
+  useVoltar(vendendo, () => setVendendo(false));
+  if (vendendo) return <VendaRapida aoVoltar={() => setVendendo(false)} avisar={avisar} online={online} />;
+  return aberto !== null ? <Detalhe id={aberto} aoVoltar={() => setAberto(null)} /> : <Lista aoAbrir={setAberto} aoVender={() => setVendendo(true)} voltar={voltar} />;
 }
 
-function Lista({ aoAbrir }: { aoAbrir: (id: number) => void }) {
+function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; aoVender: () => void; voltar?: ReactNode }) {
   const [filtro, setFiltro] = useState<FiltroPedidos>('ativos');
   const [dados, setDados] = useState<ListaPedidos | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -49,8 +54,14 @@ function Lista({ aoAbrir }: { aoAbrir: (id: number) => void }) {
   return (
     <>
       <div className="pd-head">
-        <div className="p4-rotulo">{c ? `${c.ativos} ativos · ${c.atrasados} atrasados` : 'Pedidos'}</div>
-        <div className="pd-titulo">Pedidos</div>
+        <div className="p4-head-row" style={{ gap: 4 }}>
+          {voltar}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="p4-rotulo">{c ? `${c.ativos} ativos · ${c.atrasados} atrasados` : 'Pedidos'}</div>
+            <div className="pd-titulo">Pedidos</div>
+          </div>
+          <button className="pd-novo" onClick={aoVender}>+ Venda</button>
+        </div>
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">

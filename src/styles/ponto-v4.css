@@ -361,6 +361,55 @@ a.p4-link { text-decoration: none; }
 .prd-valores small.prd-apartir { font-size: 10.5px; color: var(--text-dim); margin-bottom: -2px; }
 .prd-valores small.baixo { color: var(--danger); font-weight: 600; }
 
+/* Venda rápida — tela 11 do v4 (alvos de toque ≥ 44; o −/+ do protótipo tinha 36) */
+.vr-limpar { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--danger); font: inherit; font-size: 13px; font-weight: 600; }
+.vr-item { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border-2); }
+.vr-item:last-child { border-bottom: 0; }
+.vr-item-l { min-height: 48px; display: flex; align-items: center; gap: 10px; }
+.vr-qtd { display: flex; align-items: center; gap: 4px; }
+.vr-qtd button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font: inherit; font-size: 18px; }
+.vr-qtd button.mais { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.vr-qtd button:disabled { opacity: .45; }
+.vr-qtd span { min-width: 24px; text-align: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-sub { min-width: 72px; text-align: right; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-total { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 12px 14px; display: flex; align-items: baseline; }
+.vr-total span { font-size: 13px; font-weight: 600; }
+.vr-total b { margin-left: auto; font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+.vr-feita { padding: 32px 16px 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.vr-ok { width: 72px; height: 72px; border-radius: 20px; background: var(--pos); color: var(--bg); display: grid; place-items: center; font-size: 32px; font-weight: 600; }
+.vr-feita-t { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; margin-top: 8px; }
+.vr-feita-v { font-family: var(--font-mono); font-size: 34px; font-weight: 600; }
+.vr-feita-s { font-size: 12px; color: var(--text-dim); }
+.vr-recibo { width: 100%; margin: 16px 0 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); text-align: center; }
+.vr-feita .p4-cta { width: 100%; }
+.vr-folha { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; }
+.vr-veu { flex: 1; background: rgba(0,0,0,0.55); }
+.vr-painel { max-height: 80vh; background: var(--surface); border-top: 1px solid var(--border); border-radius: 18px 18px 0 0;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.vr-alca { align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--border); }
+.vr-folha-cab { display: flex; align-items: center; }
+.vr-folha-cab span { font-size: 17px; font-weight: 600; }
+.vr-folha-cab button { margin-left: auto; min-height: 44px; padding: 0 4px 0 12px; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: 13px; }
+.vr-painel .p4-campo input { font-family: var(--font-sans); }
+.vr-catalogo { display: flex; flex-direction: column; overflow-y: auto; min-height: 120px; }
+.vr-prod { min-height: 56px; display: flex; align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--border-2); background: none;
+  color: var(--text); font: inherit; text-align: left; padding: 6px 0; }
+.vr-prod b, .vr-metodo b { display: block; font-size: 13.5px; font-weight: 600; }
+.vr-prod small, .vr-metodo small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.vr-prod:disabled b, .vr-prod:disabled .vr-prod-v { color: var(--text-dim); }
+.vr-prod-v { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.vr-cobrar { border-radius: 12px; background: var(--bg-2); padding: 12px 14px; display: flex; align-items: baseline; }
+.vr-cobrar span { font-size: 13px; color: var(--text-dim); }
+.vr-cobrar b { margin-left: auto; font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+.vr-metodos { display: flex; flex-direction: column; gap: 6px; }
+.vr-metodo { min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  display: flex; align-items: center; gap: 10px; font: inherit; text-align: left; }
+.vr-metodo i { width: 18px; height: 18px; border-radius: 99px; border: 2px solid var(--border); flex-shrink: 0; }
+.vr-metodo.on { border-color: var(--accent); background: var(--accent-soft); }
+.vr-metodo.on i { border-color: var(--accent); background: radial-gradient(var(--accent) 45%, transparent 50%); }
+.pd-novo { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font: inherit; font-size: 13px; font-weight: 600; }
+
 /* Tela 05 · Estoque (prefixo est-) */
 .est-alerta { width: 100%; min-height: 56px; padding: 10px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
   border: 1px solid color-mix(in oklch, var(--danger) 40%, var(--border)); border-radius: 12px; background: color-mix(in oklch, var(--danger) 10%, var(--surface));
@@ -377,6 +426,56 @@ a.p4-link { text-decoration: none; }
 .est-barra { height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .est-barra i { display: block; height: 100%; background: var(--text-mute); }
 .est-barra i.danger { background: var(--danger); } .est-barra i.warn { background: var(--warn); } .est-barra i.ok { background: var(--ok); }
+
+/* Tela 39 · Marcações a validar (fg-) */
+.fg-info { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface)); font-size: 12.5px; color: var(--text-dim); }
+.fg-info b { color: var(--text); font-size: 13px; }
+.fg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.fg-l1 { display: flex; align-items: flex-start; gap: 10px; }
+.fg-l1 b { display: block; font-size: 14px; font-weight: 600; }
+.fg-l1 small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.fg-estado { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; flex-shrink: 0; white-space: nowrap; }
+.fg-anulada { margin: 0; font-size: 12px; color: var(--danger); }
+.fg-estado i { width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0; }
+.fg-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mute); }
+.fg-gps { color: var(--warn); font-weight: 600; }
+.fg-gps.ruim { color: var(--danger); }
+.fg-acoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.fg-acoes .oi-btn { min-height: 44px; }
+.fg-acoes.so-validar { grid-template-columns: minmax(0, 1fr); }
+.fg-recusar { min-height: 44px; border-radius: 8px; border: 1px solid var(--danger); background: transparent; color: var(--danger); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.fg-recusar:disabled { opacity: .5; }
+.fg-confirma { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border-2, var(--border)); font-size: 12.5px; color: var(--text); }
+/* Tela 26 · Equipe (eq-) */
+.eq-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.eq-linha { min-height: 64px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-2, var(--border)); }
+.eq-linha:last-child { border-bottom: 0; }
+.eq-quem { flex: 1; min-width: 0; }
+.eq-quem b { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-quem small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-carga { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.eq-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eq-status { font-size: 11px; font-weight: 500; }
+/* Tela 25 · Assistente (ch-) */
+.ch-lista { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.ch-msg { max-width: 82%; padding: 10px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.ch-msg small { font-family: var(--font-mono); font-size: 10.5px; }
+.ch-msg.jana { align-self: flex-start; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.ch-msg.eu { align-self: flex-end; background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); border-bottom-right-radius: 4px; }
+.ch-msg.jana.falhou { border-color: var(--danger); color: var(--danger); }
+.ch-msg.eu.falhou { opacity: .75; }
+.ch-digitando { margin: 0; font-size: 12px; color: var(--text-mute); }
+.ch-rodape { flex-shrink: 0; padding: 10px 16px 12px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.ch-aviso { margin: 0; font-size: 12px; color: var(--text-dim); }
+.ch-sugestoes { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ch-sugestoes .pd-chip { white-space: nowrap; }
+.ch-sugestoes .pd-chip:disabled { opacity: .5; }
+.ch-campo { display: flex; gap: 8px; }
+.ch-campo input { flex: 1; min-width: 0; height: 44px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 0 12px; font: inherit; font-size: 15px; }
+.ch-enviar { width: 48px; height: 44px; flex-shrink: 0; border-radius: 10px; border: 0; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; cursor: pointer; }
+.ch-campo input::placeholder { color: var(--text-mute); }
+.ch-enviar:disabled { background: var(--bg-2, var(--border)); color: var(--text-mute); cursor: default; }
 
 /* Tela 29 · Movimentações (prefixo mov-) */
 .est-card.abre { width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; min-height: 44px; }
@@ -488,3 +587,168 @@ button.db-kpi { cursor: pointer; }
 .db-eixo { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
 .db-prog { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
 .db-prog .in-barra i.db-ok { background: var(--ok); }
+
+/* Tela 07 · Ordens de serviço (prefixo os-) */
+.os-card { gap: 8px; }
+.os-linha { display: flex; align-items: center; gap: 10px; }
+.os-placa { flex-shrink: 0; font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; letter-spacing: 1px; color: var(--text);
+  background: var(--surface); border: 1.5px solid var(--text-dim); border-top: 5px solid oklch(0.45 0.13 255); border-radius: 5px; padding: 2px 7px; }
+.os-texto { flex: 1; min-width: 0; }
+.os-texto b { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 14px; font-weight: 600; line-height: 18px; overflow: hidden; }
+.os-texto small { display: block; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-pipe { display: flex; gap: 3px; }
+.os-pipe i { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
+
+/* Tela 15 · Pagamentos (prefixo pg-) */
+.pg-pago { font-size: 12px; color: var(--ok); font-weight: 600; }
+.pg-acoes { display: flex; gap: 8px; }
+.pg-acoes .oi-btn { min-height: 44px; }
+.pg-novo { min-height: 44px; flex-shrink: 0; }
+.pg-acoes { flex-wrap: wrap; }
+.pg-perigo { color: var(--danger); border-color: var(--danger); }
+.pg-perigo-cheio { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+.pg-folha { padding: 12px 16px 4px; display: flex; flex-direction: column; gap: 10px; }
+.pg-sheet { max-height: 86%; }
+.pg-refs { display: flex; flex-direction: column; gap: 6px; }
+.pg-ref { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; text-align: left; }
+.pg-ref.on { border-color: var(--accent); background: var(--accent-soft); }
+.pg-ref b { display: block; font-size: 13.5px; font-weight: 600; }
+.pg-ref small { display: block; font-size: 12px; color: var(--text-dim); }
+.pg-ref-v { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.pg-ref-v small { display: block; font-family: var(--font-sans, inherit); font-size: 11px; font-weight: 500; color: var(--text-dim); }
+.pg-seg { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-2); }
+.pg-seg-b { min-height: 44px; border: 0; border-radius: 7px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12.5px; font-weight: 600; }
+.pg-seg-b.on { background: var(--surface); color: var(--text); }
+.pg-erro { font-size: 13px; color: var(--danger); margin: 0; }
+.pg-conf { font-size: 14px; margin: 0; line-height: 1.5; }
+.pg-conf b { font-family: var(--font-mono); font-size: 18px; }
+.pg-gerar { min-height: 48px; margin-top: 4px; position: sticky; bottom: 0; box-shadow: 0 -12px 12px -4px var(--surface); }
+
+/* Tela 30 · Meu menu (pm-) */
+.pm-restaurar { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+.pm-restaurar:disabled { color: var(--text-mute); cursor: default; }
+.pm-previa { display: grid; gap: 2px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.pm-aba { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: 10px; color: var(--text-dim); }
+.pm-aba small { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-aba.on { background: var(--accent-soft); color: var(--accent-text); }
+.pm-lista { display: flex; flex-direction: column; gap: 8px; }
+.pm-mod { min-height: 56px; width: 100%; padding: 8px 12px; display: flex; align-items: center; gap: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.pm-mod.on { border-color: var(--accent); background: var(--accent-soft); }
+.pm-texto { flex: 1; min-width: 0; }
+.pm-texto b { display: block; font-size: 14px; font-weight: 600; }
+.pm-texto small { display: block; font-size: 12px; color: var(--text-dim); }
+.pm-pos { width: 26px; height: 26px; flex-shrink: 0; border-radius: 99px; border: 1px solid var(--border); display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.pm-mod.on .pm-pos { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.pm-rodape { flex-shrink: 0; padding: 10px 16px 12px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
+
+/* Tela 03 · Detalhe da OS (prefixo osd-) */
+.osd-veiculo { flex-direction: row; align-items: center; gap: 12px; }
+.osd-veic-d { font-size: 15px; font-weight: 600; }
+.osd-veic-m { font-size: 12.5px; color: var(--text-dim); }
+.osd-km { font-family: var(--font-mono); }
+.osd-texto { gap: 10px; }
+.osd-texto span { font-size: 11px; font-weight: 600; color: var(--text-mute); }
+.osd-texto p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.45; }
+.osd-texto hr { border: 0; border-top: 1px solid var(--border-2); margin: 0; }
+.osd-tag { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 5px; background: var(--bg-2); color: var(--text-dim); }
+.osd-tag.peca { background: var(--accent-soft); color: var(--accent-text); }
+.osd-tag.servico_terceiro { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); }
+.osd-vist { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.osd-vist b { font-size: 13px; font-weight: 600; }
+.osd-vist b.ok { color: var(--ok-text, var(--text-dim)); } .osd-vist b.atencao { color: var(--warn-text, var(--text)); } .osd-vist b.critico { color: var(--danger); }
+.osd-sub { padding: 8px 14px; display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border-2); }
+.osd-sub span:last-child { font-family: var(--font-mono); }
+
+/* Abas da Oficina (07 · 08) e tela 08 · Veículos (prefixo vei-) */
+.ofi-abas { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+.os-placa.antiga { border-top-width: 1.5px; background: var(--bg-2); }
+.vei-card { padding: 0; gap: 0; overflow: hidden; }
+.vei-topo { min-height: 64px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; border: 0; background: none; font: inherit; color: inherit; text-align: left; width: 100%; }
+.vei-meta { font-family: var(--font-mono); font-size: 11.5px !important; color: var(--text-mute) !important; }
+.vei-chev { width: 28px; text-align: center; font-family: var(--font-mono); font-size: 18px; color: var(--text-dim); flex-shrink: 0; }
+.vei-hist { border-top: 1px solid var(--border-2); padding: 10px 14px 6px; display: flex; flex-direction: column; gap: 2px; background: var(--bg-2); }
+.vei-os { min-height: 44px; display: flex; align-items: center; gap: 10px; border: 0; background: none; font: inherit; color: var(--text); text-align: left; padding: 0; width: 100%; }
+.vei-os + .vei-os { border-top: 1px solid var(--border-2); }
+.vei-os-t { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-dim); }
+.vei-os-v { font-family: var(--font-mono); font-size: 12.5px; }
+.vei-hist .p4-rotulo, .vei-hist .pd-num { color: var(--text-dim); }
+.vei-placas { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.vei-reboque { font-weight: 500; color: var(--text-dim); font-size: 12.5px; }
+.vei-os-t small { display: block; font-size: 11.5px; color: var(--text-dim); }
+
+/* Tela 23 · Manutenção — indicadores do pátio no topo da lista de OS (prefixo man-) */
+.man-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.man-kpi { min-height: 64px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font: inherit; color: var(--text); text-align: left; }
+.man-kpi span { font-size: 11.5px; color: var(--text-dim); }
+.man-kpi b { font-family: var(--font-mono); font-size: 22px; font-weight: 600; line-height: 1.1; }
+.man-kpi.danger b { color: var(--danger); }
+.man-kpi.ok b { color: var(--ok-text, var(--text)); }
+.man-kpi.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* Tela 03 · avançar etapa (rodapé e confirmação) */
+.osd-acoes { gap: 8px; }
+.osd-acao { display: flex; flex-direction: column; gap: 4px; }
+.osd-bloqueio { font-size: 12px; color: var(--text-dim); text-align: center; }
+.osd-folha { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.osd-conf { margin: 0; font-size: 14px; line-height: 1.5; }
+.osd-conf-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.osd-conf-bts .oi-btn, .osd-conf-bts .p4-cta { min-height: 48px; height: 48px; }
+
+/* Nova OS (prefixo nos-) */
+.nos-nova { min-height: 44px; padding: 0 14px; flex-shrink: 0; font-size: 13px; }
+.nos-escolha { flex-direction: row; align-items: center; gap: 12px; width: 100%; font: inherit; color: var(--text); text-align: left; }
+button.nos-escolha { cursor: pointer; }
+.nos-trocar { font-size: 13px; font-weight: 600; color: var(--accent-text); flex-shrink: 0; }
+.nos-bts { display: flex; gap: 4px; flex-shrink: 0; }
+.nos-link { min-height: 44px; padding: 0 10px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); }
+.nos-texto-livre { font-family: var(--font-sans, inherit) !important; }
+.nos-obs { border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 10px 12px; font: inherit; font-size: 14px; width: 100%; resize: vertical; }
+.nos-linha { min-height: 64px; width: 100%; padding: 10px 14px; display: flex; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border-2);
+  background: none; font: inherit; color: var(--text); text-align: left; }
+.nos-linha:last-child { border-bottom: 0; }
+
+/* Tela 03 · cancelar OS e recusar orçamento */
+.osd-encerrar { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.osd-encerra { min-height: 44px; padding: 0 12px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--danger); }
+.osd-encerra:disabled { color: var(--text-mute); }
+.osd-perigo { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+
+/* Novo veículo (prefixo nve-) */
+.nve-previa { flex-shrink: 0; padding-right: 8px; }
+.nve-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.nve-achado { margin-top: -6px; color: var(--text); }
+.vei-editar { min-height: 44px; width: 100%; margin-bottom: 10px; }
+.nve-excluir { min-height: 44px; margin-top: 18px; }
+.vei-km { margin-top: 14px; }
+.vei-km-l { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid var(--border-2); }
+.vei-km-d, .vei-km-v { display: flex; flex-direction: column; font-size: 12.5px; color: var(--text); }
+.vei-km-v { align-items: flex-end; font-family: var(--font-mono); font-size: 12.5px; }
+.vei-km-d small, .vei-km-v small { color: var(--text-dim); font-size: 12px; }
+.vei-km-v small.neg { color: var(--danger); }
+.vei-rev { align-self: flex-start; margin-top: 4px; font-size: 12px; }
+.vei-rev.warn { color: color-mix(in oklch, var(--warn) 62%, var(--text)); }
+.vei-rev.danger { color: color-mix(in oklch, var(--danger) 78%, var(--text)); }
+.vei-acoes { display: flex; gap: 8px; }
+.vei-acoes .vei-editar { flex: 1; }
+.age-dia { display: flex; align-items: center; gap: 8px; }
+.age-seta { min-width: 44px; min-height: 44px; padding: 0; font-size: 20px; }
+.age-rotulo { flex: 1; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0; background: none; color: var(--text); font: inherit; }
+.age-rotulo small { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.age-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.age-card.cancelado .age-hora { text-decoration: line-through; color: var(--text-dim); }
+.age-topo { display: flex; align-items: center; gap: 10px; }
+.age-hora { font-family: var(--font-mono); font-size: 16px; font-weight: 600; min-width: 46px; }
+.age-obs { margin: 0; font-size: 13px; color: var(--text-dim); }
+.age-pe { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.age-bts { display: flex; align-items: center; gap: 4px; }
+.age-abrir { min-height: 44px; }
+button.age-pill { border: 0; min-height: 32px; cursor: pointer; }
+.ofi-abas.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.age-pill.warn { color: color-mix(in oklch, var(--warn) 62%, var(--text)); }
+.age-pill.ok { color: color-mix(in oklch, var(--ok) 78%, var(--text)); }
+button.age-pill { position: relative; }
+button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }

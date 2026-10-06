@@ -2,7 +2,7 @@
 // Os dois primeiros casos são as respostas que o teste do ERP (#8495) prova para revisor.ponto e para
 // um usuário de vendas; os demais são bordas da montagem.
 import { describe, expect, it } from 'vitest';
-import { montarNavegacao, NAV_PADRAO } from './navegacao';
+import { escolhaValida, montarNavegacao, NAV_PADRAO } from './navegacao';
 
 describe('montarNavegacao', () => {
   it('colaborador (revisor.ponto): barra Ponto · Mais, abre no Ponto, Mais só com Conta', () => {
@@ -55,6 +55,13 @@ describe('montarNavegacao', () => {
     expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
   });
 
+  it('Pagamentos (D16 Onda C) mora em Mais e só com a área liberada', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'orcamentos', 'pagamentos', 'ponto', 'mais'], 'inicio');
+    expect(n.abas).not.toContain('pagamentos');
+    expect(n.modulosMais).toEqual(['orcamentos', 'pagamentos', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
   it('colaborador sem ponto liberado: abre em Mais, que é a única aba', () => {
     const n = montarNavegacao('colaborador', ['mais'], 'mais');
     expect(n.abas).toEqual(['mais']);
@@ -72,8 +79,63 @@ describe('montarNavegacao', () => {
     expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
   });
 
+  it('tela 30: a escolha salva vira a barra (Início e Mais fixos) e o resto vai para Mais', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'financeiro', 'ponto', 'mais'] as const;
+    const n = montarNavegacao('erp', [...areas], 'inicio', ['financeiro', 'tarefas']);
+    expect(n.abas).toEqual(['inicio', 'financeiro', 'tarefas', 'mais']);
+    expect(n.modulosMais).toEqual(['pedidos', 'producao', 'ponto', 'conta']);
+    expect(n.modulosBarra).toEqual(['financeiro', 'tarefas']);
+  });
+
+  it('tela 30: Ponto escolhido para a barra sai de Mais', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'ponto', 'mais'], 'inicio', ['ponto']);
+    expect(n.pontoNaBarra).toBe(true);
+    expect(n.modulosMais).toEqual(['pedidos', 'conta']);
+  });
+
+  it('tela 30: módulo sem permissão, repetido, desconhecido ou acima de 3 nunca entra na barra', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'mais'] as const;
+    expect(escolhaValida(['financeiro', 'tarefas', 'tarefas', 'xyz', 'mais', 'pedidos', 'producao', 'pessoas'], [...areas])).toEqual(['tarefas', 'pedidos', 'producao']);
+  });
+
+  it('tela 30: escolha vazia ou toda inválida = padrão de sempre', () => {
+    const areas = ['inicio', 'tarefas', 'pedidos', 'producao', 'mais'] as const;
+    expect(montarNavegacao('erp', [...areas], 'inicio', []).abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
+    expect(montarNavegacao('erp', [...areas], 'inicio', ['financeiro']).abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
+  });
+
+  it('tela 30: colaborador ignora barra e não personaliza', () => {
+    const n = montarNavegacao('colaborador', ['ponto', 'mais'], 'ponto', ['ponto']);
+    expect(n.abas).toEqual(['ponto', 'mais']);
+    expect(n.personalizavel).toBe(false);
+  });
+
+  it('tela 30: barra do ERP para quem não tem Tarefas (padrão completado pelo ERP) é seguida como veio', () => {
+    const n = montarNavegacao('erp', ['inicio', 'pedidos', 'producao', 'financeiro', 'mais'], 'inicio', ['pedidos', 'producao', 'financeiro']);
+    expect(n.abas).toEqual(['inicio', 'pedidos', 'producao', 'financeiro', 'mais']);
+    expect(n.modulosMais).toEqual(['conta']);
+  });
+
+  it('Marcações a validar (tela 39) mora em Mais e só aparece para quem tem a área de gestor', () => {
+    expect(montarNavegacao('erp', ['inicio', 'ponto', 'ponto_gestor', 'mais'], 'inicio').modulosMais).toEqual(['ponto_gestor', 'ponto', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'ponto', 'ponto_gestor', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
+    expect(montarNavegacao('colaborador', ['ponto', 'mais'], 'ponto').modulosMais).toEqual(['conta']);
+  });
+
+  it('Equipe (tela 26) mora em Mais e só aparece se a área vier liberada', () => {
+    expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').modulosMais).toEqual(['equipe', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'equipe', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
+  it('Assistente (tela 25) mora em Mais e só aparece se a área vier liberada', () => {
+    expect(montarNavegacao('erp', ['inicio', 'assistente', 'mais'], 'inicio').modulosMais).toEqual(['assistente', 'conta']);
+    expect(montarNavegacao('erp', ['inicio', 'assistente', 'mais'], 'inicio').abas).toEqual(['inicio', 'mais']);
+    expect(montarNavegacao('erp', ['inicio', 'mais'], 'inicio').modulosMais).toEqual(['conta']);
+  });
+
   it('padrão (ERP sem resposta): as 5 abas de antes da D6', () => {
     expect(NAV_PADRAO.abas).toEqual(['inicio', 'tarefas', 'pedidos', 'producao', 'mais']);
-    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'ponto', 'conta']);
+    expect(NAV_PADRAO.modulosMais).toEqual(['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'ponto_gestor', 'pagamentos', 'ponto', 'conta']);
   });
 });
