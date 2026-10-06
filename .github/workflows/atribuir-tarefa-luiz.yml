@@ -1,0 +1,48 @@
+# Atribui a 1ª tarefa do Luiz (issue #75) a ele assim que ele aceitar o convite do repo.
+# Pedido do [W] em 2026-10-06. Pode ser apagado depois que a #75 estiver atribuída.
+#
+# Três gatilhos, porque o evento `member` é o caminho rápido mas não foi testado com um
+# convite real: ele cobre a entrada no repo; o agendamento diário cobre o caso de o evento
+# não disparar; o manual serve para rodar na hora.
+name: Atribuir tarefa do Luiz
+
+on:
+  member:
+    types: [added]
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  atribuir:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      USUARIO: LuizWr2
+      ISSUE: "75"
+    steps:
+      - name: Atribuir a issue se o Luiz já puder recebê-la
+        shell: bash
+        run: |
+          set -euo pipefail
+          estado=$(gh issue view "$ISSUE" -R "$REPO" --json state --jq .state)
+          ja=$(gh issue view "$ISSUE" -R "$REPO" --json assignees --jq "[.assignees[].login] | index(\"$USUARIO\") != null")
+          if [ "$estado" != "OPEN" ] || [ "$ja" = "true" ]; then
+            echo "Nada a fazer: issue #$ISSUE está $estado e atribuída ao $USUARIO = $ja."
+            exit 0
+          fi
+          # 204 = o usuário pode ser responsável (já é colaborador); 404 = ainda não.
+          codigo=$(gh api -i "repos/$REPO/assignees/$USUARIO" 2>/dev/null | head -1 | awk '{print $2}' || true)
+          case "$codigo" in
+            204) ;;
+            404) echo "O $USUARIO ainda não aceitou o convite. Nada a fazer."; exit 0 ;;
+            *)   echo "::error::Não consegui saber se o $USUARIO pode receber a issue (resposta: '$codigo')."; exit 1 ;;
+          esac
+          gh issue edit "$ISSUE" -R "$REPO" --add-assignee "$USUARIO"
+          depois=$(gh issue view "$ISSUE" -R "$REPO" --json assignees --jq '[.assignees[].login] | join(",")')
+          echo "Responsáveis da #$ISSUE agora: [$depois]"
+          case ",$depois," in *",$USUARIO,"*) ;; *) echo "::error::A atribuição não pegou."; exit 1 ;; esac
