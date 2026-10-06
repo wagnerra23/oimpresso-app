@@ -1,6 +1,6 @@
 // Novo agendamento de revisão — abre pelo "+ Agendar" da Agenda e pelo "Agendar revisão" do cartão do veículo.
-// Veículo + cliente (sugerido do dono) + dia e hora + observação (decisão [W] 2026-10-06). Rota PROVISÓRIA
-// POST /api/app/agendamentos, pedida ao ERP e ligada por AGENDA_OFICINA. Não avisa o cliente.
+// Veículo + cliente (sugerido do dono) + dia e hora + observação (decisão [W] 2026-10-06). Rota
+// POST /api/app/agendamentos (ERP #8784), ligada por AGENDA_OFICINA. Não avisa o cliente.
 import { useState } from 'react';
 import { api, camposDoErro, ErroApi, type Agendamento, type VeiculoResumo } from '../api';
 import { useVoltar } from '../voltar';

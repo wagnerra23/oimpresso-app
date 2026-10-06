@@ -964,6 +964,12 @@ export const demo = {
       const p = corpo as { vehicle_id: number; contact_id: number | null; mileage_at_service: number | null; box_label: string | null; notes: string | null; agendamento_id?: number | null };
       const v = VEICULOS.find((x) => x.id === p.vehicle_id);
       if (!v) throw Object.assign(new Error('Veículo não encontrado.'), { status: 422, campos: { vehicle_id: 'Veículo não encontrado.' } });
+      if (p.agendamento_id) {
+        // Mesmas recusas do ERP #8784: nenhuma OS é criada.
+        const a = AGENDA?.find((x) => x.id === p.agendamento_id);
+        const msg = !a ? 'Agendamento não encontrado.' : a.veiculo.id !== p.vehicle_id ? 'O agendamento é de outro veículo.' : a.status !== 'agendado' ? 'Este agendamento não está mais aberto.' : null;
+        if (msg) throw Object.assign(new Error(msg), { status: 422, campos: { agendamento_id: msg } });
+      }
       if (p.mileage_at_service !== null && p.mileage_at_service < 0) throw Object.assign(new Error('Km inválido.'), { status: 422, campos: { mileage_at_service: 'O km não pode ser negativo.' } });
       await espera(500);
       const cliente = p.contact_id === null ? null : PESSOAS.find((x) => x.id === p.contact_id)?.nome ?? VEICULOS.find((x) => x.cliente_id === p.contact_id)?.cliente ?? null;
@@ -971,7 +977,7 @@ export const demo = {
       ORDENS.push({ id, numero: 'OS-' + String(id).padStart(5, '0'), placa: v.placa, veiculo: v.descricao, cliente: cliente ?? 'Sem cliente', valor: null, etapa: 'recepcao' });
       DETALHE_OS[id] = { local: p.box_label, km: p.mileage_at_service, observacoes: p.notes, vistoria: null, fotos: 0, itens: [] };
       const ag = p.agendamento_id ? AGENDA?.find((a) => a.id === p.agendamento_id) : undefined;
-      if (ag && ag.status === 'agendado') { ag.status = 'atendido'; ag.os_id = id; }
+      if (ag) { ag.status = 'atendido'; ag.os_id = id; }
       return demo.chamar<T>('GET', '/api/app/os/' + id);
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/os/')) {

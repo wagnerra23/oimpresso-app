@@ -94,7 +94,13 @@ export function NovaOs({ aoVoltar, aoCriar, avisar, inicial }: Props) {
       <div className="oi-scroll">
         <div className="pd-corpo">
           <div className="p4-rotulo">Veículo</div>
-          {veiculo ? (
+          {veiculo && inicial ? (
+            // Vindo do agendamento, o veículo é o dele: o ERP recusa agendamento de outro veículo.
+            <div className="pd-cartao nos-escolha">
+              <Placa placa={veiculo.placa} />
+              <span className="os-texto"><b>{veiculo.descricao ?? 'Veículo'}</b><small>Do agendamento</small></span>
+            </div>
+          ) : veiculo ? (
             <button className="pd-cartao nos-escolha" onClick={() => setModo('veiculo')}>
               <Placa placa={veiculo.placa} />
               <span className="os-texto"><b>{veiculo.descricao ?? 'Veículo'}</b><small>{veiculo.cliente ?? 'Sem dono cadastrado'}</small></span>

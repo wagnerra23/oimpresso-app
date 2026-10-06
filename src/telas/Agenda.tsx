@@ -1,7 +1,7 @@
 // Agenda da Oficina — agendamento de revisão (decisões [W] 2026-10-06): veículo + cliente + dia e hora + observação;
 // na chegada, "Abrir OS" abre a Nova OS preenchida e o ERP marca o agendamento como atendido, ligado à OS. Aba da
-// Oficina, ao lado das OS e dos Veículos. Rotas PROVISÓRIAS pedidas ao ERP (GET/POST /api/app/agendamentos e
-// /cancelar), ligadas por AGENDA_OFICINA. Agendar não gera valor, estoque nem cobrança, e não avisa o cliente.
+// Oficina, ao lado das OS e dos Veículos. Rotas do ERP #8784 (GET/POST /api/app/agendamentos e /cancelar),
+// ligadas por AGENDA_OFICINA. Agendar não gera valor, estoque nem cobrança, e não avisa o cliente.
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AGENDA_OFICINA, api, ErroApi, NOVA_OS, type Agendamento, type ListaAgendamentos } from '../api';
 import { Placa } from './Veiculos';
