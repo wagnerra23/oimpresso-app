@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement, type React
 import { Network } from '@capacitor/network';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { App as AppNativo } from '@capacitor/app';
-import { api, carregarToken, DEMO, quandoExpirar, type Area } from './api';
+import { api, carregarToken, DEMO, houveFalhaDeLeitura, quandoExpirar, type Area } from './api';
 import { renovarLembrete } from './push';
 import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
@@ -106,15 +106,42 @@ export function App() {
     return () => { h.then((x) => x.remove()); };
   }, []);
 
-  useEffect(() => {
-    if (!logado) return;
+  // Navegação montada com NAV_PADRAO porque o /inicio falhou: tentar de novo quando o app voltar.
+  const navProvisoria = useRef(false);
+  const carregarNav = useCallback(() => {
     // Áreas liberadas e onde abrir (D6). Falha = navegação padrão, para não travar o app.
     api.inicio()
-      .then((p) => { setAreas(p.areas); return montarNavegacao(p.perfil, p.areas, p.abre_em, p.barra ?? null); })
-      .catch(() => NAV_PADRAO)
+      .then((p) => { navProvisoria.current = false; setAreas(p.areas); return montarNavegacao(p.perfil, p.areas, p.abre_em, p.barra ?? null); })
+      .catch(() => { navProvisoria.current = true; return NAV_PADRAO; })
       .then((n) => { navRef.current = n; setNav(n); setAba(n.casa); setSubMais(null); });
+  }, []);
+
+  useEffect(() => {
+    if (!logado) return;
+    carregarNav();
     renovarLembrete(abrirPonto).catch(() => {});
-  }, [logado, abrirPonto]);
+  }, [logado, abrirPonto, carregarNav]);
+
+  // Recuperação sem fechar o app: a tela só busca dados ao montar, então um erro (deploy do ERP em 503,
+  // sem rede) ficava na tela até reabrir. Ao voltar do segundo plano ou a internet voltar, se a última
+  // leitura falhou, a tela é remontada (busca de novo). Sem falha, nada muda — não perde rascunho de formulário.
+  const [recarga, setRecarga] = useState(0);
+  const logadoRef = useRef(logado);
+  logadoRef.current = logado;
+  const recuperar = useCallback(() => {
+    if (!logadoRef.current) return;
+    if (navProvisoria.current) { carregarNav(); return; }
+    if (houveFalhaDeLeitura()) setRecarga((x) => x + 1);
+  }, [carregarNav]);
+  useEffect(() => {
+    const h = AppNativo.addListener('resume', recuperar);
+    return () => { h.then((x) => x.remove()); };
+  }, [recuperar]);
+  const onlineAntes = useRef(online);
+  useEffect(() => {
+    if (online && !onlineAntes.current) recuperar();
+    onlineAntes.current = online;
+  }, [online, recuperar]);
 
   // Ponto/Conta abertos a partir do Mais: o voltar do Android volta ao Mais.
   useVoltar(aba === 'mais' && subMais !== null, () => setSubMais(null));
@@ -169,7 +196,7 @@ export function App() {
     <div className="oi oi-app" data-theme={tema}>
       {DEMO && <div className="app-banner demo">Modo demonstração — dados simulados</div>}
       {!online && <div className="app-banner off" role="status">Sem conexão. Bater ponto precisa de internet.</div>}
-      <div className="oi-screen">
+      <div className="oi-screen" key={recarga}>
         {!nav && <div className="pd-corpo"><p className="p4-legal">Carregando…</p></div>}
         {nav && aba === 'inicio' && <Inicio avisar={avisar} irParaPonto={abrirPonto} irParaPedidos={() => abrir('pedidos')} irParaTarefas={() => abrir('tarefas')}
           irParaEstoque={n.modulosMais.includes('estoque') || n.abas.includes('estoque') ? () => { setEstoqueFiltro('baixo'); abrir('estoque'); } : undefined}

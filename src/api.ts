@@ -6,6 +6,7 @@
 import { CapacitorHttp, type HttpResponse } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { demo } from './demo';
+import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 
@@ -721,23 +722,47 @@ function medirDrift(r: HttpResponse) {
 let aoExpirar: () => void = () => {};
 export const quandoExpirar = (fn: () => void) => { aoExpirar = fn; };
 
+/** Uma leitura terminou em servidor fora / sem rede (e nenhuma deu certo depois). O App usa para
+ *  recarregar a tela quando o app volta do segundo plano ou a internet volta. */
+let leituraFalhou = false;
+export const houveFalhaDeLeitura = () => leituraFalhou;
+
+const dormir = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+/** 5xx com `erro` no corpo é resposta do ERP (ex.: 503 sem_configuracao da oficina): não é queda, não repete. */
+const respostaDoErp = (r: HttpResponse) => !!r.data && typeof r.data === 'object' && 'erro' in (r.data as object);
+
 async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
-  let r: HttpResponse;
-  try {
-    r = await CapacitorHttp.request({
-      method: metodo,
-      url: `${BASE}${caminho}`,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token ?? ''}`,
-        ...extra,
-      },
-      data: corpo,
-    });
-  } catch {
+  let r: HttpResponse | null = null;
+  for (let tentativa = 0; ; tentativa++) {
+    r = null;
+    try {
+      r = await CapacitorHttp.request({
+        method: metodo,
+        url: `${BASE}${caminho}`,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token ?? ''}`,
+          ...extra,
+        },
+        data: corpo,
+      });
+    } catch { /* sem resposta: status 0 */ }
+    const status = r ? r.status : 0;
+    if (r && respostaDoErp(r)) break;
+    if (!deveRetentar(metodo, status, tentativa)) break;
+    const h = r?.headers ?? {};
+    await dormir(esperaMs(tentativa, h['Retry-After'] ?? h['retry-after']));
+  }
+  if (!r) {
+    if (metodo === 'GET') leituraFalhou = true;
     throw new ErroApi(0, 'rede', 'Sem conexão com o servidor. Verifique a internet.');
+  }
+  if (metodo === 'GET') leituraFalhou = transitorio(r.status) && !respostaDoErp(r);
+  if (transitorio(r.status) && !respostaDoErp(r)) {
+    // Página HTML do deploy / LiteSpeed, ou o JSON cru do Laravel ("Service Unavailable"): mensagem nossa.
+    throw new ErroApi(r.status, 'indisponivel', MSG_INDISPONIVEL);
   }
   medirDrift(r);
   if (r.status === 401) {
