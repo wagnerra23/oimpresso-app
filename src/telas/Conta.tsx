@@ -17,7 +17,7 @@ export function Conta({ aoSair, avisar, voltar }: { aoSair: () => void; avisar: 
       const r = await ativarLembrete();
       avisar(r === 'ativo' ? 'Lembrete de ponto ativado neste aparelho.' : r === 'negado'
         ? 'Notificações bloqueadas. Libere em Ajustes › Apps › oimpresso › Notificações.'
-        : 'Lembrete disponível só no app instalado.', r === 'ativo' ? 'ok' : 'warn');
+        : 'Lembrete ainda não disponível nesta versão do app.', r === 'ativo' ? 'ok' : 'warn');
     } catch (e) {
       avisar(e instanceof Error ? e.message : 'Não foi possível ativar o lembrete.', 'erro');
     } finally {
