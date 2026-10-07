@@ -12,5 +12,9 @@ import './styles/ponto.css';
 import './styles/app.css';
 import './styles/ponto-v4.css';
 import { App } from './App';
+import { ligarDiagnostico } from './diagnostico';
+
+// Antes de montar a tela: uma falha logo na abertura também chega ao log (ADR 0429).
+ligarDiagnostico();
 
 createRoot(document.getElementById('root')!).render(<App />);

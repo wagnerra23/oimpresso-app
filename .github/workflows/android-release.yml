@@ -50,6 +50,11 @@ jobs:
         run: npm run build
         env:
           VITE_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+          # Log de falhas (ADR 0429): DSN público do GlitchTip; vazio = log desligado.
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          VITE_APP_ENV: ${{ inputs.sem_push && 'teste-fechado' || 'loja' }}
+          # versionName fixo em android/app/build.gradle; versionCode = run_number.
+          VITE_APP_RELEASE: oimpresso-app@1.0+${{ github.run_number }}
       - name: Trava — modo demonstração nunca no build de loja
         run: |
           if grep -rl "Modo demonstra" www/ ; then echo "::error::build com modo demonstração"; exit 2; fi
