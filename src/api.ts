@@ -11,6 +11,8 @@ import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
+import { biometriaLigada, celularTemBiometria, conferirBiometria, guardarTokenSeguro, lerTokenSeguro, marcarDesligada, marcarLigada } from './biometria';
+import type { ResultadoBiometria } from './biometria-regras';
 
 export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
@@ -708,14 +710,56 @@ export async function entrar(usuario: string, senha: string): Promise<void> {
     throw new ErroApi(r.status, 'login', 'Não foi possível entrar agora. Tente de novo.');
   }
   token = String(r.data.access_token);
-  await Preferences.set({ key: CHAVE_TOKEN, value: token });
+  // Biometria ligada (P9): o token novo vai para o Keychain/Keystore, não para o Preferences.
+  if (await biometriaLigada()) await guardarTokenSeguro(token);
+  else await Preferences.set({ key: CHAVE_TOKEN, value: token });
 }
 
 export async function sair(): Promise<void> {
   token = null;
   limparAjustes();
+  // A biometria é escolha de quem ligou (ADR 0432): saiu da conta, desliga e apaga o token seguro.
+  await marcarDesligada();
   if (DEMO) { demo.sair(); return; }
   await Preferences.remove({ key: CHAVE_TOKEN });
+}
+
+// ── Entrar com biometria (P9, ADR 0432 do ERP) ─────────────────────────────────────────────────────
+// A biometria só destrava o token guardado no aparelho; nada vai ao servidor. A senha continua valendo.
+
+/** Ao abrir o app: a biometria está ligada e o celular ainda a tem → a tela pede a digital antes de entrar.
+ *  Biometria apagada do celular: desliga e o token volta ao Preferences (o app abre como antes). */
+export async function precisaDestravar(): Promise<boolean> {
+  if (!(await biometriaLigada())) return false;
+  if (await celularTemBiometria()) return true;
+  await desligarBiometria();
+  return false;
+}
+
+/** Depois que a biometria confirmou: carrega o token do armazenamento seguro. false = não havia token (entra com senha). */
+export async function destravarToken(): Promise<boolean> {
+  const t = await lerTokenSeguro();
+  if (!t) return false;
+  token = t;
+  if (DEMO) demo.retomar();
+  return true;
+}
+
+/** Liga em Conta: pede a biometria uma vez (é a pessoa quem escolhe) e passa o token para o armazenamento seguro. */
+export async function ligarBiometria(): Promise<ResultadoBiometria> {
+  if (!token) return 'indisponivel';
+  const r = await conferirBiometria();
+  if (r !== 'ok') return r;
+  await marcarLigada(token);
+  if (!DEMO) await Preferences.remove({ key: CHAVE_TOKEN });
+  return 'ok';
+}
+
+/** Desliga (em Conta, ou porque a empresa desligou `app_biometria_login`): o token deixa de ficar preso à biometria. */
+export async function desligarBiometria(): Promise<void> {
+  if (!(await biometriaLigada())) return;
+  const t = (await marcarDesligada()) ?? token;
+  if (t && !DEMO) await Preferences.set({ key: CHAVE_TOKEN, value: t });
 }
 
 function medirDrift(r: HttpResponse) {
@@ -917,6 +961,7 @@ export const api = {
   inicio: () => chamar<Omit<PainelInicio, 'ajustes'> & { ajustes?: unknown }>('GET', '/api/app/inicio').then((p): PainelInicio => {
     const ajustes = completarAjustes(p.ajustes);
     guardarAjustes(ajustes);
+    if (!ajustes.app_biometria_login) void desligarBiometria(); // P9: a empresa desligou a entrada com biometria
     return { ...p, ajustes };
   }),
   /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */

@@ -329,6 +329,8 @@ export const demo = {
     semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
+  /** Biometria destravou o token guardado (P9): volta a sessão sem senha. */
+  retomar() { logado = true; },
   /** Só para teste: liga/desliga o ajuste de preço zero da empresa da demo. */
   definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
