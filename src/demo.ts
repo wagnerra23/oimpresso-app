@@ -3,6 +3,8 @@
 // app. NUNCA entra no build de loja — a tela mostra uma faixa "Modo demonstração".
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
+import { filtrarLancamentos, lerParams } from './financeiro-filtros';
+
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
 let logado = false;
@@ -249,15 +251,33 @@ const ORCAMENTOS = [
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
 
-// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias` vira data dentro do handler.
+// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias`, `emi` (emissão) e `venda`
+// viram data dentro do handler. Competência = mês da emissão. Contas: 1 movimento, 2 caixa, 3 recebíveis.
 const LANCAMENTOS = [
-  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, valor: 7840, pago: false },
-  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, valor: 1260, pago: false },
-  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, valor: 2315, pago: false },
-  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, valor: 4380, pago: false },
-  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, valor: 1920, pago: false },
-  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, valor: 3420, pago: true },
-  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, valor: 2760, pago: true },
+  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, emi: -20, venda: -22, valor: 7840, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1290', nosso: '00012345' },
+  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, emi: -37, venda: -40, valor: 1260, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1284', nosso: '00012311' },
+  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, emi: -4, venda: -5, valor: 2315, pago: false,
+    forma: 'Pix', conta: 1, nf: null, nosso: null },
+  { id: 908, tipo: 'receber', descricao: 'Pedido #0047 · banner lona', parte: 'Bistrô do Forno', dias: 12, emi: -2, venda: -2, valor: 980, pago: false,
+    forma: 'Cartão de crédito', conta: 3, nf: '1293', nosso: null },
+  { id: 909, tipo: 'receber', descricao: 'Pedido #0045 · cardápio A3', parte: 'Bistrô do Forno', dias: 25, emi: -6, venda: -9, valor: 210, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1291', nosso: '00012352' },
+  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, emi: -31, venda: null, valor: 4380, pago: false,
+    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001' },
+  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, emi: -8, venda: null, valor: 1920, pago: false,
+    forma: 'Boleto', conta: 1, nf: null, nosso: '84670000' },
+  { id: 910, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', dias: 15, emi: -15, venda: null, valor: 3500, pago: false,
+    forma: 'Transferência', conta: 1, nf: null, nosso: null },
+  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, emi: -35, venda: -36, valor: 3420, pago: true,
+    forma: 'Pix', conta: 1, nf: '1287', nosso: null },
+  { id: 911, tipo: 'receber', descricao: 'Venda balcão #V-0009', parte: 'Consumidor final', dias: -2, emi: -2, venda: -2, valor: 186, pago: true,
+    forma: 'Dinheiro', conta: 2, nf: null, nosso: null },
+  { id: 912, tipo: 'receber', descricao: 'Pedido #0040 · placa PVC', parte: 'Clínica Vita', dias: -9, emi: -40, venda: -41, valor: 640, pago: true,
+    forma: 'Cartão de débito', conta: 3, nf: '1282', nosso: null },
+  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, emi: -36, venda: null, valor: 2760, pago: true,
+    forma: 'Boleto', conta: 1, nf: '45120', nosso: '34191220' },
 ] as const;
 
 // Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
@@ -683,20 +703,27 @@ export const demo = {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
       // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
       const hoje = diaRel(0);
-      const todos = LANCAMENTOS.map(({ dias, pago, ...l }) => {
+      const todos = LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, ...l }) => {
         const data = diaRel(dias);
-        return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto' };
+        return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto',
+          emissao: diaRel(emi), competencia: diaRel(emi).slice(0, 7), venda_em: venda === null ? null : diaRel(venda),
+          forma_pagamento: forma, conta_id: conta, nf_numero: nf, nosso_numero: nosso };
       });
       const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
       const extrato = todos.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
-      const itens = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      // Filtro avançado: a mesma regra que o ERP vai aplicar. Resumo e contas não mudam; lista e contadores, sim.
+      const f = lerParams(caminho);
+      const ordenados = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      const itens = filtrarLancamentos(ordenados, f);
       const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
       const recebido = 148230, pago = 96410;
       return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
           a_receber: soma(abertos('receber')), vencido: soma(abertos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertos('pagar')) },
         contas: [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
           { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
-        itens, contadores: { receber: abertos('receber').length, pagar: abertos('pagar').length, extrato: extrato.length }, pagina: 1, tem_mais: false });
+        itens, contadores: { receber: filtrarLancamentos(abertos('receber'), f).length, pagar: filtrarLancamentos(abertos('pagar'), f).length,
+          extrato: filtrarLancamentos(extrato, f).length }, pagina: 1, tem_mais: false,
+        formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

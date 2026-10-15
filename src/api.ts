@@ -564,6 +564,10 @@ export type StatusLancamento = 'aberto' | 'vencido' | 'liquidado';
 export interface Lancamento {
   id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null;
   vencimento: string | null; pago_em: string | null; valor: number; status: StatusLancamento;
+  /** Campos do filtro avançado (proposta para o §10.1, ainda não no ERP): opcionais até a rota mandar.
+   *  `competencia` é AAAA-MM; as outras datas AAAA-MM-DD. */
+  emissao?: string | null; competencia?: string | null; venda_em?: string | null; forma_pagamento?: string | null;
+  conta_id?: number | null; nf_numero?: string | null; nosso_numero?: string | null;
 }
 export interface PainelFinanceiro {
   /** `vencido` = parte vencida do a receber (já contida em `a_receber`). */
@@ -571,7 +575,12 @@ export interface PainelFinanceiro {
   /** `saldo` null quando o ERP não sabe o saldo da conta; `detalhe` é texto pronto (banco · agência). */
   contas: Array<{ id: number; nome: string; detalhe: string | null; saldo: number | null }>;
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
+  /** Formas de pagamento da empresa para o filtro avançado; sem ela, o app usa FORMAS_PADRAO. */
+  formas_pagamento?: string[];
 }
+/** Liga o "Filtro avançado" do Financeiro. Só na demo até o ERP aceitar os filtros na rota §10.1
+ *  (parâmetros em financeiro-filtros.ts → paramsFiltros); com o ERP pronto, vira true. */
+export const FILTRO_FINANCEIRO = DEMO;
 
 /** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
@@ -919,7 +928,7 @@ export const api = {
   salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
-  financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
+  financeiro: (aba: AbaFinanceiro, pagina = 1, filtros = '') => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}${filtros}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
   dashboard: () => chamar<Dashboard>('GET', '/api/app/dashboard'),

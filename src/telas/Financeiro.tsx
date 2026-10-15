@@ -3,8 +3,11 @@
 // (Pagamentos), que mexe em valor e passa pela regra mestre. Mora dentro de Mais.
 // Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, ErroApi, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
+import { api, ErroApi, FILTRO_FINANCEIRO, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
+import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, type FiltrosFinanceiro } from '../financeiro-filtros';
+import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
+import { FiltroFinanceiro } from './FiltroFinanceiro';
 
 const ABAS: Array<{ id: AbaFinanceiro; label: string }> = [
   { id: 'receber', label: 'A receber' }, { id: 'pagar', label: 'A pagar' }, { id: 'extrato', label: 'Extrato' },
@@ -24,16 +27,19 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
   const [dados, setDados] = useState<PainelFinanceiro | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
+  const [filtros, setFiltros] = useState<FiltrosFinanceiro>(FILTROS_VAZIOS);
+  const [filtrando, setFiltrando] = useState(false);
+  useVoltar(filtrando, () => setFiltrando(false));
 
   const [lendo, setLendo] = useState(true);
   // Troca rápida de aba: só a resposta do pedido mais recente entra na tela.
   const pedido = useRef(0);
-  const carregar = useCallback(async (a: AbaFinanceiro) => {
+  const carregar = useCallback(async (a: AbaFinanceiro, f: FiltrosFinanceiro) => {
     const n = ++pedido.current;
     setErro(null); setLendo(true);
     // Troca de aba mantém resumo e contas na tela; só a lista recarrega.
     setDados((d) => (d ? { ...d, itens: [], tem_mais: false } : null));
-    try { const r = await api.financeiro(a); if (n === pedido.current) setDados(r); }
+    try { const r = await api.financeiro(a, 1, paramsFiltros(f)); if (n === pedido.current) setDados(r); }
     catch (e) {
       if (n !== pedido.current) return;
       setDados(null);
@@ -41,19 +47,24 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
     }
     finally { if (n === pedido.current) setLendo(false); }
   }, []);
-  useEffect(() => { carregar(aba); }, [aba, carregar]);
+  useEffect(() => { carregar(aba, filtros); }, [aba, filtros, carregar]);
 
   const mais = async () => {
     if (!dados) return;
     setCarregandoMais(true);
     try {
-      const prox = await api.financeiro(aba, dados.pagina + 1);
+      const prox = await api.financeiro(aba, dados.pagina + 1, paramsFiltros(filtros));
       setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
     } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
     finally { setCarregandoMais(false); }
   };
 
   const r = dados?.resumo;
+  const nFiltros = contarFiltros(filtros);
+  if (filtrando && dados) {
+    return <FiltroFinanceiro inicial={filtros} contas={dados.contas} formas={dados.formas_pagamento}
+      aoVoltar={() => setFiltrando(false)} aoAplicar={(f) => { setFiltros(f); setFiltrando(false); }} />;
+  }
   return (
     <>
       <div className="pd-head">
@@ -108,8 +119,20 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
               ))}
             </div>
           )}
+          {dados && FILTRO_FINANCEIRO && (
+            <div className="ff-barra">
+              <button className={'oi-btn ff-botao' + (nFiltros ? ' on' : '')} onClick={() => setFiltrando(true)} aria-label={nFiltros ? `Filtro avançado, ${nFiltros} ligados` : 'Filtro avançado'}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+                Filtro avançado{nFiltros > 0 && <span>{nFiltros}</span>}
+              </button>
+              {nFiltros > 0 && <button className="p4-link ff-limpar" onClick={() => setFiltros(FILTROS_VAZIOS)}>Limpar</button>}
+            </div>
+          )}
+          {dados && nFiltros > 0 && <p className="ff-resumo">{resumoFiltros(filtros, dados.contas).join(' · ')}</p>}
           {dados && lendo && dados.itens.length === 0 && <p className="p4-legal">Carregando…</p>}
-          {dados && !lendo && dados.itens.length === 0 && <div className="p4-vazio"><b>Nada aqui</b><span>{VAZIO[aba]}</span></div>}
+          {dados && !lendo && dados.itens.length === 0 && (nFiltros > 0
+            ? <div className="p4-vazio"><b>Nenhum lançamento com esses filtros</b><span>Mude o período ou tire algum filtro. As outras abas podem ter resultados.</span></div>
+            : <div className="p4-vazio"><b>Nada aqui</b><span>{VAZIO[aba]}</span></div>)}
           {dados?.itens.map((l) => {
             const s = STATUS[l.status];
             const data = l.status === 'liquidado' ? `pago ${dataCurta(l.pago_em)}` : l.status === 'vencido' ? `venceu ${dataCurta(l.vencimento)}` : `vence ${dataCurta(l.vencimento)}`;
@@ -118,6 +141,7 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{l.descricao}</b>
                   <small>{l.parte ? `${l.parte} · ` : ''}{data}</small>
+                  {(l.forma_pagamento || l.nf_numero) && <small>{[l.forma_pagamento, l.nf_numero && `NF ${l.nf_numero}`].filter(Boolean).join(' · ')}</small>}
                 </div>
                 <div className="fn-lanc-v">
                   <span className={l.tipo === 'receber' ? 'pos' : 'neg'}>{l.tipo === 'receber' ? '+ ' : '− '}{reais(l.valor)}</span>

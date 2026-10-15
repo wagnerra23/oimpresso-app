@@ -538,6 +538,16 @@ a.p4-link { text-decoration: none; }
 .fn-lanc-v { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
 .fn-lanc-v span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fn-lanc-v small { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; }
+/* Filtro avançado do Financeiro */
+.ff-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ff-botao { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }
+.ff-botao.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.ff-botao span { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--accent); color: var(--accent-fg); font-family: var(--font-mono); font-size: 11px; display: inline-grid; place-items: center; }
+.ff-limpar { font-size: 13px; color: var(--accent-text); font-weight: 600; }
+.ff-resumo { margin: -4px 0 0; font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+.ff-quebra { flex-wrap: wrap; overflow: visible; }
+.ff-duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ff-duas input[type="date"] { font-family: var(--font-sans); min-width: 0; }
 
 
 /* ── Fiscal (tela 14) ── */
