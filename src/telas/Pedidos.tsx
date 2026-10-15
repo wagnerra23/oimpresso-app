@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPedidos, type GrupoEtapa, type ListaPedidos, type PedidoDetalheApi } from '../api';
 import { useVoltar } from '../voltar';
+import { CampoBusca, casaBusca } from '../busca';
 import { VendaRapida } from './VendaRapida';
 
 const FILTROS: Array<{ id: FiltroPedidos; label: string }> = [
@@ -32,6 +33,7 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
   const [dados, setDados] = useState<ListaPedidos | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(async (f: FiltroPedidos) => {
     setDados(null); setErro(null);
@@ -51,6 +53,7 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
   };
 
   const c = dados?.contadores;
+  const itens = dados?.itens.filter((p) => casaBusca(busca, [p.numero, p.cliente, p.resumo])) ?? [];
   return (
     <>
       <div className="pd-head">
@@ -65,6 +68,7 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
+          <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente, número ou produto" rotulo="Buscar pedido" />
           <div className="pd-chips" role="tablist" aria-label="Filtro de pedidos">
             {FILTROS.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
@@ -75,7 +79,8 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
           {!dados && !erro && <p className="p4-legal">Carregando…</p>}
           {dados && dados.itens.length === 0 && <div className="p4-vazio"><b>Nenhum pedido aqui</b><span>Troque o filtro para ver outros pedidos.</span></div>}
-          {dados?.itens.map((p) => (
+          {dados && dados.itens.length > 0 && itens.length === 0 && <div className="p4-vazio"><b>Nada encontrado</b><span>Tente outro cliente, número ou produto{dados.tem_mais ? ', ou toque em Carregar mais' : ''}.</span></div>}
+          {itens.map((p) => (
             <button key={p.id} className={'pd-card' + (p.atrasado ? ' atrasado' : '')} style={{ borderLeftColor: p.atrasado ? 'var(--danger)' : TINTA[p.etapa.grupo] }} onClick={() => aoAbrir(p.id)}>
               <span className="pd-card-l1">
                 <span className="pd-num">#{p.numero}</span>

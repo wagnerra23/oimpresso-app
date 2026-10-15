@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AGENDA_OFICINA, api, ErroApi, NOVA_OS, type Agendamento, type ListaOs, type OsResumo, type VeiculoResumo } from '../api';
 import { reais } from './Pedidos';
 import { useVoltar } from '../voltar';
+import { CampoBusca, casaBusca } from '../busca';
 import { OsDetalhe } from './OsDetalhe';
 import { Veiculos } from './Veiculos';
 import { NovaOs } from './NovaOs';
@@ -104,6 +105,7 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
   const [dados, setDados] = useState<ListaOs | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(async (e: string) => {
     setDados(null); setErro(null);
@@ -122,6 +124,7 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
     finally { setCarregandoMais(false); }
   };
 
+  const itens = dados?.itens.filter((o) => casaBusca(busca, [o.numero, o.placa, o.veiculo, o.cliente])) ?? [];
   return (
     <>
       <div className="pd-head">
@@ -137,6 +140,7 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
+          <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente, número da OS ou placa" rotulo="Buscar OS" />
           {dados && (
             <div className="man-kpis" aria-label="Pátio da oficina">
               {kpisPatio(dados).map((k) => (
@@ -163,7 +167,8 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
           {dados && dados.itens.length === 0 && (
             <div className="p4-vazio"><b>Nenhuma OS aqui</b><span>{etapa === 'todas' ? 'As ordens de serviço da oficina aparecem aqui.' : 'Troque a etapa para ver outras OS.'}</span></div>
           )}
-          {dados?.itens.map((o) => {
+          {dados && dados.itens.length > 0 && itens.length === 0 && <div className="p4-vazio"><b>Nada encontrado</b><span>Tente outro cliente, número ou placa{dados.tem_mais ? ', ou toque em Carregar mais' : ''}.</span></div>}
+          {itens.map((o) => {
             const tinta = tintaOs(o);
             return (
               <button key={o.id} className="pd-card os-card" style={{ borderLeftColor: tinta }} onClick={() => aoAbrir(o.id)}>

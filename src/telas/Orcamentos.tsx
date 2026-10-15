@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroOrcamentos, type ListaOrcamentos, type StatusOrcamento } from '../api';
 import { reais } from './Pedidos';
+import { CampoBusca, casaBusca } from '../busca';
 
 const FILTROS: Array<{ id: FiltroOrcamentos; label: string }> = [
   { id: 'todos', label: 'Todos' }, { id: 'rascunho', label: 'Rascunho' }, { id: 'enviado', label: 'Enviado' },
@@ -25,6 +26,7 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
   const [dados, setDados] = useState<ListaOrcamentos | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(async (f: FiltroOrcamentos) => {
     setDados(null); setErro(null);
@@ -44,6 +46,7 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
   };
 
   const c = dados?.contadores;
+  const itens = dados?.itens.filter((q) => casaBusca(busca, [q.numero, q.titulo, q.cliente])) ?? [];
   return (
     <>
       <div className="pd-head">
@@ -57,6 +60,7 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
+          <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente, número ou título" rotulo="Buscar orçamento" />
           <div className="pd-chips" role="tablist" aria-label="Situação do orçamento">
             {FILTROS.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
@@ -67,7 +71,8 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
           {!dados && !erro && <p className="p4-legal">Carregando…</p>}
           {dados && dados.itens.length === 0 && <div className="p4-vazio"><b>Nenhum orçamento aqui</b><span>Troque o filtro para ver outras propostas.</span></div>}
-          {dados?.itens.map((q) => {
+          {dados && dados.itens.length > 0 && itens.length === 0 && <div className="p4-vazio"><b>Nada encontrado</b><span>Tente outro cliente, número ou título{dados.tem_mais ? ', ou toque em Carregar mais' : ''}.</span></div>}
+          {itens.map((q) => {
             const s = STATUS[q.status];
             return (
               <article key={q.id} className="oc-card" aria-label={`Orçamento ${q.numero}`}>
