@@ -5,6 +5,7 @@
 
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
 import type { AnexoOs, ParteFormulario } from './api';
+import { assinaturaValida } from './entrega-regras';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -101,6 +102,40 @@ const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
   const a = ACOES_SEGURAS_DEMO[etapa];
   return a && (liberadas.length === 0 || liberadas.includes(a.chave)) ? [{ chave: a.chave, rotulo: a.rotulo, pode: podeAcoesPedidoDemo }] : [];
 };
+
+// P3 · entrega (tela 22, ERP #9464). A ação `entregar` da FSM sai de uma etapa só e NÃO vem em acoes[]: o detalhe manda
+// `entrega: { pode }`. Na demo, sai de "Saiu para entrega" e vai para "Entregue" (de onde o P1 oferece "Concluir").
+const ENTREGA_DEMO = { de: 'out_for_delivery', para: { chave: 'delivered', rotulo: 'Entregue', grupo: 'entrega' as const }, progresso: 0.9 };
+/** Linha de topo da venda (`itens_venda[].linha_id`), estável por pedido. */
+const linhaIdDemo = (pedidoId: number, i: number) => pedidoId * 100 + i + 1;
+/** Próximo número do protocolo (ENT-NNNN por business). */
+let protocoloEntregaDemo = 418;
+/** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem registrar de novo). */
+const ENTREGAS_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
+const entregaDemo = (etapa: string) => (etapa === ENTREGA_DEMO.de ? { pode: podeAcoesPedidoDemo } : null);
+/** Os erros por campo do contrato (422 validacao), na ordem em que o ERP confere. */
+function camposEntregaDemo(p: (typeof PEDIDOS)[number], n: Record<string, unknown>, chave: string | undefined) {
+  const campos: Record<string, string> = {};
+  const txt = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  if (!chave) campos.idempotency_key = 'Falta a chave de idempotência.';
+  if (!txt(n.etapa_esperada)) campos.etapa_esperada = 'Informe a etapa esperada.';
+  const itens = Array.isArray(n.itens) ? (n.itens as Array<{ linha_id?: unknown; conferido?: unknown }>) : [];
+  const linhas = p.itens.map((_, i) => linhaIdDemo(p.id, i));
+  const vindas = itens.filter((i) => i.conferido === true).map((i) => Number(i.linha_id));
+  if (itens.length !== linhas.length || !linhas.every((l) => vindas.includes(l))) campos.itens = 'Confira todos os itens do pedido.';
+  const nome = txt(n.recebido_por);
+  if (nome.length < 2 || nome.length > 120) campos.recebido_por = 'Informe quem recebeu (2 a 120 caracteres).';
+  const png = typeof n.assinatura_png === 'string' && n.assinatura_png ? n.assinatura_png : null;
+  const motivo = txt(n.sem_assinatura_motivo);
+  if (png && !assinaturaValida(png)) campos.assinatura_png = 'A assinatura precisa ser um PNG de até 200 KB.';
+  else if (!png && ajustesDemo.app_entrega_exige_assinatura) campos.assinatura_png = 'A empresa exige a assinatura de quem recebeu.';
+  else if (!png && (motivo.length < 5 || motivo.length > 200)) campos.assinatura_png = 'Colha a assinatura ou diga por que ficou sem (5 a 200 caracteres).';
+  const temLat = typeof n.lat === 'number', temLng = typeof n.lng === 'number';
+  if (temLat && !temLng) campos.lng = 'Informe a longitude junto com a latitude.';
+  if (temLng && !temLat) campos.lat = 'Informe a latitude junto com a longitude.';
+  if (!temLat && !temLng && ajustesDemo.app_entrega_exige_localizacao) campos.lat = 'A empresa exige a localização da entrega.';
+  return campos;
+}
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
@@ -551,7 +586,7 @@ export const demo = {
         const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
         const pos = ordem.indexOf(p.etapa.grupo);
         return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
-          itens_venda: p.itens, etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
+          itens_venda: p.itens.map((it, i) => ({ ...it, linha_id: linhaIdDemo(p.id, i) })), entrega: entregaDemo(p.etapa.chave), etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
           acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p) });
       }
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
@@ -592,6 +627,31 @@ export const demo = {
       p.etapa = { ...a.para }; p.progresso = a.progresso;
       const resposta = await demo.chamar('GET', `/api/app/pedidos/${p.id}`);
       ACOES_PEDIDO_POR_CHAVE[chave] = { corpo: corpoTxt, resposta };
+      return r(resposta);
+    }
+    // P3 · entrega — POST /api/app/pedidos/{id}/entrega, como o ERP #9464: chave, etapa_esperada, conferência, assinatura
+    // ou motivo, ajustes da empresa, protocolo ENT-NNNN e idempotência.
+    if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/entrega$/.test(caminho)) {
+      const chave = cabecalhos['Idempotency-Key'];
+      const n = (corpo ?? {}) as Record<string, unknown>;
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = chave ? ENTREGAS_POR_CHAVE[chave] : undefined;
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra entrega.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r(ja.resposta);
+      const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      if (!podeAcoesPedidoDemo) throw Object.assign(new Error('Seu usuário não pode registrar esta entrega.'), { status: 403, codigo: 'sem_permissao' });
+      if (n.etapa_esperada && (n.etapa_esperada !== p.etapa.chave || p.etapa.chave !== ENTREGA_DEMO.de)) {
+        throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
+      }
+      const campos = camposEntregaDemo(p, n, chave);
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const protocolo = 'ENT-' + String(protocoloEntregaDemo++).padStart(4, '0');
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de: p.etapa.rotulo, para: ENTREGA_DEMO.para.rotulo, origem: 'app' });
+      p.etapa = { ...ENTREGA_DEMO.para }; p.progresso = ENTREGA_DEMO.progresso;
+      const resposta = { protocolo, registrado_em: new Date().toISOString(), recebido_por: String(n.recebido_por).trim(),
+        com_assinatura: typeof n.assinatura_png === 'string' && !!n.assinatura_png, pedido: await demo.chamar('GET', `/api/app/pedidos/${p.id}`) };
+      ENTREGAS_POR_CHAVE[chave!] = { corpo: corpoTxt, resposta };
       return r(resposta);
     }
     if (metodo === 'GET' && caminho === '/api/app/producao') {
