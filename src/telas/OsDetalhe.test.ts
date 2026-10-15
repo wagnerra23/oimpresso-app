@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acoesEncerrar, acoesVisiveis, confirmarEncerrar, destinoDaAcao, erroDaAcao, exigeMotivo, motivoParaEnvio, ETIQUETA_ITEM, textoFotos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
+import { acoesEncerrar, acoesVisiveis, confirmarEncerrar, destinoDaAcao, erroDaAcao, exigeMotivo, motivoParaEnvio, ETIQUETA_ITEM, rotuloAbaAnexos, textoKm, textoQuantidade, tintaDetalhe } from './OsDetalhe';
 import { ErroApi } from '../api';
 
 describe('tela 03 · Detalhe da OS — textos', () => {
@@ -7,10 +7,9 @@ describe('tela 03 · Detalhe da OS — textos', () => {
     expect(textoKm(48312)).toBe('48.312 km');
     expect(textoKm(null)).toBeNull();
   });
-  it('fotos do laudo: só a contagem, no singular e no plural; nenhuma esconde a linha', () => {
-    expect(textoFotos(3)).toBe('3 fotos no laudo — veja no computador');
-    expect(textoFotos(1)).toBe('1 foto no laudo — veja no computador');
-    expect(textoFotos(0)).toBeNull();
+  it('aba Anexos (P2): a contagem do laudo no rótulo; sem foto, só "Anexos"', () => {
+    expect(rotuloAbaAnexos(3)).toBe('Anexos · 3');
+    expect(rotuloAbaAnexos(0)).toBe('Anexos');
   });
   it('quantidade × valor unitário, sem zeros sobrando', () => {
     expect(textoQuantidade(2, 141)).toMatch(/^2 × R\$\s?141,00$/);

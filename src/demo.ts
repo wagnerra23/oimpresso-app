@@ -4,6 +4,7 @@
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
+import type { AnexoOs, ParteFormulario } from './api';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -312,6 +313,19 @@ let bloqueiaPrecoZeroDemo = false;
 let ajustesDemo: AjustesEmpresa = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] };
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
+// P2 · anexos — anexos por OS (handoff propostas-app, demo-propostas.ts). Sem URL assinada na demo: as fotos de exemplo
+// aparecem como miniatura listrada; as enviadas na demo voltam com a própria imagem (data:).
+const ANEXOS_OS: Record<number, AnexoOs[]> = {
+  1042: [
+    { id: 830, nome: 'IMG_0430.jpg', tipo: 'image/jpeg', tamanho: 412330, legenda: 'Peça trocada', etapa: 'em_execucao', enviado_em: '2026-10-05T15:02:00Z', enviado_por: 'Bruno Lima', url: '', miniatura: '' },
+    { id: 820, nome: 'orcamento-v3.pdf', tipo: 'application/pdf', tamanho: 1204551, legenda: 'Orçamento assinado', etapa: 'em_diagnostico', enviado_em: '2026-10-05T14:10:00Z', enviado_por: 'Bruno Lima', url: '', miniatura: null },
+    { id: 813, nome: 'IMG_0413.jpg', tipo: 'image/jpeg', tamanho: 301877, legenda: 'Painel na entrada', etapa: 'recepcao', enviado_em: '2026-10-05T12:43:00Z', enviado_por: 'Ana Souza', url: '', miniatura: '' },
+    { id: 812, nome: 'IMG_0412.jpg', tipo: 'image/jpeg', tamanho: 284113, legenda: 'Lateral · antes', etapa: 'recepcao', enviado_em: '2026-10-05T12:41:00Z', enviado_por: 'Ana Souza', url: '', miniatura: '' },
+  ],
+};
+/** Idempotency-Key → corpo (OS + arquivo + legenda) e o anexo gravado, como o `app_idempotencia` do ERP. */
+const ANEXOS_POR_CHAVE: Record<string, { corpo: string; anexo: AnexoOs }> = {};
+let proximoAnexo = 900;
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
@@ -920,6 +934,41 @@ export const demo = {
       if (/[?&]revisao=1/.test(caminho)) itens = itens.filter(proxima).sort((a, b) => falta(a) - falta(b));
       return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true, pode_editar: true,
         revisao_proxima: VEICULOS.filter(proxima).length, revisao_aviso_km: AVISO });
+    }
+    // P2 · anexos — GET/POST /api/app/os/{id}/arquivos, com as recusas do contrato tela-03-anexos (ERP #9446).
+    if (caminho.startsWith('/api/app/os/') && caminho.endsWith('/arquivos')) {
+      const idOs = Number(caminho.split('/')[4]);
+      const os = ORDENS.find((x) => x.id === idOs);
+      if (!os && !Object.values(HISTORICO_ANTIGO).some((l) => l.some((h) => h.os_id === idOs))) {
+        throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      }
+      const lista = (ANEXOS_OS[idOs] ??= []);
+      if (metodo === 'GET') return r({ itens: lista.map((a) => ({ ...a })), pode_enviar: true });
+      const partes = (Array.isArray(corpo) ? corpo : []) as ParteFormulario[];
+      const valor = (k: string) => partes.find((p) => p.key === k);
+      const arq = valor('arquivo'), origem = valor('origem')?.value ?? null, legenda = valor('legenda')?.value?.slice(0, 160) || null;
+      const chave = cabecalhos['Idempotency-Key'];
+      if (!chave) throw Object.assign(new Error('Falta a chave de idempotência.'), { status: 422, codigo: 'validacao', campos: { idempotency_key: 'Falta a chave de idempotência.' } });
+      if (origem === 'camera' && !ajustesDemo.app_anexos_camera) {
+        throw Object.assign(new Error('A empresa desligou anexos pela câmera.'), { status: 422, codigo: 'validacao', campos: { origem: 'A empresa desligou anexos pela câmera. Escolha da galeria.' } });
+      }
+      if (!arq || arq.type !== 'base64File' || !['image/jpeg', 'image/png', 'application/pdf'].includes(arq.contentType ?? '')) {
+        throw Object.assign(new Error('Envie uma foto (JPG ou PNG) ou um PDF.'), { status: 422, codigo: 'validacao', campos: { arquivo: 'Envie uma foto (JPG ou PNG) ou um PDF.' } });
+      }
+      const tamanho = Math.floor((arq.value.length * 3) / 4);
+      if (tamanho > 10 * 1024 * 1024) throw Object.assign(new Error('O arquivo passa de 10 MB.'), { status: 413, codigo: 'arquivo_grande' });
+      const corpoTxt = JSON.stringify([idOs, arq.value.length, arq.value.slice(0, 64), arq.value.slice(-64), legenda]);
+      const ja = ANEXOS_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outro envio.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r({ ...ja.anexo });
+      await espera(600);
+      const dataUrl = `data:${arq.contentType};base64,${arq.value}`;
+      const anexo: AnexoOs = { id: proximoAnexo++, nome: arq.fileName ?? 'arquivo', tipo: arq.contentType as string, tamanho, legenda,
+        etapa: os?.etapa ?? 'entregue', enviado_em: new Date().toISOString(), enviado_por: 'Você',
+        url: dataUrl, miniatura: arq.contentType === 'application/pdf' ? null : dataUrl };
+      lista.unshift(anexo);
+      ANEXOS_POR_CHAVE[chave] = { corpo: corpoTxt, anexo };
+      return r({ ...anexo });
     }
     if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
       const partes = caminho.split('/');

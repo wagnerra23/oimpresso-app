@@ -10,6 +10,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O oimpresso acessa as suas fotos somente quando você escolhe uma imagem para anexar a uma ordem de serviço.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
