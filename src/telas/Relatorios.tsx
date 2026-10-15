@@ -2,16 +2,21 @@
 // indicadores e quatro recortes (DRE, vendas, produção, estoque). "Exportar PDF" e "Excel" geram arquivo
 // no servidor e continuam no computador. "OS por status" é da oficina (Onda D) e fica de fora. Mora em Mais.
 // Rota GET /api/app/relatorios, contrato §10.3 (entrou no ERP com o #8599).
+// P6: abas Lucratividade e Comissões (ERP #9448, api/tela-13-lucratividade.md) — os números vêm prontos do ERP.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type AbaRelatorio, type PeriodoRelatorio, type Relatorios as Dados } from '../api';
 import { reais } from './Pedidos';
+import { useAjustes } from '../ajustes';
+import { avisoSemComissoes, equilibrio, reaisCurto, rotuloBase, tomMargem } from '../lucratividade-regras';
 
 const PERIODOS: Array<{ id: PeriodoRelatorio; label: string }> = [
   { id: 'mes', label: 'Este mês' }, { id: 'trimestre', label: '3 meses' }, { id: 'ano', label: '12 meses' },
 ];
 const ABAS: Array<{ id: AbaRelatorio; label: string }> = [
   { id: 'dre', label: 'DRE' }, { id: 'vendas', label: 'Vendas' }, { id: 'producao', label: 'Produção' }, { id: 'estoque', label: 'Estoque' },
+  { id: 'lucratividade', label: 'Lucro' }, { id: 'comissoes', label: 'Comissões' },
 ];
+const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 const dataCurta = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 const pct = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
 
@@ -30,6 +35,7 @@ export function Relatorios({ voltar }: { voltar?: ReactNode }) {
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [lendo, setLendo] = useState(true);
+  const ajustes = useAjustes();
 
   // Troca rápida de período ou aba: só a resposta do pedido mais recente entra na tela.
   const pedido = useRef(0);
@@ -48,7 +54,10 @@ export function Relatorios({ voltar }: { voltar?: ReactNode }) {
 
   const k = dados?.kpis;
   // Bloco null: troca em andamento ("Carregando…") ou, com a resposta já na tela, sem permissão para esse recorte.
-  const bloco = dados ? dados[aba] : null;
+  const bloco = dados ? dados[aba] ?? null : null;
+  const luc = aba === 'lucratividade' ? dados?.lucratividade ?? null : null;
+  const eq = luc ? equilibrio(luc) : null;
+  const com = aba === 'comissoes' ? dados?.comissoes ?? null : null;
   const maxDia = dados?.vendas ? Math.max(1, ...dados.vendas.receita_por_dia.map((d) => d.valor)) : 1;
   const maxDre = dados?.dre ? Math.max(1, k?.receitas ?? 0, k?.despesas ?? 0) : 1;
 
@@ -81,14 +90,15 @@ export function Relatorios({ voltar }: { voltar?: ReactNode }) {
             </div>
           )}
           {dados && (
-            <div className="rl-seg" role="tablist" aria-label="Relatório">
+            <div className="rl-seg rl-seg-2l" role="tablist" aria-label="Relatório">
               {ABAS.map((a) => (
                 <button key={a.id} role="tab" aria-selected={aba === a.id} className={'rl-seg-b' + (aba === a.id ? ' on' : '')} onClick={() => setAba(a.id)}>{a.label}</button>
               ))}
             </div>
           )}
           {dados && !bloco && lendo && <p className="p4-legal">Carregando…</p>}
-          {dados && !bloco && !lendo && <div className="p4-vazio"><b>Sem acesso a este relatório</b><span>Seu usuário não pode ver este recorte.</span></div>}
+          {dados && !bloco && !lendo && <div className="p4-vazio"><b>Sem acesso a este relatório</b>
+            <span>{aba === 'comissoes' ? avisoSemComissoes(ajustes.app_comissao_vendedor_ve_propria) : 'Seu usuário não pode ver este recorte.'}</span></div>}
 
           {aba === 'dre' && dados?.dre && k && (
             <>
@@ -140,7 +150,67 @@ export function Relatorios({ voltar }: { voltar?: ReactNode }) {
               : <Linhas titulo="Itens com estoque baixo · agora" itens={[{ k: 'Nenhum item abaixo do mínimo', v: '', tom: 'pos' }]} />
           )}
 
-          {dados && <p className="p4-legal">Exportar em PDF ou Excel continua no computador.</p>}
+          {luc && (
+            <>
+              <section className="rl-bloco" aria-label="Margem de contribuição">
+                <div className="p4-rotulo">Margem de contribuição</div>
+                <div className="lc-margem">
+                  <b>{reais(luc.margem_contribuicao)}</b>
+                  {luc.margem_pct !== null && <span className={luc.margem_pct >= 0 ? 'pos' : 'neg'}>{pct(luc.margem_pct)}</span>}
+                </div>
+                <div className="lc-tres">
+                  {[{ l: 'Receita', v: luc.receita }, { l: 'Custo variável', v: luc.custo_variavel }, { l: 'Custo fixo', v: luc.custo_fixo }].map((c) => (
+                    <div key={c.l} aria-label={`${c.l}: ${reais(c.v)}`}><small>{c.l}</small><b>{reaisCurto(c.v)}</b></div>
+                  ))}
+                </div>
+              </section>
+              <section className="rl-bloco" aria-label="Ponto de equilíbrio">
+                <div className="p4-rotulo">Ponto de equilíbrio</div>
+                {eq && luc.ponto_equilibrio !== null ? (
+                  <div className="rl-comp">
+                    <span>Equilíbrio em {reais(luc.ponto_equilibrio)}</span>
+                    <div className="rl-barra" role="progressbar" aria-label="Receita até o ponto de equilíbrio" aria-valuemin={0} aria-valuemax={100} aria-valuenow={eq.preenchido}>
+                      <i className={eq.acima ? 'pos' : 'warn'} style={{ width: `${eq.preenchido}%` }} />
+                    </div>
+                    <span>{eq.acima ? 'A receita já passou do equilíbrio: o que vier daqui é lucro.' : 'A receita ainda não chegou ao equilíbrio.'}</span>
+                  </div>
+                ) : <span className="lc-nota">Sem ponto de equilíbrio no período (sem receita ou margem negativa).</span>}
+              </section>
+              {luc.menores_margens.length > 0 ? (
+                <section className="rl-bloco" aria-label="Pedidos com menor margem">
+                  <div className="p4-rotulo">Pedidos com menor margem</div>
+                  {luc.menores_margens.map((m) => (
+                    <div key={m.pedido_id} className="lc-linha">
+                      <div><b>{m.resumo}</b><small>#{m.numero} · {reais(m.valor)}</small></div>
+                      <span className={tomMargem(m.margem_pct)}>{pct(m.margem_pct)}</span>
+                    </div>
+                  ))}
+                </section>
+              ) : <div className="p4-vazio"><b>Sem vendas no período</b></div>}
+            </>
+          )}
+
+          {com && (
+            com.vendedores.length > 0 ? (
+              <section className="rl-bloco" aria-label="Comissões">
+                <div className="p4-rotulo">{rotuloBase(com.base)}</div>
+                {com.vendedores.map((v) => (
+                  <div key={v.id} className="lc-linha">
+                    <span className="pd-avatar" aria-hidden="true">{iniciais(v.nome)}</span>
+                    <div><b>{v.nome}</b><small>{pct(v.percentual)} · vendeu {reaisCurto(v.vendido)} · recebido {reaisCurto(v.recebido)}</small></div>
+                    <div className="lc-dir">
+                      <b>{reais(v.comissao)}</b>
+                      {com.base === 'payment_received' && <small>{reais(v.a_liberar)} a liberar</small>}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ) : <div className="p4-vazio"><b>Nenhuma comissão no período</b></div>
+          )}
+
+          {dados && (aba === 'lucratividade' || aba === 'comissoes')
+            ? <p className="p4-legal">Custos e regra de comissão vêm do ERP. Pagar comissão continua no computador.</p>
+            : dados && <p className="p4-legal">Exportar em PDF ou Excel continua no computador.</p>}
         </div>
       </div>
     </>

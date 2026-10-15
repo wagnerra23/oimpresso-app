@@ -2,9 +2,11 @@
 // indicadores (pedidos, produção, a receber), pedidos por dia e o fechamento do mês. "OS no pátio" é da oficina
 // (Onda D) e fica de fora. Mora em Mais; os cartões de pedidos e produção abrem as abas.
 // Rota GET /api/app/dashboard, contrato §10.4 (ERP #8599).
+// P6: cartão de lucratividade do mês, da aba `lucratividade` de /api/app/relatorios (ERP #9448); some sem permissão ou erro.
 import { useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type Dashboard as Dados } from '../api';
+import { api, ErroApi, type Dashboard as Dados, type Lucratividade } from '../api';
 import { reais } from './Pedidos';
+import { equilibrio } from '../lucratividade-regras';
 
 const dataCurta = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 const sinal = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
@@ -31,6 +33,15 @@ export function Dashboard({ voltar, irParaPedidos, irParaProducao }: { voltar?: 
       .catch((e) => { if (vivo) setErro(e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não tem acesso ao dashboard.' : e instanceof Error ? e.message : 'Não foi possível carregar.'); });
     return () => { vivo = false; };
   }, []);
+
+  // P6 · lucratividade — cartão à parte: falha ou bloco null só escondem o cartão, o resto do dashboard fica.
+  const [luc, setLuc] = useState<Lucratividade | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    api.relatorios('mes', 'lucratividade').then((r) => { if (vivo) setLuc(r.lucratividade ?? null); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+  const eq = luc ? equilibrio(luc) : null;
 
   const f = dados?.faturamento_30d;
   const k = dados?.kpis;
@@ -95,6 +106,25 @@ export function Dashboard({ voltar, irParaPedidos, irParaProducao }: { voltar?: 
                 ))}
               </div>
               <div className="db-eixo"><span>{dataCurta(dias[0].data)}</span><span>hoje · {dias[dias.length - 1].total}</span></div>
+            </section>
+          )}
+          {dados && luc && (
+            <section className="db-bloco" aria-label="Lucratividade do mês">
+              <div className="p4-rotulo">Lucratividade · este mês</div>
+              <div className="lc-margem">
+                <b>{reais(luc.margem_contribuicao)}</b>
+                {luc.margem_pct !== null && <span className={luc.margem_pct >= 0 ? 'pos' : 'neg'}>{luc.margem_pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% de margem</span>}
+              </div>
+              {eq && luc.ponto_equilibrio !== null
+                ? (
+                  <div className="db-prog">
+                    <span>{eq.acima ? 'Passou do equilíbrio' : 'Abaixo do equilíbrio'} · {reais(luc.ponto_equilibrio)}</span>
+                    <div className="in-barra" role="progressbar" aria-label="Receita até o ponto de equilíbrio" aria-valuemin={0} aria-valuemax={100} aria-valuenow={eq.preenchido}>
+                      <i className={eq.acima ? 'db-ok' : 'db-warn'} style={{ width: `${eq.preenchido}%` }} />
+                    </div>
+                  </div>
+                )
+                : <span className="lc-nota">Sem ponto de equilíbrio no mês.</span>}
             </section>
           )}
           {dados && (dados.meta_mes || (pc && pc.total > 0)) && (
