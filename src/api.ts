@@ -11,6 +11,7 @@ import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
+import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
 
 export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
@@ -61,6 +62,8 @@ export interface PedidoDetalhe extends PedidoResumo {
   itens_venda: Array<{ produto: string; quantidade: number; total: number }>;
   etapas: Array<{ grupo: GrupoEtapa; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
   acoes: Array<{ chave: string; rotulo: string; pode: boolean }>;
+  /** P1 · histórico de etapas, mais recente primeiro (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = a tela não mostra. */
+  historico?: MudancaEtapa[];
 }
 /** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
@@ -926,6 +929,12 @@ export const api = {
    *  422 { erro: "idempotencia_conflito" } (mesma chave, corpo diferente) · 409 { erro: "em_andamento" } · 403 sem_permissao
    *  ou sem_local. `chave` = Idempotency-Key da tentativa. */
   criarVenda: (corpo: CorpoVenda, chave: string) => chamar<VendaCriada>('POST', '/api/app/vendas', corpo, { 'Idempotency-Key': chave }),
+  // P1 · avançar etapa do pedido (tela 22, ERP #9445).
+  /** 200 = o mesmo JSON do GET /pedidos/{id}, já na etapa nova (a mesma chave + mesmo corpo devolve a resposta gravada) ·
+   *  403 sem_permissao (fora da lista liberada ou RBAC da FSM) · 404 nao_encontrado · 409 etapa_mudou / em_andamento ·
+   *  422 validacao { campos } / idempotencia_conflito · 429 (30/min). `chave` = Idempotency-Key da tentativa. */
+  avancarPedido: (id: number, corpo: ReturnType<typeof corpoAcao>, chave: string) =>
+    chamar<PedidoDetalheApi>('POST', `/api/app/pedidos/${id}/acao`, corpo, { 'Idempotency-Key': chave }),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
    *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */

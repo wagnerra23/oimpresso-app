@@ -760,3 +760,15 @@ button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }
 .vei-serv.mais::before, .vei-serv.vazio::before { content: ''; }
 .vei-peca-n { font-weight: 600; font-size: 12.5px; }
 .vei-mais-pecas { min-height: 44px; margin-top: 6px; }
+
+/* P1 · histórico de etapas do pedido (tela 22) */
+.pd-hist { list-style: none; margin: 0; padding: 4px 0 0 2px; display: flex; flex-direction: column; }
+.pd-hist-l { position: relative; padding: 0 0 14px 20px; display: flex; flex-direction: column; gap: 2px; }
+.pd-hist-l::before { content: ''; position: absolute; left: 4px; top: 6px; width: 8px; height: 8px; border-radius: 99px; background: var(--border); }
+.pd-hist-l::after { content: ''; position: absolute; left: 7.5px; top: 18px; bottom: 0; width: 1px; background: var(--border-2); }
+.pd-hist-l:last-child::after { display: none; }
+.pd-hist-l.atual::before { background: var(--accent); }
+.pd-hist-d { font-size: 13.5px; font-weight: 600; }
+.pd-hist-m { font-size: 12px; color: var(--text-dim); }
+.pd-hist-nota { font-size: 11.5px; color: var(--text-mute); }
+.pd-rodape .pd-rodape-2 { min-height: 48px; }

@@ -41,7 +41,6 @@ const respostaJana = (t: string) => {
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const ACAO: Record<string, string> = { orcamento: 'Enviar para aprovação', aprovacao: 'Aprovar pedido', producao: 'Liberar para entrega', entrega: 'Confirmar entrega' };
 const PEDIDOS = [
   { id: 106, numero: '0043', cliente: 'Papelaria Sol', valor: 360.0, prazo: diaRel(2), atrasado: false, progresso: 0.4,
     etapa: { chave: 'quote_approved', rotulo: 'Aprovado pelo cliente', grupo: 'aprovacao' as const },
@@ -71,6 +70,36 @@ const PEDIDOS = [
     etapa: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' as const },
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
+
+// P1 · avançar etapa (tela 22, ERP #9445). Só a lista segura do ERP (AcoesDoPedido::SEGURAS), cada uma saindo de uma
+// etapa só, como no processo venda_com_producao. As outras ações ficam na web e não vêm em acoes[].
+const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: { chave: string; rotulo: string; grupo: 'producao' | 'concluido' }; progresso: number }> = {
+  quote_approved: { chave: 'iniciar_producao', rotulo: 'Iniciar produção', para: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' }, progresso: 0.5 },
+  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: { chave: 'on_hold', rotulo: 'Em espera', grupo: 'producao' }, progresso: 0.5 },
+  delivered: { chave: 'concluir', rotulo: 'Concluir', para: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' }, progresso: 1 },
+};
+/** `false` simula o usuário sem o RBAC da FSM (a ação vem com pode: false). Só para teste. */
+let podeAcoesPedidoDemo = true;
+/** Histórico de etapas por pedido (mais recente primeiro), criado na 1ª leitura. */
+const HISTORICO_PEDIDO: Record<number, Array<{ em: string; quem: string | null; de: string | null; para: string; origem: 'app' | 'web' }>> = {};
+/** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem mover de novo). */
+const ACOES_PEDIDO_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
+const horasAtras = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
+function historicoPedidoDemo(p: (typeof PEDIDOS)[number]) {
+  if (!HISTORICO_PEDIDO[p.id]) {
+    const h: (typeof HISTORICO_PEDIDO)[number] = [{ em: horasAtras(72), quem: 'Ana Souza', de: null, para: 'Orçamento', origem: 'web' }];
+    if (p.etapa.grupo !== 'orcamento') h.unshift({ em: horasAtras(30), quem: 'Ana Souza', de: 'Orçamento', para: 'Aprovado pelo cliente', origem: 'web' });
+    if (p.etapa.chave !== 'quote_approved' && p.etapa.grupo !== 'orcamento' && p.etapa.chave !== 'awaiting_approval') {
+      h.unshift({ em: horasAtras(5), quem: 'Bruno Lima', de: 'Aprovado pelo cliente', para: p.etapa.rotulo, origem: 'app' });
+    }
+    HISTORICO_PEDIDO[p.id] = h;
+  }
+  return HISTORICO_PEDIDO[p.id];
+}
+const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
+  const a = ACOES_SEGURAS_DEMO[etapa];
+  return a && (liberadas.length === 0 || liberadas.includes(a.chave)) ? [{ chave: a.chave, rotulo: a.rotulo, pode: podeAcoesPedidoDemo }] : [];
+};
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
@@ -332,6 +361,8 @@ export const demo = {
   /** Só para teste: liga/desliga o ajuste de preço zero da empresa da demo. */
   definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
+  /** P1 · só para teste: `false` = o usuário não passa no RBAC da FSM (acoes[] com pode: false; POST → 403). */
+  definirPodeAcoesPedido(v: boolean) { podeAcoesPedidoDemo = v; },
   definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] }; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
@@ -395,7 +426,7 @@ export const demo = {
         const pos = ordem.indexOf(p.etapa.grupo);
         return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
           itens_venda: p.itens, etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
-          acoes: p.etapa.grupo === 'concluido' ? [] : [{ chave: 'avancar', rotulo: ACAO[p.etapa.grupo], pode: true }] });
+          acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p) });
       }
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
       const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
@@ -404,6 +435,38 @@ export const demo = {
       return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
+    }
+    // P1 · POST /api/app/pedidos/{id}/acao, como o ERP #9445: chave obrigatória, etapa_esperada, lista liberada, idempotência.
+    if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/acao$/.test(caminho)) {
+      const chave = cabecalhos['Idempotency-Key'];
+      const n = (corpo ?? {}) as { acao?: string; motivo?: string | null; etapa_esperada?: string };
+      const campos: Record<string, string> = {};
+      if (!chave) campos.idempotency_key = 'Falta a chave de idempotência.';
+      if (!n.acao) campos.acao = 'Informe a ação.';
+      if (!n.etapa_esperada) campos.etapa_esperada = 'Informe a etapa esperada.';
+      if (n.motivo && n.motivo.length > 500) campos.motivo = 'O motivo tem no máximo 500 caracteres.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = ACOES_PEDIDO_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra ação.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r(ja.resposta);
+      const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      const liberadas = ajustesDemo.app_acoes_fsm_liberadas;
+      const segura = Object.values(ACOES_SEGURAS_DEMO).some((a) => a.chave === n.acao);
+      if (!segura || (liberadas.length && !liberadas.includes(n.acao!)) || !podeAcoesPedidoDemo) {
+        throw Object.assign(new Error('Seu usuário não pode executar esta ação no app.'), { status: 403, codigo: 'sem_permissao' });
+      }
+      const a = ACOES_SEGURAS_DEMO[p.etapa.chave];
+      if (n.etapa_esperada !== p.etapa.chave || !a || a.chave !== n.acao) {
+        throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
+      }
+      const de = p.etapa.rotulo;
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de, para: a.para.rotulo, origem: 'app' });
+      p.etapa = { ...a.para }; p.progresso = a.progresso;
+      const resposta = await demo.chamar('GET', `/api/app/pedidos/${p.id}`);
+      ACOES_PEDIDO_POR_CHAVE[chave] = { corpo: corpoTxt, resposta };
+      return r(resposta);
     }
     if (metodo === 'GET' && caminho === '/api/app/producao') {
       const rotulos: Record<string, string> = { quote_approved: 'Aprovado pelo cliente', in_production: 'Em produção', on_hold: 'Em espera', ready_for_invoice: 'Pronto pra faturar' };
