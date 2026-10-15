@@ -47,15 +47,38 @@ de design) por `npm run tokens` → `src/styles/oi-v4.css` — não editar o CSS
 
 ### 1. Permissões
 
-Só localização **enquanto em uso** (ADR 0383: sem câmera, sem biometria).
+Localização só **enquanto em uso**. Câmera só para anexos e QR. Biometria só no login.
+Decisão [W] de 2026-10-05.
 
-- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`. **Sem** `ACCESS_BACKGROUND_LOCATION`,
-  **sem** `CAMERA`. `POST_NOTIFICATIONS` entra pelo plugin de push.
-- iOS: `NSLocationWhenInUseUsageDescription` e `NSPhotoLibraryUsageDescription` (anexo de OS) em
-  PT-BR, textos de `docs/lojas-app/textos/privacidade-lojas.md` do ERP. **Sem** `NSCameraUsageDescription`,
-  **sem** microfone.
+- **Ponto (ADR 0383):** continua sem câmera e sem biometria. Nenhuma tela do ponto pede câmera
+  ou biometria.
+- **Câmera:** só para tirar foto de anexo (OS e pedido) e ler o QR da etiqueta no apontamento.
+  Sempre a pedido de quem usa, nunca em segundo plano.
+- **Biometria:** só para entrar no app. A biometria do celular destrava o token guardado no
+  aparelho e nada vai ao servidor (LGPD, Art. 11). A ADR do ERP sobre biometria no login é o PR
+  00b.
 
-Nunca adicionar permissão de câmera.
+Permissões hoje nos manifests:
+
+- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`. **Sem** `ACCESS_BACKGROUND_LOCATION`.
+  `POST_NOTIFICATIONS` entra pelo plugin de push.
+- iOS: `NSLocationWhenInUseUsageDescription` e `NSPhotoLibraryUsageDescription` (anexo de OS).
+  **Sem** microfone.
+
+Câmera e biometria entram nos manifests **junto com o plugin que as usa**, não antes: permissão
+declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
+
+| Permissão | Onde | Entra no PR | Texto |
+|---|---|---|---|
+| `CAMERA` | Android | 08 (QR) ou 10 (anexos), o que vier primeiro | — (o Android não mostra texto; o pedido aparece na hora de usar) |
+| `NSCameraUsageDescription` | iOS | 08 ou 10, junto com o `CAMERA` | O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento. |
+| `USE_BIOMETRIC` | Android | 15 (biometria no login) | — (permissão sem diálogo) |
+| `NSFaceIDUsageDescription` | iOS | 15, junto com o `USE_BIOMETRIC` | O oimpresso usa o Face ID somente para você entrar no app. A biometria fica no seu celular e não é enviada ao servidor. |
+
+Os textos em PT-BR seguem `docs/lojas-app/textos/privacidade-lojas.md` do ERP (atualizado no PR
+00b). Se o texto mudar lá, muda aqui e no `Info.plist`.
+
+Nunca adicionar câmera ou biometria ao ponto, nem microfone ou localização em segundo plano.
 
 ### 2. Links externos
 
