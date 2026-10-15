@@ -48,11 +48,13 @@ describe('ajustes da empresa no app', () => {
   it('a demo manda o bloco completo, nos dois perfis, e aceita troca de ajuste', async () => {
     await demo.entrar('demo', 'abc');
     const erp = await demo.chamar<{ ajustes: unknown }>('GET', '/api/app/inicio');
-    expect(erp.ajustes).toEqual(AJUSTES_PADRAO);
+    // A empresa da demo liga o orçamento rápido (P4); no ERP ele nasce desligado.
+    const DEMO = { ...AJUSTES_PADRAO, app_orcamento_rapido: true };
+    expect(erp.ajustes).toEqual(DEMO);
     demo.definirAjustes({ app_entrega_exige_assinatura: true });
     expect((await demo.chamar<{ ajustes: { app_entrega_exige_assinatura: boolean } }>('GET', '/api/app/inicio')).ajustes.app_entrega_exige_assinatura).toBe(true);
     demo.definirAjustes();
     await demo.entrar('revisor.ponto', 'abc');
-    expect((await demo.chamar<{ ajustes: unknown }>('GET', '/api/app/inicio')).ajustes).toEqual(AJUSTES_PADRAO);
+    expect((await demo.chamar<{ ajustes: unknown }>('GET', '/api/app/inicio')).ajustes).toEqual(DEMO);
   });
 });

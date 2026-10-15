@@ -173,7 +173,7 @@ export function VendaRapida({ aoVoltar, avisar, online }: { aoVoltar: () => void
   );
 }
 
-function Folha({ titulo, aoFechar, travada = false, children }: { titulo: string; aoFechar: () => void; travada?: boolean; children: React.ReactNode }) {
+export function Folha({ titulo, aoFechar, travada = false, children }: { titulo: string; aoFechar: () => void; travada?: boolean; children: React.ReactNode }) {
   return (
     <div className="vr-folha" role="dialog" aria-modal="true" aria-label={titulo}>
       <div className="vr-veu" onClick={aoFechar} />

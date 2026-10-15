@@ -316,6 +316,39 @@ const ORCAMENTOS = [
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
 
+// P4 · orçamento rápido (tela 04) — handoff propostas-app, demo-propostas.ts. A demo faz o papel do ERP: é ela (o
+// "servidor") que calcula, com a fórmula do OrcamentoCalculator em inteiros — área = L × A × Qtd (3 casas), total =
+// área × preço do m² (2 casas). O app só mostra o que vem daqui.
+const MATERIAIS_ORC = [
+  { id: 12, nome: 'Lona 440g', categoria: 'lona', unidade: 'm2', preco_m2: 65.0 },
+  { id: 18, nome: 'Adesivo vinil', categoria: 'adesivo', unidade: 'm2', preco_m2: 85.0 },
+  { id: 31, nome: 'ACM 3 mm', categoria: 'chapa', unidade: 'm2', preco_m2: 280.0 },
+];
+let numeroOrcamentoDemo = 41;
+/** Idempotency-Key → corpo enviado + orçamento criado (repetição com o mesmo corpo devolve o mesmo). */
+const ORCAMENTOS_POR_CHAVE: Record<string, { corpo: string; criado: Record<string, unknown> }> = {};
+/** "3.25" → 3250 (milésimos), sem float; formato fora do contrato → null. */
+const milesimosDemo = (v: unknown, casas: number) => {
+  if (typeof v !== 'string' || !new RegExp(`^\\d+(\\.\\d{1,${casas}})?$`).test(v)) return null;
+  const [i, d = ''] = v.split('.');
+  return Number(i) * 1000 + Number(d.padEnd(3, '0'));
+};
+/** O cálculo "do ERP" na demo, em inteiros. null = medida fora do formato ou ≤ 0. */
+function calcularOrcamentoDemo(it: Record<string, unknown>, campo: (k: string, msg: string) => void, pre = '') {
+  const mat = MATERIAIS_ORC.find((m) => m.id === it.material_id);
+  const l = milesimosDemo(it.largura_m, 3), a = milesimosDemo(it.altura_m, 3);
+  const q = typeof it.quantidade === 'string' && /^\d+$/.test(it.quantidade) ? Number(it.quantidade) : null;
+  if (!mat) campo(pre + 'material_id', 'Escolha um material.');
+  if (!l) campo(pre + 'largura_m', 'Informe a largura em metros, com ponto (ex.: "3.00").');
+  if (!a) campo(pre + 'altura_m', 'Informe a altura em metros, com ponto (ex.: "1.20").');
+  if (!q) campo(pre + 'quantidade', 'Informe a quantidade (inteiro, pelo menos 1).');
+  if (!mat || !l || !a || !q) return null;
+  const areaMil = Math.round((l * a * q) / 1000); // m² em milésimos (3 casas)
+  const precoCent = Math.round(mat.preco_m2 * 100);
+  const totalCent = Math.round((areaMil * precoCent) / 1000);
+  return { area_m2: areaMil / 1000, preco_m2: mat.preco_m2, total: totalCent / 100, totalCent };
+}
+
 // Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias` vira data dentro do handler.
 const LANCAMENTOS = [
   { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, valor: 7840, pago: false },
@@ -374,7 +407,10 @@ let numeroVenda = 4820;
 /** Ajuste "bloqueia_preco_zero" da empresa na demo. Padrão desligado, como no ERP (decisão [W] 2026-10-05). */
 let bloqueiaPrecoZeroDemo = false;
 /** Ajustes da empresa (aba "App das lojas") na demo: o bloco completo, como o ERP manda (contrato §6.2). */
-let ajustesDemo: AjustesEmpresa = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] };
+// P4 · orçamento rápido: no ERP `app_orcamento_rapido` nasce false (só liga depois do ok do [W]); a empresa da demo
+// liga, para o "+ Novo" de Orçamentos aparecer. `definirAjustes()` volta a este bloco.
+const AJUSTES_DEMO: Readonly<AjustesEmpresa> = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [], app_orcamento_rapido: true };
+let ajustesDemo: AjustesEmpresa = { ...AJUSTES_DEMO, app_acoes_fsm_liberadas: [] };
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
 // P2 · anexos — anexos por OS (handoff propostas-app, demo-propostas.ts). Sem URL assinada na demo: as fotos de exemplo
@@ -488,7 +524,7 @@ export const demo = {
   /** P5 · atendimento — só para teste: canal do WhatsApp ligado/desligado (desligado = área some de `areas`). Recomeça as conversas. */
   definirCanalAtendimento(ligado: boolean) { canalAtendimentoDemo = ligado; conversasDemo = null; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
-  definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] }; },
+  definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_DEMO, app_acoes_fsm_liberadas: [] }; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
     const r = (v: unknown) => v as T;
@@ -847,6 +883,52 @@ export const demo = {
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/chat/')) {
       return r({ conversa_id: 'demo-1', mensagens: conversaDemo });
+    }
+    // P4 · orçamento rápido (antes do GET /orcamentos, que pega qualquer caminho que começa igual).
+    if (metodo === 'GET' && caminho === '/api/app/orcamentos/materiais') return r({ itens: MATERIAIS_ORC });
+    if (metodo === 'POST' && caminho === '/api/app/orcamentos/calcular') {
+      const campos: Record<string, string> = {};
+      const c = calcularOrcamentoDemo((corpo ?? {}) as Record<string, unknown>, (k, m) => { campos[k] = m; });
+      if (!c) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      return r({ area_m2: c.area_m2, preco_m2: c.preco_m2, total: c.total });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/orcamentos') {
+      if (!ajustesDemo.app_orcamento_rapido) throw Object.assign(new Error('O orçamento rápido está desligado nas configurações da empresa.'), { status: 403, codigo: 'sem_permissao' });
+      const chave = cabecalhos['Idempotency-Key'];
+      if (!chave) throw Object.assign(new Error('Falta o cabeçalho Idempotency-Key.'), { status: 422, codigo: 'validacao' });
+      const b = (corpo ?? {}) as { cliente_id?: unknown; itens?: unknown };
+      const corpoTxt = JSON.stringify(b);
+      const ja = ORCAMENTOS_POR_CHAVE[chave];
+      if (ja) {
+        if (ja.corpo !== corpoTxt) throw Object.assign(new Error('Esta chave já foi usada com outro orçamento.'), { status: 422, codigo: 'idempotencia_conflito' });
+        return r(ja.criado);
+      }
+      const campos: Record<string, string> = {};
+      const campo = (k: string, m: string) => { campos[k] ??= m; };
+      const cli = b.cliente_id == null ? null : PESSOAS.find((x) => x.id === b.cliente_id && x.papeis.includes('cliente'));
+      if (cli === undefined) campo('cliente_id', 'Cliente não encontrado.');
+      const itens = Array.isArray(b.itens) ? (b.itens as Array<Record<string, unknown>>) : [];
+      if (!itens.length || itens.length > 50) campo('itens', 'Envie de 1 a 50 itens.');
+      let somaCent = 0;
+      const calculados = itens.map((it, i) => {
+        const c = calcularOrcamentoDemo(it, campo, `itens.${i}.`);
+        if (!c) return null;
+        // Dupla prova: o total que o app mostrou tem de bater, em centavos, com o calculado agora.
+        const prev = milesimosDemo(it.total_previsto, 2);
+        if (prev === null || prev / 10 !== c.totalCent) campo(`itens.${i}.total_previsto`, `O total mudou: o ERP calculou ${(c.totalCent / 100).toFixed(2)}. Confira e envie de novo.`);
+        somaCent += c.totalCent;
+        return c;
+      });
+      if (Object.keys(campos).length || calculados.some((c) => !c)) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      await espera(500);
+      const id = 900 + numeroOrcamentoDemo;
+      const numero = `ORC-${new Date().getFullYear()}-${String(++numeroOrcamentoDemo).padStart(5, '0')}`;
+      const mat = MATERIAIS_ORC.find((m) => m.id === itens[0].material_id)!;
+      ORCAMENTOS.unshift({ id, numero, titulo: `${mat.nome} · ${String(itens[0].largura_m).replace('.', ',')} × ${String(itens[0].altura_m).replace('.', ',')} m`,
+        cliente: cli ? cli.nome : 'Sem cliente', validade: null, status: 'rascunho', valor: somaCent / 100, area_m2: null, itens: itens.length });
+      const criado = { id, numero, status: 'rascunho', total: somaCent / 100 };
+      ORCAMENTOS_POR_CHAVE[chave] = { corpo: corpoTxt, criado };
+      return r(criado);
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
