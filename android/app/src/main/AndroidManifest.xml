@@ -39,4 +39,6 @@
     <!-- Câmera (README §1): só a pedido, para anexo da OS/pedido e QR do apontamento. Nunca no ponto. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Biometria SÓ no login (ADR 0432, PR 15): o celular confere e o app destrava o token guardado. Nunca no ponto. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 </manifest>
