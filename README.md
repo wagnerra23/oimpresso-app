@@ -67,7 +67,8 @@ Permissões hoje nos manifests:
   `POST_NOTIFICATIONS` entra pelo plugin de push.
 - iOS: `NSLocationWhenInUseUsageDescription` e `NSPhotoLibraryUsageDescription` (anexo de OS).
   **Sem** microfone.
-- Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS).
+- Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS). O `USE_FINGERPRINT`
+  entra pelo `androidx.biometric` (a mesma permissão no Android 7–8.1, sem diálogo).
 
 Câmera e biometria entram nos manifests **junto com o plugin que as usa**, não antes: permissão
 declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
