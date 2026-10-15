@@ -1,15 +1,16 @@
 // Detalhe da OS — desenho v4 (tela 03), Onda D. Só leitura. Abre pela lista de OS (tela 07) e pelo
 // histórico do veículo (tela 08). Rota GET /api/app/os/{id}, formato fechado pela sessão ERP da Onda D.
 // O ERP não tem queixa nem diagnóstico: a tela mostra as observações da OS e o resumo da vistoria digital.
-// Os totais vêm prontos do ERP (o app não soma valor). Fotos: só a contagem das fotos do laudo — o app não
-// mostra nem tira foto (ADR 0383, sem câmera). Fora de propósito: sugestão da IA, "+ Adicionar" item,
+// Os totais vêm prontos do ERP (o app não soma valor). Fotos e anexos: aba Anexos (P2, AnexosOs.tsx), com câmera
+// só a pedido (README §1). Fora de propósito: sugestão da IA, "+ Adicionar" item,
 // "Link de aprovação" e "Faturar" (escritas, que mexem em valor e cobrança).
 // Avançar etapa (rodapé): as ações vêm do ERP com o motivo do bloqueio quando o gate barra; ação crítica pede
 // confirmação. Mudar de etapa não mexe em estoque nem valor (o processo da oficina não tem efeito colateral).
 // Cancelar OS e recusar orçamento ficam num botão vermelho à parte, sempre com confirmação e motivo opcional
 // (ligados por ENCERRAR_OS). Acionar garantia fica na web. Rota do ERP #8637 (contrato tela-03).
 import { useEffect, useState } from 'react';
-import { api, camposDoErro, ENCERRAR_OS, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
+import { ANEXOS_OS, api, camposDoErro, ENCERRAR_OS, ErroApi, ESCRITA_OS, type OsAcao, type OsDetalhe as Detalhe, type TipoItemOs } from '../api';
+import { AnexosOs } from './AnexosOs';
 import { reais } from './Pedidos';
 
 /** Quilometragem como o protótipo: "48.312 km". */
@@ -24,11 +25,8 @@ export const ETIQUETA_ITEM: Record<TipoItemOs, readonly [string, string]> = {
 export const textoQuantidade = (quantidade: number, unitario: number): string =>
   `${quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} × ${reais(unitario)}`;
 
-/** Linha das fotos: só a contagem, nunca a imagem. */
-export function textoFotos(n: number): string | null {
-  if (n <= 0) return null;
-  return n === 1 ? '1 foto no laudo — veja no computador' : `${n} fotos no laudo — veja no computador`;
-}
+/** Rótulo da aba Anexos (P2): com a contagem do laudo enquanto a lista não chega. */
+export const rotuloAbaAnexos = (n: number): string => (n > 0 ? `Anexos · ${n}` : 'Anexos');
 
 /** Mensagem para o erro de uma ação: o texto do ERP quando ele explica (gate, etapa mudou); senão um genérico. */
 export function erroDaAcao(e: unknown): string {
@@ -69,8 +67,10 @@ export function tintaDetalhe(o: Pick<Detalhe, 'etapa' | 'travada'>): string {
   return 'var(--accent-text)';
 }
 
-export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => void; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
+export function OsDetalhe({ id, aoVoltar, avisar, online = true }: { id: number; aoVoltar: () => void; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online?: boolean }) {
   const [o, setO] = useState<Detalhe | null>(null);
+  // P2 · anexos — aba da tela: resumo (o de sempre) ou anexos.
+  const [aba, setAba] = useState<'resumo' | 'anexos'>('resumo');
   const [confirmando, setConfirmando] = useState<OsAcao | null>(null);
   const [executando, setExecutando] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState<OsAcao | null>(null);
@@ -95,14 +95,13 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
   };
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
-    setO(null); setErro(null);
+    setO(null); setErro(null); setAba('resumo');
     api.osDetalhe(id).then(setO).catch((e) => setErro(e instanceof ErroApi && e.status === 404 ? 'Esta OS não existe ou não é desta empresa.'
       : e instanceof Error ? e.message : 'Não foi possível carregar.'));
   }, [id]);
 
   const tinta = o ? tintaDetalhe(o) : undefined;
   const km = o?.veiculo ? textoKm(o.veiculo.km) : null;
-  const fotos = o ? textoFotos(o.fotos_laudo) : null;
   const vist = o?.vistoria;
   const temVistoria = !!vist && vist.ok + vist.atencao + vist.critico > 0;
   return (
@@ -117,6 +116,15 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
         </div>
         {o && <span className="pd-status" style={{ color: tinta, paddingRight: 8 }}><i style={{ background: tinta }} />{o.etapa?.rotulo ?? 'Fora do fluxo'}</span>}
       </div>
+      {o && ANEXOS_OS && (
+        <div className="osd-abas">
+          <div className="rl-seg" role="tablist" aria-label="Seções da OS">
+            <button role="tab" aria-selected={aba === 'resumo'} className={'rl-seg-b' + (aba === 'resumo' ? ' on' : '')} onClick={() => setAba('resumo')}>Resumo</button>
+            <button role="tab" aria-selected={aba === 'anexos'} className={'rl-seg-b' + (aba === 'anexos' ? ' on' : '')} onClick={() => setAba('anexos')}>{rotuloAbaAnexos(o.fotos_laudo)}</button>
+          </div>
+        </div>
+      )}
+      {o && aba === 'anexos' ? <AnexosOs os={o} online={online} avisar={avisar} /> : <>
       <div className="oi-scroll">
         {erro && <div className="pd-corpo"><div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div></div>}
         {!o && !erro && <div className="pd-corpo"><p className="p4-legal">Carregando…</p></div>}
@@ -172,7 +180,6 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
               )}
             </div>
 
-            {fotos && <p className="p4-legal">{fotos}</p>}
             <p className="p4-legal">{acoesVisiveis(o.acoes).length ? acoesEncerrar(o.acoes).length ? 'Link de aprovação, garantia e faturar ficam no computador.' : 'Link de aprovação, cancelar e faturar ficam no computador.' : 'No app a OS é só consulta. Link de aprovação, mudar de etapa e faturar ficam no computador.'}</p>
           </div>
         )}
@@ -199,6 +206,7 @@ export function OsDetalhe({ id, aoVoltar, avisar }: { id: number; aoVoltar: () =
           )}
         </div>
       )}
+      </>}
       {encerrando && o && (
         <div className="oi-sheet-backdrop" onClick={() => executando === null && setEncerrando(null)}>
           <div className="oi-sheet" role="dialog" aria-modal="true" aria-labelledby="osd-enc-t" onClick={(e) => e.stopPropagation()}>

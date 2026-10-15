@@ -9,7 +9,9 @@ import type { Area } from './api';
 import type { SubMais } from './telas/Mais';
 
 /** Áreas que moram dentro de Mais (nunca na barra), na ordem em que aparecem lá. */
-const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'ponto_gestor', 'pagamentos'] as const;
+const DENTRO_DE_MAIS = ['pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'ponto_gestor', 'pagamentos',
+  // P5 · atendimento — só quando o ERP manda a área (canal do WhatsApp ligado); fora do NAV_PADRAO de propósito.
+  'atendimento'] as const;
 /** Qualquer área pode ser aba quando o usuário escolhe (tela 30). */
 export type Aba = Area;
 /** Módulos com tela no app que podem ir para a barra (tela 30), na ordem em que aparecem em Mais. */

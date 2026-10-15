@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { api, DEMO } from './api';
 import { pushNoBuild } from './push-regras';
+import { somarNoIcone } from './badge';
 
 /** Build sem google-services.json: nada de push, senão o register() derruba o app (push-regras.ts). */
 const PUSH = pushNoBuild(import.meta.env.VITE_PUSH);
@@ -18,6 +19,8 @@ function ouvir(aoTocar: () => void) {
     const plat = Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
     api.registrarPush(value, plat).catch(() => { /* tenta de novo na próxima abertura */ });
   });
+  // Push com o app aberto: soma no contador do ícone (P7); o Início/Notificações acertam com o ERP.
+  PushNotifications.addListener('pushNotificationReceived', () => somarNoIcone());
   // Tocar na notificação (data.url = "/ponto/mobile") abre a tela de ponto do app.
   PushNotifications.addListener('pushNotificationActionPerformed', () => aoTocar());
 }

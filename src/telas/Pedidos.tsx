@@ -1,11 +1,19 @@
 // Pedidos — desenho v4 (telas 21 Pedidos · 22 Detalhe do pedido), dados pelo contrato
-// API-CONTRATO-v1 §2 (Pedido = venda do ERP; etapas = grupos da FSM). Só leitura na v1:
-// o botão da etapa fica desabilitado com "Abrir no computador" (ações mexem em estoque/cobrança).
+// API-CONTRATO-v1 §2 (Pedido = venda do ERP; etapas = grupos da FSM). P1 · tela 22 (ERP #9445): o rodapé do Detalhe
+// move a etapa só pelas ações que o ERP manda em acoes[] (lista segura, sem efeito em valor ou estoque) e que a empresa
+// liberou (`app_acoes_fsm_liberadas`). Confirma em folha; offline trava; 409 etapa_mudou recarrega o pedido.
+// P3 · tela 22 (ERP #9464): com `entrega.pode`, o rodapé abre "Registrar entrega" (EntregaPedido), fora de acoes[].
 // "+ Venda" abre a Venda rápida (tela 11, D16 Onda A). Fora do v4 de propósito: "Link de aprovação" (não está no contrato).
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, type FiltroPedidos, type GrupoEtapa, type ListaPedidos, type PedidoDetalheApi } from '../api';
+import { useAjustes } from '../ajustes';
+import { acoesDoRodape, corpoAcao, reacaoAoErro, soConsulta, textoMudanca, tituloConfirmacao, type AcaoPedido } from '../pedido-acao-regras';
+import { botaoEntrega } from '../entrega-regras';
+import { haQuanto } from '../tempo';
+import { novaChave } from '../venda';
 import { useVoltar } from '../voltar';
 import { CampoBusca, casaBusca } from '../busca';
+import { EntregaPedido } from './EntregaPedido';
 import { VendaRapida } from './VendaRapida';
 
 const FILTROS: Array<{ id: FiltroPedidos; label: string }> = [
@@ -25,7 +33,7 @@ export function Pedidos({ voltar, avisar, online }: { voltar?: ReactNode; avisar
   useVoltar(aberto !== null, () => setAberto(null));
   useVoltar(vendendo, () => setVendendo(false));
   if (vendendo) return <VendaRapida aoVoltar={() => setVendendo(false)} avisar={avisar} online={online} />;
-  return aberto !== null ? <Detalhe id={aberto} aoVoltar={() => setAberto(null)} /> : <Lista aoAbrir={setAberto} aoVender={() => setVendendo(true)} voltar={voltar} />;
+  return aberto !== null ? <Detalhe id={aberto} aoVoltar={() => setAberto(null)} avisar={avisar} online={online} /> : <Lista aoAbrir={setAberto} aoVender={() => setVendendo(true)} voltar={voltar} />;
 }
 
 function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; aoVender: () => void; voltar?: ReactNode }) {
@@ -98,12 +106,68 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
   );
 }
 
-export function Detalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }) {
+const statusDe = (e: unknown) => (e instanceof ErroApi ? e.status : (e as { status?: number } | null)?.status ?? 0);
+const codigoDe = (e: unknown) => (e instanceof ErroApi ? e.codigo : (e as { codigo?: string } | null)?.codigo ?? '');
+
+export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar: () => void; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online: boolean }) {
   const [p, setP] = useState<PedidoDetalheApi | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  useEffect(() => { api.pedido(id).then(setP).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')); }, [id]);
+  const [confirmando, setConfirmando] = useState<AcaoPedido | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  /** Ações recusadas com 403 nesta visita: o botão some até recarregar. */
+  const [recusadas, setRecusadas] = useState<string[]>([]);
+  /** Idempotency-Key da tentativa: a mesma enquanto ação e etapa forem as mesmas (rede/5xx repetem sem mover 2×). */
+  const chave = useRef<{ sig: string; valor: string } | null>(null);
+  const ajustes = useAjustes();
+  // P3 · entrega: tela aberta e 403 nesta visita (o botão some até recarregar).
+  const [entregando, setEntregando] = useState(false);
+  const [entregaRecusada, setEntregaRecusada] = useState(false);
+  useVoltar(entregando, () => setEntregando(false));
 
-  const acao = p?.acoes.find((a) => a.pode) ?? p?.acoes[0];
+  const recarregar = useCallback(() => api.pedido(id).then((n) => { setP(n); setRecusadas([]); setEntregaRecusada(false); })
+    .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')), [id]);
+  useEffect(() => { recarregar(); }, [recarregar]);
+
+  const acoes = p ? p.acoes.filter((a) => !recusadas.includes(a.chave)) : [];
+  const botoes = acoesDoRodape(acoes, ajustes.app_acoes_fsm_liberadas);
+  const entregar = p ? botaoEntrega(p.entrega, entregaRecusada) : false;
+  const consulta = !entregar && (soConsulta(acoes, ajustes.app_acoes_fsm_liberadas) || (!!p?.entrega && botoes.length === 0));
+
+  const mover = async (a: AcaoPedido) => {
+    if (!p || enviando) return;
+    if (!online) { setConfirmando(null); avisar('Sem conexão. Mover etapa precisa de internet.', 'warn'); return; }
+    const sig = `${p.id}|${a.chave}|${p.etapa.chave}`;
+    if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
+    setEnviando(true);
+    try {
+      const novo = await api.avancarPedido(p.id, corpoAcao(a.chave, p.etapa.chave), chave.current.valor);
+      chave.current = null;
+      setP(novo); setConfirmando(null);
+      avisar(`Pedido #${novo.numero} em ${novo.etapa.rotulo}`);
+    } catch (e) {
+      const r = reacaoAoErro(statusDe(e), codigoDe(e));
+      if (!r.manterChave) chave.current = null;
+      setConfirmando(null);
+      avisar(r.reacao === 'avisar' && e instanceof Error && e.message ? e.message : r.mensagem, r.reacao === 'repetir' || r.reacao === 'recarregar' ? 'warn' : 'erro');
+      if (r.reacao === 'recarregar') recarregar();
+      else if (r.reacao === 'sumir') setRecusadas((x) => [...x, a.chave]);
+      else if (r.reacao === 'voltar') aoVoltar();
+    } finally { setEnviando(false); }
+  };
+
+  if (entregando && p) {
+    return (
+      <EntregaPedido pedido={p} online={online} avisar={avisar} aoVoltar={() => setEntregando(false)}
+        aoRegistrada={(r) => setP(r.pedido)}
+        aoReagir={(r) => {
+          setEntregando(false);
+          if (r === 'recarregar') recarregar();
+          else if (r === 'sumir') setEntregaRecusada(true);
+          else aoVoltar();
+        }} />
+    );
+  }
+
   return (
     <>
       <div className="pd-dhead">
@@ -154,13 +218,47 @@ export function Detalhe({ id, aoVoltar }: { id: number; aoVoltar: () => void }) 
                 {p.cliente.telefone && <a className="p4-link" href={`tel:${p.cliente.telefone.replace(/\D/g, '')}`}>Ligar</a>}
               </div>
             </div>
+
+            {p.historico && p.historico.length > 0 && (
+              <>
+                <div className="p4-rotulo">Histórico</div>
+                <ol className="pd-hist" aria-label="Histórico de etapas">
+                  {p.historico.map((m, i) => (
+                    <li key={i} className={'pd-hist-l' + (i === 0 ? ' atual' : '')}>
+                      <span className="pd-hist-d">{textoMudanca(m)}</span>
+                      <span className="pd-hist-m">{[m.quem, haQuanto(m.em), m.origem === 'app' ? 'pelo app' : null].filter(Boolean).join(' · ')}</span>
+                    </li>
+                  ))}
+                </ol>
+                <span className="pd-hist-nota">Cada mudança grava quem moveu e quando, igual à web. Voltar etapa continua no computador.</span>
+              </>
+            )}
           </div>
         )}
       </div>
-      {p && acao && (
+      {p && (botoes.length > 0 || consulta || entregar) && (
         <div className="pd-rodape">
-          <button className="p4-cta" disabled>{acao.rotulo}</button>
-          <span className="pd-rodape-nota">Abrir no computador — no app esta etapa é só consulta.</span>
+          {consulta && <span className="pd-rodape-nota">Seu usuário só consulta este pedido.</span>}
+          {entregar && <button className="p4-cta" disabled={!online || enviando} onClick={() => setEntregando(true)}>Registrar entrega</button>}
+          {botoes.map((a, i) => (
+            <button key={a.chave} className={i === 0 && !entregar ? 'p4-cta' : 'oi-btn block pd-rodape-2'} disabled={!online || enviando} onClick={() => setConfirmando(a)}>{a.rotulo}</button>
+          ))}
+          {(botoes.length > 0 || entregar) && !online && <span className="pd-rodape-nota">{entregar && botoes.length === 0 ? 'Sem conexão. Registrar a entrega precisa de internet.' : 'Sem conexão. Mover etapa precisa de internet.'}</span>}
+        </div>
+      )}
+      {confirmando && p && (
+        <div className="oi-sheet-backdrop" onClick={() => !enviando && setConfirmando(null)}>
+          <div className="oi-sheet" role="dialog" aria-modal="true" aria-labelledby="pd-conf-t" onClick={(e) => e.stopPropagation()}>
+            <div className="oi-sheet-grip" />
+            <div className="oi-sheet-h"><b id="pd-conf-t">{tituloConfirmacao(confirmando)}</b></div>
+            <div className="osd-folha">
+              <p className="osd-conf">O pedido #{p.numero} sai de <b>{p.etapa.rotulo}</b>. Fica no histórico com seu nome e a hora.</p>
+              <div className="osd-conf-bts">
+                <button className="oi-btn" disabled={enviando} onClick={() => setConfirmando(null)}>Cancelar</button>
+                <button className="p4-cta" disabled={enviando || !online} onClick={() => mover(confirmando)}>{enviando ? 'Movendo…' : 'Mover'}</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>

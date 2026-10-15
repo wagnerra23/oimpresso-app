@@ -5,8 +5,9 @@ import { useCallback, useEffect, useRef, useState, type ReactElement, type React
 import { Network } from '@capacitor/network';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { App as AppNativo } from '@capacitor/app';
-import { api, carregarToken, DEMO, houveFalhaDeLeitura, quandoExpirar, type Area } from './api';
+import { api, carregarToken, DEMO, houveFalhaDeLeitura, precisaDestravar, quandoExpirar, type Area } from './api';
 import { renovarLembrete } from './push';
+import { limparIcone } from './badge';
 import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
 import { tratarVoltar } from './voltar';
@@ -34,6 +35,8 @@ import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
+// P5 · atendimento
+import { Atendimento } from './telas/Atendimento';
 
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
@@ -48,6 +51,8 @@ export function App() {
   const tema = useTemaDoCelular();
   const [pronto, setPronto] = useState(false);
   const [logado, setLogado] = useState(false);
+  // P9: biometria ligada neste aparelho → o login abre pedindo a digital.
+  const [trancado, setTrancado] = useState(false);
   const [aba, setAba] = useState<Aba>('inicio');
   const [subMais, setSubMais] = useState<SubMais | null>(null);
   // Card "Estoque" do Início abre a tela 05 já em "Baixo estoque"; pelo Mais abre em "Todos".
@@ -100,7 +105,9 @@ export function App() {
 
   useEffect(() => {
     quandoExpirar(() => { setLogado(false); setNav(null); setAba('inicio'); setSubMais(null); });
-    carregarToken().then((ok) => { setLogado(ok); setPronto(true); SplashScreen.hide(); });
+    precisaDestravar().catch(() => false)
+      .then(async (b) => { if (b) setTrancado(true); else setLogado(await carregarToken()); })
+      .finally(() => { setPronto(true); SplashScreen.hide(); });
     Network.getStatus().then((s) => setOnline(s.connected));
     const h = Network.addListener('networkStatusChange', (s) => setOnline(s.connected));
     return () => { h.then((x) => x.remove()); };
@@ -121,6 +128,8 @@ export function App() {
     carregarNav();
     renovarLembrete(abrirPonto).catch(() => {});
   }, [logado, abrirPonto, carregarNav]);
+  // Sem conta (saiu ou o token expirou): o ícone não mostra as não lidas de quem saiu (P7).
+  useEffect(() => { if (pronto && !logado) limparIcone(); }, [pronto, logado]);
 
   // Recuperação sem fechar o app: a tela só busca dados ao montar, então um erro (deploy do ERP em 503,
   // sem rede) ficava na tela até reabrir. Ao voltar do segundo plano ou a internet voltar, se a última
@@ -161,7 +170,7 @@ export function App() {
     switch (k) {
       case 'tarefas': return <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} voltar={voltar} />;
       case 'pedidos': return <Pedidos voltar={voltar} avisar={avisar} online={online} />;
-      case 'producao': return <Producao voltar={voltar} />;
+      case 'producao': return <Producao voltar={voltar} avisar={avisar} online={online} />;
       case 'pessoas': return <Pessoas avisar={avisar} voltar={voltar} />;
       case 'orcamentos': return <Orcamentos voltar={voltar} />;
       case 'estoque': return <Estoque filtroInicial={estoqueFiltro} voltar={voltar} />;
@@ -172,10 +181,12 @@ export function App() {
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;
       case 'ponto_gestor': return <FilaGestor avisar={avisar} voltar={voltar} />;
       case 'equipe': return <Equipe voltar={voltar} />;
-      case 'oficina': return <OrdensServico avisar={avisar} voltar={voltar} />;
+      case 'oficina': return <OrdensServico avisar={avisar} voltar={voltar} online={online} />;
       case 'assistente': return <Assistente online={online} voltar={voltar} />;
       case 'pagamentos': return <Pagamentos avisar={avisar} voltar={voltar} />;
       case 'ponto': return <Ponto avisar={avisar} online={online} voltar={voltar} />;
+      // P5 · atendimento
+      case 'atendimento': return <Atendimento avisar={avisar} online={online} voltar={voltar} />;
       case 'conta': return <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={voltar} />;
       case 'menu': {
         const nv = navRef.current;
@@ -189,7 +200,7 @@ export function App() {
   }
 
   if (!pronto) return null;
-  if (!logado) return <Login aoEntrar={() => setLogado(true)} />;
+  if (!logado) return <Login biometria={trancado} aoEntrar={() => { setTrancado(false); setLogado(true); }} />;
   const n = nav ?? NAV_PADRAO;
 
   return (
