@@ -318,6 +318,39 @@ const ORCAMENTOS = [
   { id: 205, numero: 'ORC-0114', titulo: 'Placa de sinalização interna — kit 12', cliente: 'Clínica Vita', validade: null, status: 'enviado', valor: 1290, area_m2: null, itens: 12 },
 ];
 
+// P4 · orçamento rápido (tela 04) — handoff propostas-app, demo-propostas.ts. A demo faz o papel do ERP: é ela (o
+// "servidor") que calcula, com a fórmula do OrcamentoCalculator em inteiros — área = L × A × Qtd (3 casas), total =
+// área × preço do m² (2 casas). O app só mostra o que vem daqui.
+const MATERIAIS_ORC = [
+  { id: 12, nome: 'Lona 440g', categoria: 'lona', unidade: 'm2', preco_m2: 65.0 },
+  { id: 18, nome: 'Adesivo vinil', categoria: 'adesivo', unidade: 'm2', preco_m2: 85.0 },
+  { id: 31, nome: 'ACM 3 mm', categoria: 'chapa', unidade: 'm2', preco_m2: 280.0 },
+];
+let numeroOrcamentoDemo = 41;
+/** Idempotency-Key → corpo enviado + orçamento criado (repetição com o mesmo corpo devolve o mesmo). */
+const ORCAMENTOS_POR_CHAVE: Record<string, { corpo: string; criado: Record<string, unknown> }> = {};
+/** "3.25" → 3250 (milésimos), sem float; formato fora do contrato → null. */
+const milesimosDemo = (v: unknown, casas: number) => {
+  if (typeof v !== 'string' || !new RegExp(`^\\d+(\\.\\d{1,${casas}})?$`).test(v)) return null;
+  const [i, d = ''] = v.split('.');
+  return Number(i) * 1000 + Number(d.padEnd(3, '0'));
+};
+/** O cálculo "do ERP" na demo, em inteiros. null = medida fora do formato ou ≤ 0. */
+function calcularOrcamentoDemo(it: Record<string, unknown>, campo: (k: string, msg: string) => void, pre = '') {
+  const mat = MATERIAIS_ORC.find((m) => m.id === it.material_id);
+  const l = milesimosDemo(it.largura_m, 3), a = milesimosDemo(it.altura_m, 3);
+  const q = typeof it.quantidade === 'string' && /^\d+$/.test(it.quantidade) ? Number(it.quantidade) : null;
+  if (!mat) campo(pre + 'material_id', 'Escolha um material.');
+  if (!l) campo(pre + 'largura_m', 'Informe a largura em metros, com ponto (ex.: "3.00").');
+  if (!a) campo(pre + 'altura_m', 'Informe a altura em metros, com ponto (ex.: "1.20").');
+  if (!q) campo(pre + 'quantidade', 'Informe a quantidade (inteiro, pelo menos 1).');
+  if (!mat || !l || !a || !q) return null;
+  const areaMil = Math.round((l * a * q) / 1000); // m² em milésimos (3 casas)
+  const precoCent = Math.round(mat.preco_m2 * 100);
+  const totalCent = Math.round((areaMil * precoCent) / 1000);
+  return { area_m2: areaMil / 1000, preco_m2: mat.preco_m2, total: totalCent / 100, totalCent };
+}
+
 // Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias`, `emi` (emissão) e `venda`
 // viram data dentro do handler. Competência = mês da emissão. Contas: 1 movimento, 2 caixa, 3 recebíveis.
 const LANCAMENTOS = [
@@ -485,7 +518,10 @@ let numeroVenda = 4820;
 /** Ajuste "bloqueia_preco_zero" da empresa na demo. Padrão desligado, como no ERP (decisão [W] 2026-10-05). */
 let bloqueiaPrecoZeroDemo = false;
 /** Ajustes da empresa (aba "App das lojas") na demo: o bloco completo, como o ERP manda (contrato §6.2). */
-let ajustesDemo: AjustesEmpresa = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] };
+// P4 · orçamento rápido: no ERP `app_orcamento_rapido` nasce false (só liga depois do ok do [W]); a empresa da demo
+// liga, para o "+ Novo" de Orçamentos aparecer. `definirAjustes()` volta a este bloco.
+const AJUSTES_DEMO: Readonly<AjustesEmpresa> = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [], app_orcamento_rapido: true };
+let ajustesDemo: AjustesEmpresa = { ...AJUSTES_DEMO, app_acoes_fsm_liberadas: [] };
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
 // P2 · anexos — anexos por OS (handoff propostas-app, demo-propostas.ts). Sem URL assinada na demo: as fotos de exemplo
@@ -504,6 +540,57 @@ let proximoAnexo = 900;
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
+
+// ── Apontamento por QR (P8, tela 02 · PR 08). Imita o contrato tela-02-apontamento.md do ERP (#9447, grava no PCP):
+// QR com o hash da empresa, etapa = programação (OS × posto × responsável), uma etapa de pessoa aberta por operador,
+// etapa de máquina rodando junto, `momento` do toque com os limites do serviço, Idempotency-Key e
+// app_apontamento_exige_qr. ──
+const HASH_EMPRESA_DEMO = 'a1b2c3d4e5f6';
+/** O que o leitor devolve na demo pelo navegador (sem câmera): a etiqueta da OS 4812. */
+export const QR_DEMO = `oimpresso:p:${HASH_EMPRESA_DEMO}:comvis_os:4812`;
+const EU_DEMO = { id: 1, nome: 'Você' };
+const OS_APONTAMENTO = [
+  { id: 4812, numero: 'OS-2026-04812', resumo: 'Fachada ACM + Letra caixa', cliente: 'Ótica Visão Clara',
+    etapa: { programacao_id: 77, status: 'pendente', posto: { id: 3, nome: 'Impressão', tipo: 'pessoa' }, responsavel: EU_DEMO } },
+  { id: 4820, numero: 'OS-2026-04820', resumo: 'Lona frontlight 6 × 1,6 m', cliente: 'Supermercado Bom Preço',
+    etapa: { programacao_id: 80, status: 'pendente', posto: { id: 5, nome: 'Roland VG3-640', tipo: 'maquina' }, responsavel: EU_DEMO } },
+  { id: 4815, numero: 'OS-2026-04815', resumo: 'Banners formatura', cliente: 'Escola Aprender',
+    etapa: { programacao_id: 78, status: 'pendente', posto: { id: 4, nome: 'Laminação', tipo: 'pessoa' }, responsavel: { id: 7, nome: 'Felipe Andrade' } } },
+  { id: 4790, numero: 'OS-2026-04790', resumo: 'Placas de sinalização', cliente: 'Clínica Vita',
+    etapa: { programacao_id: 79, status: 'concluida', posto: { id: 3, nome: 'Impressão', tipo: 'pessoa' }, responsavel: EU_DEMO } },
+];
+type OsApontamentoDemo = (typeof OS_APONTAMENTO)[number];
+interface AbertoDemo { id: number; os: OsApontamentoDemo; iniciado_em: string }
+let apontamentosAbertos: AbertoDemo[] = [];
+let idApontamento = 700;
+/** Idempotency-Key → rota + corpo + resposta (repetição devolve a mesma, sem apontar de novo). */
+const APONTAMENTOS_POR_CHAVE: Record<string, { pedido: string; resposta: unknown }> = {};
+const erroDemo = (status: number, codigo: string, mensagem: string, extra: Record<string, unknown> = {}) =>
+  Object.assign(new Error(mensagem), { status, codigo, ...extra });
+const pedidoApontamento = (o: OsApontamentoDemo) => ({ id: o.id, numero: o.numero, resumo: o.resumo, cliente: o.cliente });
+const etapaApontamento = (o: OsApontamentoDemo) => ({ ...o.etapa, inicio_previsto: null });
+const abertoDemo = (a: AbertoDemo) => ({ id: a.id, tipo: a.os.etapa.posto.tipo, pedido: pedidoApontamento(a.os), etapa: etapaApontamento(a.os), iniciado_em: a.iniciado_em });
+/** QR ou número → OS. QR de outra empresa ou OS inexistente → undefined (404 sem dizer se existe). */
+function osDoCodigo(codigo: string): OsApontamentoDemo | undefined | 'numero' {
+  // Formato do PR 07 (`…:<os_tipo>:<id>`) ou o antigo sem tipo (= comvis_os). Outro tipo de OS → 404, como o ERP.
+  const qr = /^oimpresso:p:([0-9a-f]{12}):(?:([a-z_]+):)?(\d+)$/.exec(codigo.toLowerCase());
+  if (qr) return qr[1] === HASH_EMPRESA_DEMO && (qr[2] ?? 'comvis_os') === 'comvis_os' ? OS_APONTAMENTO.find((o) => o.id === Number(qr[3])) : undefined;
+  if (ajustesDemo.app_apontamento_exige_qr) return 'numero';
+  const t = codigo.trim().toUpperCase();
+  return OS_APONTAMENTO.find((o) => String(o.id) === t || o.numero === t);
+}
+const NUMERO_RECUSADO = 'Leia o QR da etiqueta: esta empresa não aceita número digitado.';
+/** `momento` do toque como o serviço do PCP confere: ISO com fuso, até 5 min à frente e até 72 h para trás. */
+function momentoDemo(m: unknown): string {
+  if (m === undefined || m === null || m === '') return new Date().toISOString();
+  if (typeof m !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(m)) {
+    throw erroDemo(422, 'validacao', 'Use data e hora ISO 8601 com fuso.', { campos: { momento: 'Use data e hora ISO 8601 com fuso.' } });
+  }
+  const t = Date.parse(m), agora = Date.now();
+  if (t > agora + 5 * 60000) throw erroDemo(422, 'validacao', 'Hora do aparelho errada; acerte o relógio', { campos: { momento: 'Hora do aparelho errada; acerte o relógio' } });
+  if (t < agora - 72 * 3600000) throw erroDemo(422, 'validacao', 'Envio vencido; peça a correção ao gestor', { campos: { momento: 'Envio vencido; peça a correção ao gestor' } });
+  return new Date(t).toISOString();
+}
 
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
 
@@ -599,7 +686,7 @@ export const demo = {
   /** P5 · atendimento — só para teste: canal do WhatsApp ligado/desligado (desligado = área some de `areas`). Recomeça as conversas. */
   definirCanalAtendimento(ligado: boolean) { canalAtendimentoDemo = ligado; conversasDemo = null; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
-  definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] }; },
+  definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_DEMO, app_acoes_fsm_liberadas: [] }; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
     const r = (v: unknown) => v as T;
@@ -671,6 +758,73 @@ export const demo = {
       return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
+    }
+    // ── Apontamento por QR (P8 · PR 08) ──
+    if (caminho.startsWith('/api/app/producao/')) {
+      if (metodo === 'GET' && caminho === '/api/app/producao/apontamentos/em-andamento') {
+        return r({ pessoa: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'pessoa').map(abertoDemo)[0] ?? null,
+          maquinas: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'maquina').map(abertoDemo),
+          ponto: { entrada: '07:02', saida: null, presenca_minutos: null } });
+      }
+      if (metodo === 'GET' && caminho.startsWith('/api/app/producao/etiqueta/')) {
+        const o = osDoCodigo(decodeURIComponent(caminho.slice('/api/app/producao/etiqueta/'.length)));
+        if (o === 'numero') throw erroDemo(422, 'validacao', NUMERO_RECUSADO, { campos: { codigo: NUMERO_RECUSADO } });
+        if (!o) throw erroDemo(404, 'nao_encontrado', 'Etiqueta não encontrada.');
+        return r({ pedido: pedidoApontamento(o), etapa: etapaApontamento(o), pode_apontar: o.etapa.responsavel.id === EU_DEMO.id && o.etapa.status !== 'concluida' });
+      }
+      if (metodo === 'POST' && caminho.startsWith('/api/app/producao/apontamentos/')) {
+        const chave = cabecalhos['Idempotency-Key'];
+        if (!chave) throw erroDemo(422, 'validacao', 'Envie o header Idempotency-Key.', { campos: { idempotency_key: 'Envie o header Idempotency-Key.' } });
+        const pedido = caminho + ' ' + JSON.stringify(corpo ?? {});
+        const ja = APONTAMENTOS_POR_CHAVE[chave];
+        if (ja && ja.pedido !== pedido) throw erroDemo(422, 'idempotencia_conflito', 'Chave já usada em outro apontamento.');
+        if (ja) return r(ja.resposta);
+        const c = (corpo ?? {}) as { programacao_id?: number; codigo?: string; momento?: string; justificativa?: string };
+        let resposta: unknown;
+        if (caminho === '/api/app/producao/apontamentos/iniciar') {
+          const o = OS_APONTAMENTO.find((x) => x.etapa.programacao_id === c.programacao_id);
+          if (ajustesDemo.app_apontamento_exige_qr) {
+            if (!c.codigo) throw erroDemo(422, 'validacao', NUMERO_RECUSADO, { campos: { codigo: NUMERO_RECUSADO } });
+            if (osDoCodigo(c.codigo) !== o) throw erroDemo(404, 'nao_encontrado', 'Etiqueta não encontrada.');
+          }
+          if (!o) throw erroDemo(404, 'nao_encontrado', 'Etapa não encontrada.');
+          const momento = momentoDemo(c.momento);
+          if (o.etapa.responsavel.id !== EU_DEMO.id) {
+            throw erroDemo(409, 'etapa_alheia', `Esta etapa está em ${o.etapa.posto.nome}, com ${o.etapa.responsavel.nome}. Nada foi apontado.`, { etapa: etapaApontamento(o) });
+          }
+          if (o.etapa.status === 'concluida') throw erroDemo(422, 'bloqueado', 'Esta etapa já foi concluída.');
+          const ocupado = apontamentosAbertos.find((a) => a.os.etapa.posto.tipo === 'pessoa');
+          if (o.etapa.posto.tipo === 'pessoa' && ocupado) throw erroDemo(409, 'em_andamento', 'Você já tem uma etapa aberta.', { apontamento_id: ocupado.id });
+          if (apontamentosAbertos.some((a) => a.os === o)) throw erroDemo(422, 'bloqueado', 'Esta etapa já está em andamento.');
+          idApontamento += 1;
+          apontamentosAbertos.push({ id: idApontamento, os: o, iniciado_em: momento });
+          resposta = { id: idApontamento, programacao_id: o.etapa.programacao_id, iniciado_em: momento };
+        } else {
+          const m = /^\/api\/app\/producao\/apontamentos\/(\d+)\/(concluir|corrigir|pausar)$/.exec(caminho);
+          if (!m) throw new Error('Rota sem simulação: ' + caminho);
+          const id = Number(m[1]);
+          const aberto = apontamentosAbertos.find((a) => a.id === id);
+          if (m[2] === 'corrigir') {
+            const n = (c.justificativa ?? '').trim().length;
+            if (!c.momento) throw erroDemo(422, 'validacao', 'Informe a hora certa.', { campos: { momento: 'Informe a hora certa.' } });
+            if (n < 5 || n > 500) throw erroDemo(422, 'validacao', 'A justificativa precisa de 5 a 500 letras.', { campos: { justificativa: 'A justificativa precisa de 5 a 500 letras.' } });
+            if (!(id > 700 && id <= idApontamento)) throw erroDemo(404, 'nao_encontrado', 'Apontamento não encontrado.');
+            resposta = { id: 9000 + id, apontamento_id: id, situacao: 'aguardando_gestor' };
+          } else {
+            // O de outro operador dá o mesmo 404 do de outra empresa; já encerrado → 422 bloqueado.
+            if (!aberto) {
+              if (id > 700 && id <= idApontamento) throw erroDemo(422, 'bloqueado', 'Este apontamento já foi encerrado.');
+              throw erroDemo(404, 'nao_encontrado', 'Apontamento não encontrado.');
+            }
+            const momento = momentoDemo(c.momento);
+            resposta = { id, encerrado_por: m[2] === 'pausar' ? 'pausa' : 'fim', origem: 'app', encerrado_em: momento,
+              minutos: Math.max(0, Math.floor((Date.parse(momento) - Date.parse(aberto.iniciado_em)) / 60000)) };
+            apontamentosAbertos = apontamentosAbertos.filter((a) => a !== aberto);
+          }
+        }
+        APONTAMENTOS_POR_CHAVE[chave] = { pedido, resposta };
+        return r(resposta);
+      }
     }
     // P1 · POST /api/app/pedidos/{id}/acao, como o ERP #9445: chave obrigatória, etapa_esperada, lista liberada, idempotência.
     if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/acao$/.test(caminho)) {
@@ -958,6 +1112,52 @@ export const demo = {
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/chat/')) {
       return r({ conversa_id: 'demo-1', mensagens: conversaDemo });
+    }
+    // P4 · orçamento rápido (antes do GET /orcamentos, que pega qualquer caminho que começa igual).
+    if (metodo === 'GET' && caminho === '/api/app/orcamentos/materiais') return r({ itens: MATERIAIS_ORC });
+    if (metodo === 'POST' && caminho === '/api/app/orcamentos/calcular') {
+      const campos: Record<string, string> = {};
+      const c = calcularOrcamentoDemo((corpo ?? {}) as Record<string, unknown>, (k, m) => { campos[k] = m; });
+      if (!c) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      return r({ area_m2: c.area_m2, preco_m2: c.preco_m2, total: c.total });
+    }
+    if (metodo === 'POST' && caminho === '/api/app/orcamentos') {
+      if (!ajustesDemo.app_orcamento_rapido) throw Object.assign(new Error('O orçamento rápido está desligado nas configurações da empresa.'), { status: 403, codigo: 'sem_permissao' });
+      const chave = cabecalhos['Idempotency-Key'];
+      if (!chave) throw Object.assign(new Error('Falta o cabeçalho Idempotency-Key.'), { status: 422, codigo: 'validacao' });
+      const b = (corpo ?? {}) as { cliente_id?: unknown; itens?: unknown };
+      const corpoTxt = JSON.stringify(b);
+      const ja = ORCAMENTOS_POR_CHAVE[chave];
+      if (ja) {
+        if (ja.corpo !== corpoTxt) throw Object.assign(new Error('Esta chave já foi usada com outro orçamento.'), { status: 422, codigo: 'idempotencia_conflito' });
+        return r(ja.criado);
+      }
+      const campos: Record<string, string> = {};
+      const campo = (k: string, m: string) => { campos[k] ??= m; };
+      const cli = b.cliente_id == null ? null : PESSOAS.find((x) => x.id === b.cliente_id && x.papeis.includes('cliente'));
+      if (cli === undefined) campo('cliente_id', 'Cliente não encontrado.');
+      const itens = Array.isArray(b.itens) ? (b.itens as Array<Record<string, unknown>>) : [];
+      if (!itens.length || itens.length > 50) campo('itens', 'Envie de 1 a 50 itens.');
+      let somaCent = 0;
+      const calculados = itens.map((it, i) => {
+        const c = calcularOrcamentoDemo(it, campo, `itens.${i}.`);
+        if (!c) return null;
+        // Dupla prova: o total que o app mostrou tem de bater, em centavos, com o calculado agora.
+        const prev = milesimosDemo(it.total_previsto, 2);
+        if (prev === null || prev / 10 !== c.totalCent) campo(`itens.${i}.total_previsto`, `O total mudou: o ERP calculou ${(c.totalCent / 100).toFixed(2)}. Confira e envie de novo.`);
+        somaCent += c.totalCent;
+        return c;
+      });
+      if (Object.keys(campos).length || calculados.some((c) => !c)) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      await espera(500);
+      const id = 900 + numeroOrcamentoDemo;
+      const numero = `ORC-${new Date().getFullYear()}-${String(++numeroOrcamentoDemo).padStart(5, '0')}`;
+      const mat = MATERIAIS_ORC.find((m) => m.id === itens[0].material_id)!;
+      ORCAMENTOS.unshift({ id, numero, titulo: `${mat.nome} · ${String(itens[0].largura_m).replace('.', ',')} × ${String(itens[0].altura_m).replace('.', ',')} m`,
+        cliente: cli ? cli.nome : 'Sem cliente', validade: null, status: 'rascunho', valor: somaCent / 100, area_m2: null, itens: itens.length });
+      const criado = { id, numero, status: 'rascunho', total: somaCent / 100 };
+      ORCAMENTOS_POR_CHAVE[chave] = { corpo: corpoTxt, criado };
+      return r(criado);
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/orcamentos')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

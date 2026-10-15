@@ -4,10 +4,12 @@
 // "Gerar OP", o botão de avançar etapa, "Arte" e "Link" (mover de etapa é ação da FSM, fora da v1).
 // A busca filtra no aparelho: a rota não recebe texto e devolve no máximo 50 itens por coluna
 // (o `total` traz a contagem real).
+// P8 (PR 08): "Apontar" no topo abre o apontamento por QR (tela 02, src/telas/Apontamento.tsx).
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, COLUNAS_PRODUCAO, ErroApi, type ColunaProducao, type FilaProducao } from '../api';
 import { useVoltar } from '../voltar';
 import { Detalhe, reais } from './Pedidos';
+import { Apontamento } from './Apontamento';
 
 const TINTA: Record<ColunaProducao, string> = {
   quote_approved: 'var(--info)', in_production: 'var(--accent)', on_hold: 'var(--warn)', ready_for_invoice: 'var(--ok)',
@@ -19,17 +21,22 @@ const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
  *  pedido move a etapa (P1); sem `online` a escrita fica travada. */
 export function Producao({ voltar, avisar = () => {}, online = false }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online?: boolean } = {}) {
   const [aberto, setAberto] = useState<number | null>(null);
+  const [apontando, setApontando] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
+  useVoltar(apontando, () => setApontando(false));
   // A fila fica montada por baixo do detalhe para não recarregar nem perder a coluna escolhida.
   return (
     <>
       {aberto !== null && <Detalhe id={aberto} aoVoltar={() => setAberto(null)} avisar={avisar} online={online} />}
-      <div style={{ display: aberto !== null ? 'none' : 'contents' }}><Fila aoAbrir={setAberto} voltar={voltar} /></div>
+      {apontando && <Apontamento aoVoltar={() => setApontando(false)} avisar={avisar} online={online} />}
+      <div style={{ display: aberto !== null || apontando ? 'none' : 'contents' }}>
+        <Fila aoAbrir={setAberto} voltar={voltar} aoApontar={() => setApontando(true)} />
+      </div>
     </>
   );
 }
 
-function Fila({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: ReactNode }) {
+function Fila({ aoAbrir, voltar, aoApontar }: { aoAbrir: (id: number) => void; voltar?: ReactNode; aoApontar?: () => void }) {
   const [dados, setDados] = useState<FilaProducao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [coluna, setColuna] = useState<ColunaProducao>('in_production');
@@ -61,6 +68,12 @@ function Fila({ aoAbrir, voltar }: { aoAbrir: (id: number) => void; voltar?: Rea
             <div className="p4-rotulo">{dados ? `${total} na fila${atrasados ? ` · ${atrasados} ${atrasados === 1 ? 'atrasado' : 'atrasados'}` : ''}` : 'Produção'}</div>
             <div className="pd-titulo">Produção</div>
           </div>
+          {aoApontar && (
+            <button className="oi-btn pr-apontar" onClick={aoApontar} aria-label="Apontar etapa pelo QR da etiqueta">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /><path d="M8 12h8" /></svg>
+              Apontar
+            </button>
+          )}
         </div>
       </div>
       <div className="oi-scroll">

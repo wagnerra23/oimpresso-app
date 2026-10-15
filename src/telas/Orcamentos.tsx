@@ -1,10 +1,15 @@
-// Orçamentos — desenho v4 (tela 04), D16 Onda A. Só leitura: ficam de fora "+ Novo", "Editar", "PDF" e
+// Orçamentos — desenho v4 (tela 04), D16 Onda A. Lista só leitura; "+ Novo" abre o orçamento rápido (P4,
+// OrcamentoNovo.tsx), só com o ajuste `app_orcamento_rapido` ligado. Ficam de fora "Editar", "PDF" e
 // "Converter em pedido" (escrevem ou geram documento — PR próprio; converter mexe em valor e passa pela
 // regra mestre). Mora dentro de Mais (a barra de baixo é a do §7.1). Rota GET /api/app/orcamentos,
 // contrato §2.1 (ERP #8555).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useVoltar } from '../voltar';
 import { api, ErroApi, type FiltroOrcamentos, type ListaOrcamentos, type StatusOrcamento } from '../api';
 import { reais } from './Pedidos';
+// P4 · orçamento rápido
+import { useAjustes } from '../ajustes';
+import { OrcamentoNovo } from './OrcamentoNovo';
 
 const FILTROS: Array<{ id: FiltroOrcamentos; label: string }> = [
   { id: 'todos', label: 'Todos' }, { id: 'rascunho', label: 'Rascunho' }, { id: 'enviado', label: 'Enviado' },
@@ -20,7 +25,10 @@ const STATUS: Record<StatusOrcamento, { label: string; cor: string }> = {
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 const m2 = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 
-export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
+export function Orcamentos({ voltar, avisar, online }: { voltar?: ReactNode; avisar: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online: boolean }) {
+  const ajustes = useAjustes();
+  const [novo, setNovo] = useState(false);
+  useVoltar(novo, () => setNovo(false));
   const [filtro, setFiltro] = useState<FiltroOrcamentos>('todos');
   const [dados, setDados] = useState<ListaOrcamentos | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,6 +52,10 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
   };
 
   const c = dados?.contadores;
+  if (novo) {
+    return <OrcamentoNovo avisar={avisar} online={online} aoVoltar={() => setNovo(false)}
+      aoSalvar={(o) => { setNovo(false); avisar(`${o.numero} salvo como rascunho`); if (filtro === 'todos' || filtro === 'rascunho') carregar(filtro); else setFiltro('rascunho'); }} />;
+  }
   return (
     <>
       <div className="pd-head">
@@ -53,6 +65,8 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
             <div className="p4-rotulo">{c ? `${c.todos} ${c.todos === 1 ? 'proposta' : 'propostas'} · ${c.aprovado} ${c.aprovado === 1 ? 'aprovada' : 'aprovadas'}` : 'Orçamentos'}</div>
             <div className="pd-titulo">Orçamentos</div>
           </div>
+          {ajustes.app_orcamento_rapido && <button className="or-novo" onClick={() => setNovo(true)} disabled={!online}
+            title={online ? undefined : 'Sem conexão'}>+ Novo</button>}
         </div>
       </div>
       <div className="oi-scroll">
@@ -86,7 +100,7 @@ export function Orcamentos({ voltar }: { voltar?: ReactNode }) {
             );
           })}
           {dados?.tem_mais && <button className="oi-btn block" style={{ minHeight: 44 }} disabled={carregandoMais} onClick={mais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</button>}
-          {dados && <p className="p4-legal">Criar, editar, gerar PDF e converter em pedido continuam no computador.</p>}
+          {dados && <p className="p4-legal">{ajustes.app_orcamento_rapido ? 'Editar' : 'Criar, editar'}, gerar PDF e converter em pedido continuam no computador.</p>}
         </div>
       </div>
     </>
