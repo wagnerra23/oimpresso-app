@@ -11,6 +11,8 @@ import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
+// P5 · atendimento
+import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAtalho } from './atendimento-regras';
 
 export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
@@ -443,7 +445,7 @@ export const HISTORICO_VEICULO = true;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais' | 'atendimento';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -963,4 +965,15 @@ export const api = {
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),
+  // P5 · atendimento — tela 41 (ERP PR 18, AtendimentoController). Área `atendimento` só vem em `areas` com o canal ligado.
+  // Erros: 403 sem_permissao · 404 nao_encontrado · 409 em_andamento · 422 validacao / idempotencia_conflito /
+  // sem_consentimento / janela_fechada / bloqueado · 502 falha_envio · 503 sem_configuracao. Throttle 20/min no envio.
+  atendimento: (pagina = 1) => chamar<ListaAtendimento>('GET', `/api/app/atendimento?pagina=${pagina}`),
+  conversaAtendimento: (id: number) => chamar<DetalheAtendimento>('GET', `/api/app/atendimento/${id}`),
+  /** Texto livre. `modelo` e `anexo` vão null na v1. 201 (200 na repetição da chave com o mesmo corpo). */
+  enviarAtendimento: (id: number, texto: string, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/mensagens`, { texto, modelo: null, anexo: null }, { 'Idempotency-Key': chave }),
+  /** O ERP monta o texto do registro `ref_id` (do cliente da conversa). 403 com `app_atendimento_atalhos` desligado. */
+  atalhoAtendimento: (id: number, tipo: TipoAtalho, ref_id: number, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/atalho`, { tipo, ref_id }, { 'Idempotency-Key': chave }),
 };
