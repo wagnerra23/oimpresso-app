@@ -6,8 +6,10 @@
 // desconta o desvio do relógio do aparelho (header Date, `drift()` do api.ts), para um celular adiantado não mostrar
 // minutos a mais.
 
-/** QR da etiqueta: `oimpresso:p:<business_hash 12 hex>:<id da OS>` (EtiquetaProducao::codigo no ERP). */
-const QR = /^oimpresso:p:[0-9a-f]{12}:[1-9]\d{0,9}$/;
+/** QR da etiqueta (EtiquetaProducao::codigo no ERP, PR 07 #9474): `oimpresso:p:<business_hash 12 hex>:<os_tipo>:<id da OS>`,
+ *  ex. `oimpresso:p:3f9a0c1b2d4e:comvis_os:501`. O antigo, sem `os_tipo`, ainda vale (= comvis_os). O app manda o texto
+ *  lido inteiro; o ERP confere empresa e tipo. */
+const QR = /^oimpresso:p:[0-9a-f]{12}:(?:[a-z_]{1,40}:)?[1-9]\d{0,9}$/;
 
 /** Texto lido pela câmera → código para o ERP, ou null se não é etiqueta de produção do oimpresso. */
 export function codigoDoQr(lido: string): string | null {

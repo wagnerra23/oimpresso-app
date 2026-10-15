@@ -8,6 +8,8 @@ describe('apontamento — leitura da etiqueta', () => {
   it('aceita só o QR de produção do oimpresso (hash de 12 hex + id)', () => {
     expect(codigoDoQr('oimpresso:p:a1b2c3d4e5f6:4812')).toBe('oimpresso:p:a1b2c3d4e5f6:4812');
     expect(codigoDoQr('  OIMPRESSO:P:A1B2C3D4E5F6:4812\n')).toBe('oimpresso:p:a1b2c3d4e5f6:4812');
+    expect(codigoDoQr('oimpresso:p:3f9a0c1b2d4e:comvis_os:501')).toBe('oimpresso:p:3f9a0c1b2d4e:comvis_os:501');
+    expect(codigoDoQr('oimpresso:p:3f9a0c1b2d4e:comvis-os:501')).toBeNull();
     expect(codigoDoQr('oimpresso:p:a1b2c3:4812')).toBeNull();
     expect(codigoDoQr('oimpresso:p:a1b2c3d4e5f6:0')).toBeNull();
     expect(codigoDoQr('https://oimpresso.com/os/4812')).toBeNull();

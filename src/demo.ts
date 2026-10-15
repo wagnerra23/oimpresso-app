@@ -400,7 +400,7 @@ const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' &&
 // app_apontamento_exige_qr. ──
 const HASH_EMPRESA_DEMO = 'a1b2c3d4e5f6';
 /** O que o leitor devolve na demo pelo navegador (sem câmera): a etiqueta da OS 4812. */
-export const QR_DEMO = `oimpresso:p:${HASH_EMPRESA_DEMO}:4812`;
+export const QR_DEMO = `oimpresso:p:${HASH_EMPRESA_DEMO}:comvis_os:4812`;
 const EU_DEMO = { id: 1, nome: 'Você' };
 const OS_APONTAMENTO = [
   { id: 4812, numero: 'OS-2026-04812', resumo: 'Fachada ACM + Letra caixa', cliente: 'Ótica Visão Clara',
@@ -425,8 +425,9 @@ const etapaApontamento = (o: OsApontamentoDemo) => ({ ...o.etapa, inicio_previst
 const abertoDemo = (a: AbertoDemo) => ({ id: a.id, tipo: a.os.etapa.posto.tipo, pedido: pedidoApontamento(a.os), etapa: etapaApontamento(a.os), iniciado_em: a.iniciado_em });
 /** QR ou número → OS. QR de outra empresa ou OS inexistente → undefined (404 sem dizer se existe). */
 function osDoCodigo(codigo: string): OsApontamentoDemo | undefined | 'numero' {
-  const qr = /^oimpresso:p:([0-9a-f]{12}):(\d+)$/.exec(codigo.toLowerCase());
-  if (qr) return qr[1] === HASH_EMPRESA_DEMO ? OS_APONTAMENTO.find((o) => o.id === Number(qr[2])) : undefined;
+  // Formato do PR 07 (`…:<os_tipo>:<id>`) ou o antigo sem tipo (= comvis_os). Outro tipo de OS → 404, como o ERP.
+  const qr = /^oimpresso:p:([0-9a-f]{12}):(?:([a-z_]+):)?(\d+)$/.exec(codigo.toLowerCase());
+  if (qr) return qr[1] === HASH_EMPRESA_DEMO && (qr[2] ?? 'comvis_os') === 'comvis_os' ? OS_APONTAMENTO.find((o) => o.id === Number(qr[3])) : undefined;
   if (ajustesDemo.app_apontamento_exige_qr) return 'numero';
   const t = codigo.trim().toUpperCase();
   return OS_APONTAMENTO.find((o) => String(o.id) === t || o.numero === t);

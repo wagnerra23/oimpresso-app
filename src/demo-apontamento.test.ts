@@ -29,6 +29,9 @@ describe('apontamento na demo', () => {
     expect((await etiqueta('4815')).pode_apontar).toBe(false);
     expect((await etiqueta('4790')).pode_apontar).toBe(false);
     await expect(etiqueta('oimpresso:p:ffffffffffff:4812')).rejects.toMatchObject({ status: 404 });
+    // QR antigo (sem os_tipo) ainda vale; outro tipo de OS → 404.
+    expect((await etiqueta('oimpresso:p:a1b2c3d4e5f6:4812')).pedido.id).toBe(4812);
+    await expect(etiqueta('oimpresso:p:a1b2c3d4e5f6:repair:4812')).rejects.toMatchObject({ status: 404 });
     await expect(etiqueta('9999')).rejects.toMatchObject({ status: 404 });
   });
 
