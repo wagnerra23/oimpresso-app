@@ -197,10 +197,10 @@ export function Relatorios({ voltar }: { voltar?: ReactNode }) {
                 {com.vendedores.map((v) => (
                   <div key={v.id} className="lc-linha">
                     <span className="pd-avatar" aria-hidden="true">{iniciais(v.nome)}</span>
-                    <div><b>{v.nome}</b><small>{pct(v.percentual)} · vendeu {reaisCurto(v.vendido)} · recebido {reaisCurto(v.recebido)}</small></div>
-                    <div className="lc-dir">
-                      <b>{reais(v.comissao)}</b>
-                      {com.base === 'payment_received' && <small>{reais(v.a_liberar)} a liberar</small>}
+                    <div className="lc-vend">
+                      <div><b>{v.nome}</b><b className="lc-valor">{reais(v.comissao)}</b></div>
+                      <small><span>vendeu {reaisCurto(v.vendido)}</span> · <span>recebido {reaisCurto(v.recebido)}</span></small>
+                      <small>{pct(v.percentual)} de comissão{com.base === 'payment_received' && <> · {reais(v.a_liberar)} a liberar</>}</small>
                     </div>
                   </div>
                 ))}

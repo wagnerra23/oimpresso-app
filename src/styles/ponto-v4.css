@@ -776,12 +776,14 @@ button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }
 .lc-tres b { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .lc-linha { min-height: 44px; display: flex; align-items: center; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border-2, var(--border)); }
 .p4-rotulo + .lc-linha { padding-top: 0; border-top: 0; }
-.lc-linha > div:not(.lc-dir) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lc-linha > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .lc-linha b { font-size: 13.5px; font-weight: 500; }
 .lc-linha small { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); }
 .lc-linha > span:not(.pd-avatar) { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .lc-linha .pd-avatar { flex-shrink: 0; }
-.lc-dir { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
-.lc-dir b { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lc-nota { font-size: 12.5px; color: var(--text-dim); }
 .db-prog .in-barra i.db-warn { background: var(--warn); }
+.lc-linha > .lc-vend { gap: 3px; }
+.lc-vend > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.lc-vend b.lc-valor { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lc-vend small span { white-space: nowrap; }

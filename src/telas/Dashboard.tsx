@@ -118,7 +118,7 @@ export function Dashboard({ voltar, irParaPedidos, irParaProducao }: { voltar?: 
               {eq && luc.ponto_equilibrio !== null
                 ? (
                   <div className="db-prog">
-                    <span>{eq.acima ? 'Passou do equilíbrio' : 'Abaixo do equilíbrio'} · {reais(luc.ponto_equilibrio)}</span>
+                    <span>Equilíbrio em {reais(luc.ponto_equilibrio)} · {eq.acima ? 'já passou' : 'ainda não chegou'}</span>
                     <div className="in-barra" role="progressbar" aria-label="Receita até o ponto de equilíbrio" aria-valuemin={0} aria-valuemax={100} aria-valuenow={eq.preenchido}>
                       <i className={eq.acima ? 'db-ok' : 'db-warn'} style={{ width: `${eq.preenchido}%` }} />
                     </div>
