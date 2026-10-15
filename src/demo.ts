@@ -3,6 +3,8 @@
 // app. NUNCA entra no build de loja — a tela mostra uma faixa "Modo demonstração".
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
+import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
+
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
 let logado = false;
@@ -306,6 +308,8 @@ const ROTULO_METODO: Record<string, string> = { pix: 'PIX', credito: 'Crédito',
 let numeroVenda = 4820;
 /** Ajuste "bloqueia_preco_zero" da empresa na demo. Padrão desligado, como no ERP (decisão [W] 2026-10-05). */
 let bloqueiaPrecoZeroDemo = false;
+/** Ajustes da empresa (aba "App das lojas") na demo: o bloco completo, como o ERP manda (contrato §6.2). */
+let ajustesDemo: AjustesEmpresa = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] };
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -327,6 +331,8 @@ export const demo = {
   sair() { logado = false; },
   /** Só para teste: liga/desliga o ajuste de preço zero da empresa da demo. */
   definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
+  /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
+  definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] }; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
     await espera(250);
     const r = (v: unknown) => v as T;
@@ -536,14 +542,15 @@ export const demo = {
       const ativos = PEDIDOS.filter((x) => x.etapa.grupo !== 'concluido');
       if (perfilDemo === 'colaborador') {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
-          faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [] });
+          faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [], ajustes: { ...ajustesDemo } });
       }
       return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
         financeiro: { a_receber: 8200, a_pagar: 3100 },
-        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, barra: barraDemo ?? BARRA_PADRAO_DEMO });
+        proximas_tarefas: TAREFAS.slice(0, 3), nao_lidas: NOTIFICACOES.filter((x) => !x.lida).length, barra: barraDemo ?? BARRA_PADRAO_DEMO,
+        ajustes: { ...ajustesDemo } });
     }
     if (metodo === 'PUT' && caminho === '/api/app/perfil-menu') {
       const { modulos } = (corpo ?? {}) as { modulos?: string[] };

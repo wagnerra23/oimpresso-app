@@ -9,6 +9,10 @@ import { demo } from './demo';
 import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
+import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
+import { guardarAjustes, limparAjustes } from './ajustes';
+
+export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -515,6 +519,9 @@ export interface PainelInicio {
   proximas_tarefas: Tarefa[];
   /** Notificações não lidas, para o ponto no sino (pedido ao ERP; ausente = sem ponto). */
   nao_lidas?: number | null;
+  /** Ajustes da empresa (contrato §6.2, ERP #9442). O `api.inicio()` sempre devolve completo: o ERP antigo
+   *  não manda o bloco e o app usa o padrão (ajustes-regras.ts). As telas leem por `useAjustes()` (ajustes.ts). */
+  ajustes: AjustesEmpresa;
 }
 
 /** Tela 16 · Notificações (D16, Onda A). Contrato §6.1 (ERP #8557): tabela notifications do Laravel (o sino da web),
@@ -706,6 +713,7 @@ export async function entrar(usuario: string, senha: string): Promise<void> {
 
 export async function sair(): Promise<void> {
   token = null;
+  limparAjustes();
   if (DEMO) { demo.sair(); return; }
   await Preferences.remove({ key: CHAVE_TOKEN });
 }
@@ -905,7 +913,12 @@ export const api = {
   marcarLida: (id: string) => chamar<{ nao_lidas: number }>('POST', `/api/app/notificacoes/${encodeURIComponent(id)}/lida`),
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
-  inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  /** Painel do Início. Completa o bloco `ajustes` com o padrão e o guarda para o `useAjustes()`. */
+  inicio: () => chamar<Omit<PainelInicio, 'ajustes'> & { ajustes?: unknown }>('GET', '/api/app/inicio').then((p): PainelInicio => {
+    const ajustes = completarAjustes(p.ajustes);
+    guardarAjustes(ajustes);
+    return { ...p, ajustes };
+  }),
   /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */
   produtosVenda: (q = '') => chamar<ListaProdutosVenda>('GET', `/api/app/venda/produtos${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   /** Tela 11 · cria a venda. 201 VendaCriada (200 na repetição da chave) · 422 { erro: "validacao", campos } com
