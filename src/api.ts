@@ -12,6 +12,8 @@ import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
 import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
+import { biometriaLigada, celularTemBiometria, conferirBiometria, guardarTokenSeguro, lerTokenSeguro, marcarDesligada, marcarLigada } from './biometria';
+import type { ResultadoBiometria } from './biometria-regras';
 
 export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
@@ -603,8 +605,8 @@ export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<Filt
  *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
  *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
-export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
-export interface Relatorios {
+export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque' | AbaRelatorioP6;
+export interface Relatorios extends RelatoriosP6 {
   periodo: { de: string; ate: string };
   /** null sem acesso ao Financeiro. `margem_pct` = saldo ÷ receitas × 100, null sem receita. */
   kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null } | null;
@@ -615,6 +617,31 @@ export interface Relatorios {
   producao: { por_etapa: Array<{ rotulo: string; total: number }> } | null;
   /** Só com stock_report.view. */
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
+}
+
+// P6 · lucratividade — abas `lucratividade` e `comissoes` da tela 13 (ERP #9448, api/tela-13-lucratividade.md). Só leitura:
+// o app mostra os números do ERP e não refaz conta nenhuma. Bloco sem permissão → null (o app avisa e o Dashboard esconde o cartão).
+export type AbaRelatorioP6 = 'lucratividade' | 'comissoes';
+export interface MenorMargem { pedido_id: number; numero: string; resumo: string; valor: number; margem_pct: number }
+/** Os números do Lucro/Prejuízo web no período (`getProfitLossDetails`). Exige `dashboard.data`. */
+export interface Lucratividade {
+  receita: number; custo_variavel: number; custo_fixo: number; margem_contribuicao: number;
+  /** null sem receita. */
+  margem_pct: number | null;
+  /** null sem receita ou com margem ≤ 0. */
+  ponto_equilibrio: number | null;
+  /** Até 5 vendas finais do período, menor margem primeiro. */
+  menores_margens: MenorMargem[];
+}
+/** `invoice_value` = sobre a venda; `payment_received` = sobre o recebido (pos_settings.cmmsn_calculation_type). */
+export type BaseComissao = 'invoice_value' | 'payment_received';
+export interface ComissaoVendedor { id: number; nome: string; percentual: number; vendido: number; recebido: number; comissao: number; a_liberar: number }
+/** Com `commission_agent.view`, todos; sem ela, o vendedor vê só a própria linha (ajuste `app_comissao_vendedor_ve_propria`). */
+export interface Comissoes { base: BaseComissao; vendedores: ComissaoVendedor[] }
+export interface RelatoriosP6 {
+  /** Ausente em ERP anterior ao #9448 — trate como null. */
+  lucratividade?: Lucratividade | null;
+  comissoes?: Comissoes | null;
 }
 
 /** Tela 35 · Dashboard (D16, Onda C) — só leitura. Contrato §10.4 (ERP #8599). Sem `dashboard.data` → 403 e a área
@@ -711,14 +738,56 @@ export async function entrar(usuario: string, senha: string): Promise<void> {
     throw new ErroApi(r.status, 'login', 'Não foi possível entrar agora. Tente de novo.');
   }
   token = String(r.data.access_token);
-  await Preferences.set({ key: CHAVE_TOKEN, value: token });
+  // Biometria ligada (P9): o token novo vai para o Keychain/Keystore, não para o Preferences.
+  if (await biometriaLigada()) await guardarTokenSeguro(token);
+  else await Preferences.set({ key: CHAVE_TOKEN, value: token });
 }
 
 export async function sair(): Promise<void> {
   token = null;
   limparAjustes();
+  // A biometria é escolha de quem ligou (ADR 0432): saiu da conta, desliga e apaga o token seguro.
+  await marcarDesligada();
   if (DEMO) { demo.sair(); return; }
   await Preferences.remove({ key: CHAVE_TOKEN });
+}
+
+// ── Entrar com biometria (P9, ADR 0432 do ERP) ─────────────────────────────────────────────────────
+// A biometria só destrava o token guardado no aparelho; nada vai ao servidor. A senha continua valendo.
+
+/** Ao abrir o app: a biometria está ligada e o celular ainda a tem → a tela pede a digital antes de entrar.
+ *  Biometria apagada do celular: desliga e o token volta ao Preferences (o app abre como antes). */
+export async function precisaDestravar(): Promise<boolean> {
+  if (!(await biometriaLigada())) return false;
+  if (await celularTemBiometria()) return true;
+  await desligarBiometria();
+  return false;
+}
+
+/** Depois que a biometria confirmou: carrega o token do armazenamento seguro. false = não havia token (entra com senha). */
+export async function destravarToken(): Promise<boolean> {
+  const t = await lerTokenSeguro();
+  if (!t) return false;
+  token = t;
+  if (DEMO) demo.retomar();
+  return true;
+}
+
+/** Liga em Conta: pede a biometria uma vez (é a pessoa quem escolhe) e passa o token para o armazenamento seguro. */
+export async function ligarBiometria(): Promise<ResultadoBiometria> {
+  if (!token) return 'indisponivel';
+  const r = await conferirBiometria();
+  if (r !== 'ok') return r;
+  await marcarLigada(token);
+  if (!DEMO) await Preferences.remove({ key: CHAVE_TOKEN });
+  return 'ok';
+}
+
+/** Desliga (em Conta, ou porque a empresa desligou `app_biometria_login`): o token deixa de ficar preso à biometria. */
+export async function desligarBiometria(): Promise<void> {
+  if (!(await biometriaLigada())) return;
+  const t = (await marcarDesligada()) ?? token;
+  if (t && !DEMO) await Preferences.set({ key: CHAVE_TOKEN, value: t });
 }
 
 function medirDrift(r: HttpResponse) {
@@ -920,6 +989,7 @@ export const api = {
   inicio: () => chamar<Omit<PainelInicio, 'ajustes'> & { ajustes?: unknown }>('GET', '/api/app/inicio').then((p): PainelInicio => {
     const ajustes = completarAjustes(p.ajustes);
     guardarAjustes(ajustes);
+    if (!ajustes.app_biometria_login) void desligarBiometria(); // P9: a empresa desligou a entrada com biometria
     return { ...p, ajustes };
   }),
   /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */

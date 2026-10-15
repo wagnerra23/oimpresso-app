@@ -25,7 +25,9 @@ de design) por `npm run tokens` → `src/styles/oi-v4.css` — não editar o CSS
 
 - **Pacote local**, não o site: o Vite gera `www/` e o Capacitor empacota. Sem `server.url`.
 - **Login por token**: usuário e senha do ERP vão para `POST /oauth/token` (Passport, password grant,
-  client **público** — o app não guarda segredo). O token fica em `@capacitor/preferences`.
+  client **público** — o app não guarda segredo). O token fica em `@capacitor/preferences`; com a
+  biometria ligada em Conta (P9), fica no Keychain/Keystore (`@capgo/capacitor-native-biometric`) e só
+  é lido depois que o celular confirma a digital ou o rosto. A senha nunca é guardada.
 - **API do ponto**: `/ponto/api/*` (`auth:api`), contrato de `MobileMarcacaoController`.
 - **HTTP nativo** (`CapacitorHttp`): as chamadas não passam por CORS — nada a mudar no ERP por isso.
 - **Relógio**: a diferença aparelho × servidor sai do header `Date` das respostas; acima de 30 s o botão
@@ -55,8 +57,9 @@ Decisão [W] de 2026-10-05.
 - **Câmera:** só para tirar foto de anexo (OS e pedido) e ler o QR da etiqueta no apontamento.
   Sempre a pedido de quem usa, nunca em segundo plano.
 - **Biometria:** só para entrar no app. A biometria do celular destrava o token guardado no
-  aparelho e nada vai ao servidor (LGPD, Art. 11). A ADR do ERP sobre biometria no login é o PR
-  00b.
+  aparelho e nada vai ao servidor (LGPD, Art. 11). ADR 0432 do ERP. Opção em Conta, desligada até a
+  pessoa ligar; três falhas seguidas pedem a senha; sair da conta desliga; a empresa pode tirar a
+  opção (`app_biometria_login`).
 
 Permissões hoje nos manifests:
 
@@ -64,6 +67,8 @@ Permissões hoje nos manifests:
   `POST_NOTIFICATIONS` entra pelo plugin de push.
 - iOS: `NSLocationWhenInUseUsageDescription` e `NSPhotoLibraryUsageDescription` (anexo de OS).
   **Sem** microfone.
+- Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS). O `USE_FINGERPRINT`
+  entra pelo `androidx.biometric` (a mesma permissão no Android 7–8.1, sem diálogo).
 
 Câmera e biometria entram nos manifests **junto com o plugin que as usa**, não antes: permissão
 declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
