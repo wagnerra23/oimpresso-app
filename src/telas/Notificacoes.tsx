@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type DestinoNotificacao, type ListaNotificacoes, type Notificacao } from '../api';
 import { haQuanto } from '../tempo';
+import { mostrarNoIcone } from '../badge';
 
 const ORIGENS = ['OS', 'CRM', 'FIN', 'PNT', 'MFG', 'OFI'];
 
@@ -34,6 +35,9 @@ export function Notificacoes({ aoVoltar, abrirDestino, avisar, aoMudarNaoLidas }
     catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+  // Ao abrir e a cada leitura (uma, todas ou desfeita), o ícone do app acompanha o contador (P7).
+  const naoLidas = dados?.nao_lidas;
+  useEffect(() => { mostrarNoIcone(naoLidas); }, [naoLidas]);
 
   const mais = async () => {
     if (!dados) return;
