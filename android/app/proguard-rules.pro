@@ -24,3 +24,8 @@
 # criado por reflexão (newInstance). As regras do próprio .aar cobrem só 9 deles e deixam de fora Samsung,
 # Huawei, OPPO, Vivo, LG, ZUK, ZTE e Everything.me; sem isto o R8 tira o construtor e o contador some.
 -keep class me.leolin.shortcutbadger.impl.** { <init>(...); }
+
+# Câmera (@capacitor/camera 8.2.4 → io.ionic.libs:ioncamera-android 1.0.2): os modelos de parâmetro e resultado
+# levam @SerializedName do Gson, e o .aar não traz regra própria. Hoje o plugin lê os campos direto (nada de
+# toJson/fromJson); a regra evita que um Gson numa versão nova da lib leia campos renomeados pelo R8.
+-keep class io.ionic.libs.ioncameralib.model.** { *; }

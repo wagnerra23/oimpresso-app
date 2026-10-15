@@ -56,7 +56,7 @@ export function veiculoDoAgendamento(a: Agendamento): VeiculoResumo {
 /** Valor da OS; sem valor ainda (antes do orçamento), travessão. */
 export const valorOs = (v: number | null): string => (v === null ? '—' : reais(v));
 
-export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
+export function OrdensServico({ voltar, avisar, online = true }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online?: boolean }) {
   const [aba, setAba] = useState<'os' | 'agenda' | 'veiculos'>('os');
   const [agendando, setAgendando] = useState<{ dia: string; veiculo: VeiculoResumo | null } | null>(null);
   const [diaAgenda, setDiaAgenda] = useState<string | undefined>(undefined);
@@ -81,7 +81,7 @@ export function OrdensServico({ voltar, avisar }: { voltar?: ReactNode; avisar?:
     aoExcluir={() => { setEditandoVeiculo(null); setAba('veiculos'); }} />;
   if (novoVeiculo) return <NovoVeiculo avisar={avisar} aoVoltar={() => setNovoVeiculo(false)} aoCriar={() => { setNovoVeiculo(false); setAba('veiculos'); }} />;
   if (nova) return <NovaOs avisar={avisar} aoVoltar={() => setNova(false)} aoCriar={(os) => { setNova(false); setAba('os'); setAberta(os.id); }} />;
-  if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} />;
+  if (aberta !== null) return <OsDetalhe id={aberta} aoVoltar={() => setAberta(null)} avisar={avisar} online={online} />;
   // Abas da Oficina (tela 07 · tela 08), no lugar da barra própria do protótipo.
   const abas = (
     <div className={"p4-abas ofi-abas" + (AGENDA_OFICINA ? " tres" : "")} role="tablist" aria-label="Oficina">

@@ -63,10 +63,11 @@ Decisão [W] de 2026-10-05.
 
 Permissões hoje nos manifests:
 
-- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`. **Sem** `ACCESS_BACKGROUND_LOCATION`.
+- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `CAMERA` (desde o PR 10, anexos da OS;
+  `android.hardware.camera` não obrigatório). **Sem** `ACCESS_BACKGROUND_LOCATION`.
   `POST_NOTIFICATIONS` entra pelo plugin de push.
-- iOS: `NSLocationWhenInUseUsageDescription` e `NSPhotoLibraryUsageDescription` (anexo de OS).
-  **Sem** microfone.
+- iOS: `NSLocationWhenInUseUsageDescription`, `NSPhotoLibraryUsageDescription` (anexo de OS) e
+  `NSCameraUsageDescription` (desde o PR 10). **Sem** microfone.
 - Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS). O `USE_FINGERPRINT`
   entra pelo `androidx.biometric` (a mesma permissão no Android 7–8.1, sem diálogo).
 
@@ -75,8 +76,8 @@ declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
 
 | Permissão | Onde | Entra no PR | Texto |
 |---|---|---|---|
-| `CAMERA` | Android | 08 (QR) ou 10 (anexos), o que vier primeiro | — (o Android não mostra texto; o pedido aparece na hora de usar) |
-| `NSCameraUsageDescription` | iOS | 08 ou 10, junto com o `CAMERA` | O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento. |
+| `CAMERA` | Android | 10 (anexos) ✅ — o 08 (QR) reaproveita | — (o Android não mostra texto; o pedido aparece na hora de usar) |
+| `NSCameraUsageDescription` | iOS | 10 ✅, junto com o `CAMERA` | O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento. |
 | `USE_BIOMETRIC` | Android | 15 (biometria no login) | — (permissão sem diálogo) |
 | `NSFaceIDUsageDescription` | iOS | 15, junto com o `USE_BIOMETRIC` | O oimpresso usa o Face ID somente para você entrar no app. A biometria fica no seu celular e não é enviada ao servidor. |
 

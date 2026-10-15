@@ -699,6 +699,22 @@ button.db-kpi { cursor: pointer; }
 .osd-conf-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .osd-conf-bts .oi-btn, .osd-conf-bts .p4-cta { min-height: 48px; height: 48px; }
 
+/* P2 · anexos — aba Anexos da OS (prefixo anx-, desenho #p2) */
+.osd-abas { flex-shrink: 0; padding: 10px 16px 0; }
+.anx-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.anx-item { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; min-width: 0; cursor: pointer; }
+.anx-mini { display: block; width: 100%; aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); object-fit: cover; background: var(--bg-2); }
+.anx-vazia { position: relative; background: repeating-linear-gradient(135deg, var(--surface) 0 8px, var(--bg-2) 8px 16px); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-dim); }
+.anx-vazia i { position: absolute; left: 6px; right: 6px; bottom: 5px; font-style: normal; font-size: 9.5px; font-weight: 400; color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anx-txt { font-size: 11.5px; line-height: 1.3; color: var(--text-dim); overflow-wrap: anywhere; }
+.anx-bts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.anx-bts.so-galeria { grid-template-columns: minmax(0, 1fr); }
+.anx-bts .oi-btn, .anx-bts .p4-cta { min-height: 48px; height: 48px; }
+.anx-ver { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); color: #fff; }
+.anx-ver img { max-width: 100%; max-height: calc(100% - 110px); object-fit: contain; border-radius: 6px; }
+.anx-ver span { font-size: 13px; text-align: center; opacity: 0.85; }
+.anx-ver .oi-btn { min-height: 44px; min-width: 120px; }
+
 /* Nova OS (prefixo nos-) */
 .nos-nova { min-height: 44px; padding: 0 14px; flex-shrink: 0; font-size: 13px; }
 .nos-escolha { flex-direction: row; align-items: center; gap: 12px; width: 100%; font: inherit; color: var(--text); text-align: left; }
