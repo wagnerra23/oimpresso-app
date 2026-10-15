@@ -7,6 +7,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { App as AppNativo } from '@capacitor/app';
 import { api, carregarToken, DEMO, houveFalhaDeLeitura, quandoExpirar, type Area } from './api';
 import { renovarLembrete } from './push';
+import { limparIcone } from './badge';
 import { useTemaDoCelular } from './tema';
 import { Ic } from './icones';
 import { tratarVoltar } from './voltar';
@@ -121,6 +122,8 @@ export function App() {
     carregarNav();
     renovarLembrete(abrirPonto).catch(() => {});
   }, [logado, abrirPonto, carregarNav]);
+  // Sem conta (saiu ou o token expirou): o ícone não mostra as não lidas de quem saiu (P7).
+  useEffect(() => { if (pronto && !logado) limparIcone(); }, [pronto, logado]);
 
   // Recuperação sem fechar o app: a tela só busca dados ao montar, então um erro (deploy do ERP em 503,
   // sem rede) ficava na tela até reabrir. Ao voltar do segundo plano ou a internet voltar, se a última
