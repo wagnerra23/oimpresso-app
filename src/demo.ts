@@ -3,6 +3,7 @@
 // app. NUNCA entra no build de loja — a tela mostra uma faixa "Modo demonstração".
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
+import type { NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
 import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
@@ -286,11 +287,20 @@ const LANCAMENTOS = [
 ] as const;
 // Plano de contas da demo: grupos e contas, na ordem do código.
 const PLANO_CONTAS = [
-  { codigo: '1', nome: 'Receitas' }, { codigo: '1.1', nome: 'Vendas' }, { codigo: '1.1.01', nome: 'Comunicação visual' },
-  { codigo: '1.1.02', nome: 'Impressos e etiquetas' }, { codigo: '2', nome: 'Despesas' }, { codigo: '2.1', nome: 'Insumos' },
-  { codigo: '2.1.01', nome: 'Lona e substratos' }, { codigo: '2.1.02', nome: 'Tintas' }, { codigo: '2.2', nome: 'Despesas fixas' },
-  { codigo: '2.2.01', nome: 'Energia' }, { codigo: '2.2.02', nome: 'Aluguel' },
-];
+  { codigo: '1', nome: 'Receitas', tipo: 'receita' }, { codigo: '1.1', nome: 'Vendas', tipo: 'receita' },
+  { codigo: '1.1.01', nome: 'Comunicação visual', tipo: 'receita' }, { codigo: '1.1.02', nome: 'Impressos e etiquetas', tipo: 'receita' },
+  { codigo: '2', nome: 'Despesas', tipo: 'despesa' }, { codigo: '2.1', nome: 'Insumos', tipo: 'despesa' },
+  { codigo: '2.1.01', nome: 'Lona e substratos', tipo: 'despesa' }, { codigo: '2.1.02', nome: 'Tintas', tipo: 'despesa' },
+  { codigo: '2.2', nome: 'Despesas fixas', tipo: 'despesa' }, { codigo: '2.2.01', nome: 'Energia', tipo: 'despesa' },
+  { codigo: '2.2.02', nome: 'Aluguel', tipo: 'despesa' },
+] as const;
+// Lançamentos criados pelo "+ Novo" nesta sessão (datas já absolutas). `chaves`: Idempotency-Key → id.
+const LANC_CRIADOS: Array<{ id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; valor: number; vencimento: string;
+  emissao: string; competencia: string; venda_em: null; forma_pagamento: string | null; conta_id: number | null; nf_numero: string | null;
+  nosso_numero: null; plano_codigo: string; plano_nome: string | null; documento: string | null; excluido: false }> = [];
+const chavesLanc = new Map<string, number>();
+type LancDemo = Omit<(typeof LANC_CRIADOS)[number], 'nosso_numero' | 'venda_em' | 'excluido'> & {
+  pago_em: string | null; status: string; nosso_numero: string | null; venda_em: string | null; excluido: boolean };
 
 // Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
 const FISCAIS = [
@@ -711,17 +721,42 @@ export const demo = {
       return r({ id: p.id, descricao: p.descricao, valor: p.valor, vencimento: diaRel(p.dias), metodo: p.metodo, status: p.status,
         pago_em: p.pago === null ? null : diaRel(p.pago), link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` });
     }
+    if (metodo === 'POST' && caminho === '/api/app/financeiro/lancamentos') {
+      // Mesma validação do app, repetida aqui como o ERP faria (o servidor nunca confia no corpo).
+      const n = (corpo ?? {}) as Partial<NovoLancamentoDemo>;
+      const chave = cabecalhos['Idempotency-Key'];
+      if (chave && chavesLanc.has(chave)) return r({ id: chavesLanc.get(chave) });
+      const campos: Record<string, string> = {};
+      if (n.tipo !== 'receber' && n.tipo !== 'pagar') campos.tipo = 'Escolha a receber ou a pagar.';
+      if (!String(n.descricao ?? '').trim()) campos.descricao = 'Escreva uma descrição.';
+      if (typeof n.valor !== 'number' || !(n.valor > 0)) campos.valor = 'O valor precisa ser maior que zero.';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(n.vencimento))) campos.vencimento = 'Escolha a data de vencimento.';
+      const plano = PLANO_CONTAS.find((p) => p.codigo === n.plano_codigo);
+      if (!plano) campos.plano = 'Escolha a conta do plano de contas.';
+      else if (PLANO_CONTAS.some((p) => p.codigo.startsWith(plano.codigo + '.'))) campos.plano = 'Escolha uma conta, não um grupo.';
+      else if (plano.tipo !== (n.tipo === 'receber' ? 'receita' : 'despesa')) campos.plano = 'Essa conta não é do mesmo tipo do lançamento.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      await espera(500);
+      const id = 950 + LANC_CRIADOS.length;
+      const parte = n.contato_id ? PESSOAS.find((p) => p.id === n.contato_id)?.nome ?? null : null;
+      LANC_CRIADOS.push({ id, tipo: n.tipo!, descricao: String(n.descricao).trim(), parte, valor: n.valor!, vencimento: n.vencimento!,
+        emissao: n.emissao ?? diaRel(0), competencia: n.competencia ?? diaRel(0).slice(0, 7), venda_em: null,
+        forma_pagamento: n.forma_pagamento ?? null, conta_id: n.conta_id ?? null, nf_numero: n.nf_numero ?? null, nosso_numero: null,
+        plano_codigo: plano!.codigo, plano_nome: plano!.nome, documento: n.documento ?? null, excluido: false });
+      if (chave) chavesLanc.set(chave, id);
+      return r({ id });
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
       // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
       const hoje = diaRel(0);
-      const todos = LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, plano, doc, exc, ...l }) => {
+      const todos: LancDemo[] = [...LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, plano, doc, exc, ...l }): LancDemo => {
         const data = diaRel(dias);
         return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto',
           emissao: diaRel(emi), competencia: diaRel(emi).slice(0, 7), venda_em: venda === null ? null : diaRel(venda),
           forma_pagamento: forma, conta_id: conta, nf_numero: nf, nosso_numero: nosso,
-          plano_codigo: plano, plano_nome: PLANO_CONTAS.find((p) => p.codigo === plano)?.nome ?? null, documento: doc, excluido: exc };
-      });
+          plano_codigo: plano, plano_nome: PLANO_CONTAS.find((p) => p.codigo === plano)?.nome ?? null, documento: doc, excluido: exc as boolean };
+      }), ...LANC_CRIADOS.map((l) => ({ ...l, pago_em: null, status: l.vencimento < hoje ? 'vencido' : 'aberto' }))];
       // A lista passa pelo filtro (que esconde os excluídos por padrão); o resumo do mês é só dos ativos.
       const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
       const abertosAtivos = (t: string) => abertos(t).filter((l) => !l.excluido);

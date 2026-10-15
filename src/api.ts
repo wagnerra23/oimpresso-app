@@ -10,6 +10,7 @@ import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import type { Situacao } from './financeiro-filtros';
+import type { NovoLancamento } from './lancamento-regras';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -583,11 +584,14 @@ export interface PainelFinanceiro {
   /** Contagem por caixa de seleção (já com o filtro avançado), quando a rota recebe `situacao=`. */
   contadores_situacao?: Record<Situacao, number>;
   /** Plano de contas da empresa (grupos e contas, na ordem do código) para o filtro avançado; sem ele, o filtro some. */
-  planos_conta?: Array<{ codigo: string; nome: string }>;
+  planos_conta?: Array<{ codigo: string; nome: string; tipo?: 'receita' | 'despesa' }>;
 }
 /** Liga o "Filtro avançado" do Financeiro. Só na demo até o ERP aceitar os filtros na rota §10.1
  *  (parâmetros em financeiro-filtros.ts → paramsFiltros); com o ERP pronto, vira true. */
 export const FILTRO_FINANCEIRO = DEMO;
+/** Liga "+ Novo" no Financeiro (POST /api/app/financeiro/lancamentos, formato em lancamento-regras.ts). Mexe em valor:
+ *  regra mestre Tier 0 (dupla prova e ok do [W]). Só na demo até o ERP ter a rota. */
+export const NOVO_LANCAMENTO = DEMO;
 
 /** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
@@ -951,6 +955,10 @@ export const api = {
   /** Tela 25 (ERP #8596). Sem conversa_id, o ERP abre uma conversa nova. Erros: 403 · 404 (conversa de outro) · 422 · 429. */
   enviarChat: (mensagem: string, conversa_id: string | null) => chamar<RespostaChat>('POST', '/api/app/chat', { mensagem, conversa_id }),
   conversaChat: (id: string) => chamar<ConversaChat>('GET', `/api/app/chat/${encodeURIComponent(id)}`),
+  /** Novo lançamento (tela 06). 201 { id } (200 na repetição da chave) · 422 { erro: "validacao", campos } ·
+   *  422 idempotencia_conflito · 409 em_andamento · 403 sem_permissao. `chave` = Idempotency-Key da tentativa. */
+  criarLancamento: (corpo: NovoLancamento, chave: string) =>
+    chamar<{ id: number }>('POST', '/api/app/financeiro/lancamentos', corpo, { 'Idempotency-Key': chave }),
   pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
   // ── Escrita da tela 15 (regra mestre: dupla prova, antes→depois e ok do [W] antes do merge). Formato proposto ao ERP. ──
   referenciasCobranca: () => chamar<{ itens: ReferenciaCobranca[] }>('GET', '/api/app/pagamentos/referencias'),

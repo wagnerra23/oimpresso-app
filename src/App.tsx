@@ -166,7 +166,7 @@ export function App() {
       case 'orcamentos': return <Orcamentos voltar={voltar} />;
       case 'estoque': return <Estoque filtroInicial={estoqueFiltro} voltar={voltar} />;
       case 'produtos': return <Produtos avisar={avisar} voltar={voltar} />;
-      case 'financeiro': return <Financeiro voltar={voltar} />;
+      case 'financeiro': return <Financeiro voltar={voltar} avisar={avisar} />;
       case 'fiscal': return <Fiscal voltar={voltar} />;
       case 'relatorios': return <Relatorios voltar={voltar} />;
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;

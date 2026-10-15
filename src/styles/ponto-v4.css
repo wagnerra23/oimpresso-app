@@ -550,6 +550,9 @@ a.p4-link { text-decoration: none; }
 .ff-quebra { flex-wrap: wrap; overflow: visible; }
 .ff-duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .ff-duas input[type="date"] { font-family: var(--font-sans); min-width: 0; }
+.nl-parte { display: flex; align-items: center; gap: 6px; }
+.nl-parte .oi-btn { flex: 1; min-width: 0; min-height: 44px; justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nl-obs { width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
 .ff-situacoes { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .ff-check { position: relative; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
   display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text-dim); cursor: pointer; }

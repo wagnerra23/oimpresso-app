@@ -3,11 +3,12 @@
 // (Pagamentos), que mexe em valor e passa pela regra mestre. Mora dentro de Mais.
 // Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, ErroApi, FILTRO_FINANCEIRO, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
+import { api, ErroApi, FILTRO_FINANCEIRO, NOVO_LANCAMENTO, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
 import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, SITUACOES, type FiltrosFinanceiro, type Situacao } from '../financeiro-filtros';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { FiltroFinanceiro } from './FiltroFinanceiro';
+import { NovoLancamento } from './NovoLancamento';
 
 const ABAS: Array<{ id: AbaFinanceiro; label: string }> = [
   { id: 'receber', label: 'A receber' }, { id: 'pagar', label: 'A pagar' }, { id: 'extrato', label: 'Extrato' },
@@ -22,7 +23,7 @@ const VAZIO: Record<AbaFinanceiro, string> = {
   receber: 'Nada a receber em aberto.', pagar: 'Nada a pagar em aberto.', extrato: 'Nenhum lançamento liquidado neste mês.',
 };
 
-export function Financeiro({ voltar }: { voltar?: ReactNode }) {
+export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aba, setAba] = useState<AbaFinanceiro>('receber');
   // Com o filtro avançado ligado, as abas viram caixas de seleção (dá para juntar, ex.: A pagar + Pagas).
   const [situacoes, setSituacoes] = useState<Situacao[]>(['a_receber']);
@@ -33,7 +34,9 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosFinanceiro>(FILTROS_VAZIOS);
   const [filtrando, setFiltrando] = useState(false);
+  const [novo, setNovo] = useState(false);
   useVoltar(filtrando, () => setFiltrando(false));
+  useVoltar(novo, () => setNovo(false));
 
   const [lendo, setLendo] = useState(true);
   // Troca rápida de aba: só a resposta do pedido mais recente entra na tela.
@@ -65,6 +68,19 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
 
   const r = dados?.resumo;
   const nFiltros = contarFiltros(filtros);
+  if (novo && dados) {
+    // Abre no lado que a tela mostra (só "A pagar" marcado → a pagar). Ao lançar, garante a caixa do lado marcada.
+    const tipo = FILTRO_FINANCEIRO ? (situacoes.includes('a_receber') || !situacoes.includes('a_pagar') ? 'receber' : 'pagar') : (aba === 'pagar' ? 'pagar' : 'receber');
+    return <NovoLancamento tipoInicial={tipo} contas={dados.contas} formas={dados.formas_pagamento} planos={dados.planos_conta ?? []} avisar={avisar}
+      aoVoltar={() => setNovo(false)}
+      aoCriar={(t) => {
+        setNovo(false);
+        if (FILTRO_FINANCEIRO) {
+          const s: Situacao = t === 'receber' ? 'a_receber' : 'a_pagar';
+          if (!situacoes.includes(s)) marcar(s); else carregar(situacoes, filtros);
+        } else if (aba !== t) setAba(t); else carregar(aba, filtros);
+      }} />;
+  }
   if (filtrando && dados) {
     return <FiltroFinanceiro inicial={filtros} contas={dados.contas} formas={dados.formas_pagamento}
       planos={dados.planos_conta} aoVoltar={() => setFiltrando(false)} aoAplicar={(f) => { setFiltros(f); setFiltrando(false); }} />;
@@ -78,6 +94,7 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
             <div className="p4-rotulo">Caixa · a receber · a pagar</div>
             <div className="pd-titulo">Financeiro</div>
           </div>
+          {NOVO_LANCAMENTO && dados && <button className="pd-novo" onClick={() => setNovo(true)}>+ Novo</button>}
         </div>
       </div>
       <div className="oi-scroll">
