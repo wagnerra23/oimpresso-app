@@ -35,6 +35,8 @@ import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
 import { Conta } from './telas/Conta';
+// P5 · atendimento
+import { Atendimento } from './telas/Atendimento';
 
 type Toast = { texto: string; tom: 'ok' | 'warn' | 'erro' } | null;
 
@@ -179,10 +181,12 @@ export function App() {
       case 'dashboard': return <Dashboard irParaPedidos={() => abrir('pedidos')} irParaProducao={() => abrir('producao')} voltar={voltar} />;
       case 'ponto_gestor': return <FilaGestor avisar={avisar} voltar={voltar} />;
       case 'equipe': return <Equipe voltar={voltar} />;
-      case 'oficina': return <OrdensServico avisar={avisar} voltar={voltar} />;
+      case 'oficina': return <OrdensServico avisar={avisar} voltar={voltar} online={online} />;
       case 'assistente': return <Assistente online={online} voltar={voltar} />;
       case 'pagamentos': return <Pagamentos avisar={avisar} voltar={voltar} />;
       case 'ponto': return <Ponto avisar={avisar} online={online} voltar={voltar} />;
+      // P5 · atendimento
+      case 'atendimento': return <Atendimento avisar={avisar} online={online} voltar={voltar} />;
       case 'conta': return <Conta avisar={avisar} aoSair={() => setLogado(false)} voltar={voltar} />;
       case 'menu': {
         const nv = navRef.current;

@@ -12,6 +12,9 @@ import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
 import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
+// P5 · atendimento
+import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAtalho } from './atendimento-regras';
+
 import { biometriaLigada, celularTemBiometria, conferirBiometria, guardarTokenSeguro, lerTokenSeguro, marcarDesligada, marcarLigada } from './biometria';
 import type { ResultadoBiometria } from './biometria-regras';
 
@@ -331,7 +334,7 @@ export interface OsDetalhe {
   vistoria: { ok: number; atencao: number; critico: number } | null;
   itens: Array<{ tipo: TipoItemOs; descricao: string; quantidade: number; valor_unitario: number; valor: number }>;
   totais: { pecas: number; mao_de_obra: number; terceiros: number; total: number };
-  /** Fotos do laudo: só a contagem; o app não mostra nem tira foto (ADR 0383). */
+  /** Fotos do laudo: só a contagem. As fotos em si vêm de GET /os/{id}/arquivos (aba Anexos, P2). */
   fotos_laudo: number;
   /** Ações de avanço que saem da etapa atual (contrato tela-03, ERP #8637), na ordem do processo. OS terminal ou fora
    *  do pipeline: []. Cancelar, recusar e garantia nunca vêm (ficam na web). Ausente = ERP sem a rota ainda. */
@@ -352,6 +355,24 @@ export interface OsAcao {
 export const ESCRITA_OS = true;
 /** Liga cancelar OS e recusar orçamento na tela 03. Rota do ERP #8646 em produção desde 2026-10-05. */
 export const ENCERRAR_OS = true;
+
+// P2 · anexos — aba Anexos da OS (telas 03/22). Contrato tela-03-anexos do ERP (#9446): GET e POST /api/app/os/{id}/arquivos.
+/** Um anexo da OS. `url` e `miniatura` são assinadas e valem 10 min (abrem sem token); PDF vem com miniatura null. */
+export interface AnexoOs {
+  id: number; nome: string; tipo: string; tamanho: number;
+  legenda: string | null;
+  /** Chave da etapa da OS quando o anexo foi enviado (gravada pelo servidor); null nos arquivos antigos. */
+  etapa: string | null;
+  enviado_em: string; enviado_por: string | null;
+  url: string; miniatura: string | null;
+}
+export interface ListaAnexosOs { itens: AnexoOs[]; pode_enviar: boolean }
+/** Arquivo pronto para o POST: conteúdo em base64 (sem o prefixo data:), sempre jpg, png ou pdf. */
+export interface ArquivoAnexo { nome: string; tipo: string; base64: string }
+/** Parte do multipart como o CapacitorHttp nativo espera (dataType "formData"). */
+export interface ParteFormulario { key: string; value: string; type: 'string' | 'base64File'; fileName?: string; contentType?: string }
+/** Liga a aba Anexos na tela 03. Desligar se o app for às lojas antes do ERP #9446 em produção. */
+export const ANEXOS_OS = true;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
  *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
@@ -448,7 +469,7 @@ export const HISTORICO_VEICULO = true;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais' | 'atendimento';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -811,7 +832,9 @@ const dormir = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 /** 5xx com `erro` no corpo é resposta do ERP (ex.: 503 sem_configuracao da oficina): não é queda, não repete. */
 const respostaDoErp = (r: HttpResponse) => !!r.data && typeof r.data === 'object' && 'erro' in (r.data as object);
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {},
+  /** "formData" = multipart (corpo = ParteFormulario[]); o nativo monta o boundary. */
+  dataType?: 'formData'): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
   let r: HttpResponse | null = null;
   for (let tentativa = 0; ; tentativa++) {
@@ -827,6 +850,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', ca
           ...extra,
         },
         data: corpo,
+        dataType,
       });
     } catch { /* sem resposta: status 0 */ }
     const status = r ? r.status : 0;
@@ -926,6 +950,16 @@ export const api = {
   executarAcaoOs: (id: number, chave: string, motivo: string | null = null) => (ESCRITA_OS
     ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`, motivo ? { motivo } : undefined)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Mudar a etapa pelo app ainda não está disponível.'))),
+  /** P2 · anexos da OS, do mais novo para o mais antigo (até 100). 403 sem_permissao · 404 nao_encontrado. */
+  anexosOs: (id: number) => chamar<ListaAnexosOs>('GET', `/api/app/os/${id}/arquivos`),
+  /** P2 · envia um anexo (multipart). 201 = o item · 413 arquivo_grande · 422 validacao (campos.arquivo, campos.origem com
+   *  a câmera desligada nos ajustes) ou idempotencia_conflito · 409 em_andamento · 403 · 404 · 429. `chave` = Idempotency-Key. */
+  enviarAnexoOs: (id: number, arquivo: ArquivoAnexo, origem: 'camera' | 'galeria', chave: string, legenda: string | null = null) =>
+    chamar<AnexoOs>('POST', `/api/app/os/${id}/arquivos`, [
+      { key: 'arquivo', value: arquivo.base64, type: 'base64File', fileName: arquivo.nome, contentType: arquivo.tipo },
+      { key: 'origem', value: origem, type: 'string' },
+      ...(legenda ? [{ key: 'legenda', value: legenda, type: 'string' as const }] : []),
+    ] satisfies ParteFormulario[], { 'Content-Type': 'multipart/form-data', 'Idempotency-Key': chave }, 'formData'),
   /** Tela 08 · Veículos. */
   /** Nova OS. 201 = o mesmo JSON do GET /api/app/os/{id} · 422 { erro: "validacao", campos } (vehicle_id, contact_id…) ·
    *  403 sem_permissao · 503 sem_configuracao (módulo ausente) · throttle 30/min. Contrato tela-07 (ERP #8639). */
@@ -1042,4 +1076,15 @@ export const api = {
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),
+  // P5 · atendimento — tela 41 (ERP PR 18, AtendimentoController). Área `atendimento` só vem em `areas` com o canal ligado.
+  // Erros: 403 sem_permissao · 404 nao_encontrado · 409 em_andamento · 422 validacao / idempotencia_conflito /
+  // sem_consentimento / janela_fechada / bloqueado · 502 falha_envio · 503 sem_configuracao. Throttle 20/min no envio.
+  atendimento: (pagina = 1) => chamar<ListaAtendimento>('GET', `/api/app/atendimento?pagina=${pagina}`),
+  conversaAtendimento: (id: number) => chamar<DetalheAtendimento>('GET', `/api/app/atendimento/${id}`),
+  /** Texto livre. `modelo` e `anexo` vão null na v1. 201 (200 na repetição da chave com o mesmo corpo). */
+  enviarAtendimento: (id: number, texto: string, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/mensagens`, { texto, modelo: null, anexo: null }, { 'Idempotency-Key': chave }),
+  /** O ERP monta o texto do registro `ref_id` (do cliente da conversa). 403 com `app_atendimento_atalhos` desligado. */
+  atalhoAtendimento: (id: number, tipo: TipoAtalho, ref_id: number, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/atalho`, { tipo, ref_id }, { 'Idempotency-Key': chave }),
 };
