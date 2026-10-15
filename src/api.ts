@@ -10,7 +10,7 @@ import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import type { Situacao } from './financeiro-filtros';
-import type { NovoLancamento } from './lancamento-regras';
+import type { Frequencia, NovoLancamento } from './lancamento-regras';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -592,6 +592,16 @@ export const FILTRO_FINANCEIRO = DEMO;
 /** Liga "+ Novo" no Financeiro (POST /api/app/financeiro/lancamentos, formato em lancamento-regras.ts). Mexe em valor:
  *  regra mestre Tier 0 (dupla prova e ok do [W]). Só na demo até o ERP ter a rota. */
 export const NOVO_LANCAMENTO = DEMO;
+/** Liga a aba Recorrências do Financeiro (contratos e contas fixas, com "Interromper"). Só na demo até o ERP ter as rotas. */
+export const RECORRENCIAS = DEMO;
+/** Recorrência (contrato ou conta fixa). `proxima_geracao`: dia em que o ERP cria o próximo lançamento (null se o
+ *  contrato terminou); `gerados`: quantos lançamentos ela já criou. */
+export interface Recorrencia {
+  id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
+  frequencia: Frequencia; dia_geracao: number; dia_vencimento: number; inicio: string; termino: string | null;
+  proxima_geracao: string | null; proximo_vencimento: string | null; gerados: number;
+  status: 'ativa' | 'interrompida'; interrompida_em: string | null;
+}
 
 /** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
  *  cancelar e abrir o DANFE ficam para o PR de escrita. */
@@ -958,7 +968,10 @@ export const api = {
   /** Novo lançamento (tela 06). 201 { id } (200 na repetição da chave) · 422 { erro: "validacao", campos } ·
    *  422 idempotencia_conflito · 409 em_andamento · 403 sem_permissao. `chave` = Idempotency-Key da tentativa. */
   criarLancamento: (corpo: NovoLancamento, chave: string) =>
-    chamar<{ id: number }>('POST', '/api/app/financeiro/lancamentos', corpo, { 'Idempotency-Key': chave }),
+    chamar<{ id: number; ids: number[]; recorrencia_id: number | null }>('POST', '/api/app/financeiro/lancamentos', corpo, { 'Idempotency-Key': chave }),
+  recorrencias: () => chamar<{ itens: Recorrencia[] }>('GET', '/api/app/financeiro/recorrencias'),
+  /** Para de gerar daqui pra frente; idempotente (interromper de novo devolve a mesma). */
+  interromperRecorrencia: (id: number) => chamar<Recorrencia>('POST', `/api/app/financeiro/recorrencias/${id}/interromper`),
   pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),
   // ── Escrita da tela 15 (regra mestre: dupla prova, antes→depois e ok do [W] antes do merge). Formato proposto ao ERP. ──
   referenciasCobranca: () => chamar<{ itens: ReferenciaCobranca[] }>('GET', '/api/app/pagamentos/referencias'),

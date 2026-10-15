@@ -1,7 +1,8 @@
 // Novo lançamento (tela 06): validação por campo e corpo que vai ao ERP. Mexe em valor (regra mestre): o corpo
 // leva só os campos do contrato, montados um a um, e o valor arredondado em centavos.
 import { describe, expect, it } from 'vitest';
-import { contaAnalitica, corpoLancamento, formVazio, planosDoTipo, validarLancamento, type FormLancamento } from './lancamento-regras';
+import { contaAnalitica, corpoLancamento, dataGeracao, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
+  validarLancamento, type FormLancamento } from './lancamento-regras';
 
 const PLANOS = [
   { codigo: '1', nome: 'Receitas', tipo: 'receita' as const }, { codigo: '1.1', nome: 'Vendas', tipo: 'receita' as const },
@@ -45,8 +46,64 @@ describe('corpoLancamento', () => {
     expect(corpoLancamento(ok({ parte: { id: 11, nome: 'Gráfica Lona Sul' }, documento: '  ', nf: '88213 ' }))).toEqual({
       tipo: 'pagar', descricao: 'Lona 440 g', contato_id: 11, valor: 1250.5, vencimento: '2026-10-30', emissao: '2026-10-15',
       competencia: '2026-10', forma_pagamento: null, conta_id: null, plano_codigo: '2.1.01', documento: null, nf_numero: '88213', observacao: null,
+      parcelas: null, recorrencia: null,
     });
   });
   it('não leva o nome da pessoa, só o id', () => expect(Object.keys(corpoLancamento(ok({ parte: { id: 1, nome: 'X' } })))).not.toContain('parte'));
   it('recusa valor inválido mesmo sem validar antes', () => expect(() => corpoLancamento(ok({ valor: '0' }))).toThrow());
+});
+
+describe('parcelado', () => {
+  it('divide em centavos e a sobra vai para a 1ª', () => {
+    expect(dividirParcelas(100, 3)).toEqual([33.34, 33.33, 33.33]);
+    expect(dividirParcelas(1250.5, 2)).toEqual([625.25, 625.25]);
+    expect(dividirParcelas(0.05, 2)).toEqual([0.03, 0.02]);
+  });
+  it('a soma das parcelas é sempre o total', () => {
+    for (const [t, n] of [[999.99, 7], [1, 3], [12345.67, 60]] as const) {
+      expect(Math.round(dividirParcelas(t, n).reduce((a, b) => a + b, 0) * 100)).toBe(Math.round(t * 100));
+    }
+  });
+  it('um vencimento por mês; dia 31 cai no último dia do mês curto', () => {
+    expect(previaParcelas(300, '2026-01-31', 3).map((p) => p.vencimento)).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+    expect(somarMeses('2026-11-15', 3)).toBe('2027-02-15');
+    expect(somarMeses('2026-03-31', -1)).toBe('2026-02-28');
+  });
+  it('valida número de parcelas e não deixa parcela de zero', () => {
+    expect(validarLancamento(ok({ repeticao: 'parcelado', parcelas: '1' }), PLANOS).parcelas).toMatch(/2 a 60/);
+    expect(validarLancamento(ok({ repeticao: 'parcelado', parcelas: '61' }), PLANOS).parcelas).toMatch(/2 a 60/);
+    expect(validarLancamento(ok({ repeticao: 'parcelado', parcelas: '3', valor: '0,02' }), PLANOS).parcelas).toMatch(/0,01/);
+    expect(validarLancamento(ok({ repeticao: 'parcelado', parcelas: '12' }), PLANOS)).toEqual({});
+  });
+  it('corpo leva o total e o número de parcelas', () => {
+    const c = corpoLancamento(ok({ repeticao: 'parcelado', parcelas: '3' }));
+    expect([c.valor, c.parcelas, c.recorrencia]).toEqual([1250.5, 3, null]);
+  });
+});
+
+describe('recorrente', () => {
+  it('gera no mesmo mês quando o dia vem antes do vencimento, senão no mês anterior', () => {
+    expect(dataGeracao('2026-11-10', 1)).toBe('2026-11-01');
+    expect(dataGeracao('2026-11-10', 10)).toBe('2026-11-10');
+    expect(dataGeracao('2026-11-10', 25)).toBe('2026-10-25');
+    expect(dataGeracao('2026-03-05', 28)).toBe('2026-02-28');
+  });
+  it('próximo ciclo a partir de hoje, por frequência', () => {
+    expect(proximaRecorrencia('2026-10-10', 'mensal', 1, null, '2026-10-15')).toEqual({ geracao: '2026-11-01', vencimento: '2026-11-10' });
+    expect(proximaRecorrencia('2026-10-10', 'trimestral', 25, null, '2026-10-15')).toEqual({ geracao: '2026-12-25', vencimento: '2027-01-10' });
+    expect(proximaRecorrencia('2025-06-20', 'anual', 5, null, '2026-10-15')).toEqual({ geracao: '2027-06-05', vencimento: '2027-06-20' });
+  });
+  it('pula ciclos já gerados e para no término do contrato', () => {
+    expect(proximaRecorrencia('2026-01-10', 'mensal', 1, null, '2026-10-15')).toEqual({ geracao: '2026-11-01', vencimento: '2026-11-10' });
+    expect(proximaRecorrencia('2026-10-10', 'mensal', 1, '2026-11-09', '2026-10-15')).toBeNull();
+  });
+  it('valida dia de renovação e término', () => {
+    expect(validarLancamento(ok({ repeticao: 'recorrente', dia_geracao: '31' }), PLANOS).dia_geracao).toMatch(/1 a 28/);
+    expect(validarLancamento(ok({ repeticao: 'recorrente', termino: '2026-10-01' }), PLANOS).termino).toMatch(/antes do 1º vencimento/);
+    expect(validarLancamento(ok({ repeticao: 'recorrente', dia_geracao: '5', termino: '2027-10-30' }), PLANOS)).toEqual({});
+  });
+  it('corpo leva a recorrência e não leva parcelas', () => {
+    const c = corpoLancamento(ok({ repeticao: 'recorrente', frequencia: 'anual', dia_geracao: '5', termino: '' }));
+    expect([c.parcelas, c.recorrencia]).toEqual([null, { frequencia: 'anual', dia_geracao: 5, termino: null }]);
+  });
 });

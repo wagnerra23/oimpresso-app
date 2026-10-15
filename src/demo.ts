@@ -3,7 +3,7 @@
 // app. NUNCA entra no build de loja — a tela mostra uma faixa "Modo demonstração".
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
-import type { NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
+import { dividirParcelas, proximaRecorrencia, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
 import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
@@ -298,7 +298,29 @@ const PLANO_CONTAS = [
 const LANC_CRIADOS: Array<{ id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; valor: number; vencimento: string;
   emissao: string; competencia: string; venda_em: null; forma_pagamento: string | null; conta_id: number | null; nf_numero: string | null;
   nosso_numero: null; plano_codigo: string; plano_nome: string | null; documento: string | null; excluido: false }> = [];
-const chavesLanc = new Map<string, number>();
+const chavesLanc = new Map<string, { id: number; ids: number[]; recorrencia_id: number | null }>();
+// Recorrências da demo. `ini` = dias do 1º vencimento a partir de hoje; `fim` = término; `parou` = interrompida há N dias.
+// Datas viram absolutas na 1ª leitura (nunca no topo do módulo: o build de produção precisa descartar o demo).
+const RECORRENCIAS_SEMENTE = [
+  { id: 801, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', plano: 'Aluguel', valor: 3500, frequencia: 'mensal', dia: 1, ini: -350, fim: null, gerados: 12, parou: null },
+  { id: 802, tipo: 'receber', descricao: 'Contrato · manutenção de fachada', parte: 'Clínica Vita', plano: 'Comunicação visual', valor: 450, frequencia: 'mensal', dia: 20, ini: -115, fim: 250, gerados: 4, parou: null },
+  { id: 803, tipo: 'pagar', descricao: 'Licença do software de corte', parte: 'Software Corte Ltda', plano: 'Insumos', valor: 1890, frequencia: 'anual', dia: 5, ini: -200, fim: null, gerados: 1, parou: null },
+  { id: 804, tipo: 'receber', descricao: 'Contrato · painel de LED', parte: 'Bistrô do Forno', plano: 'Comunicação visual', valor: 300, frequencia: 'mensal', dia: 10, ini: -190, fim: null, gerados: 6, parou: -20 },
+] as const;
+type RecDemo = { id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
+  frequencia: Frequencia; dia_geracao: number; inicio: string; termino: string | null; gerados: number; interrompida_em: string | null };
+let recorrenciasDemo: RecDemo[] | null = null;
+const recorrencias = (): RecDemo[] => (recorrenciasDemo ??= RECORRENCIAS_SEMENTE.map((s) => ({ id: s.id, tipo: s.tipo, descricao: s.descricao,
+  parte: s.parte, plano_nome: s.plano, valor: s.valor, frequencia: s.frequencia, dia_geracao: s.dia, inicio: diaRel(s.ini),
+  termino: s.fim === null ? null : diaRel(s.fim), gerados: s.gerados, interrompida_em: s.parou === null ? null : diaRel(s.parou) })));
+/** Formato da rota: próxima criação calculada na hora, pela mesma regra do app. */
+const verRecorrencia = (r: RecDemo) => {
+  const prox = r.interrompida_em ? null : proximaRecorrencia(r.inicio, r.frequencia, r.dia_geracao, r.termino, diaRel(0));
+  return { id: r.id, tipo: r.tipo, descricao: r.descricao, parte: r.parte, plano_nome: r.plano_nome, valor: r.valor, frequencia: r.frequencia,
+    dia_geracao: r.dia_geracao, dia_vencimento: Number(r.inicio.slice(8, 10)), inicio: r.inicio, termino: r.termino,
+    proxima_geracao: prox?.geracao ?? null, proximo_vencimento: prox?.vencimento ?? null, gerados: r.gerados,
+    status: r.interrompida_em ? 'interrompida' : 'ativa', interrompida_em: r.interrompida_em };
+};
 type LancDemo = Omit<(typeof LANC_CRIADOS)[number], 'nosso_numero' | 'venda_em' | 'excluido'> & {
   pago_em: string | null; status: string; nosso_numero: string | null; venda_em: string | null; excluido: boolean };
 
@@ -725,7 +747,7 @@ export const demo = {
       // Mesma validação do app, repetida aqui como o ERP faria (o servidor nunca confia no corpo).
       const n = (corpo ?? {}) as Partial<NovoLancamentoDemo>;
       const chave = cabecalhos['Idempotency-Key'];
-      if (chave && chavesLanc.has(chave)) return r({ id: chavesLanc.get(chave) });
+      if (chave && chavesLanc.has(chave)) return r(chavesLanc.get(chave));
       const campos: Record<string, string> = {};
       if (n.tipo !== 'receber' && n.tipo !== 'pagar') campos.tipo = 'Escolha a receber ou a pagar.';
       if (!String(n.descricao ?? '').trim()) campos.descricao = 'Escreva uma descrição.';
@@ -735,16 +757,46 @@ export const demo = {
       if (!plano) campos.plano = 'Escolha a conta do plano de contas.';
       else if (PLANO_CONTAS.some((p) => p.codigo.startsWith(plano.codigo + '.'))) campos.plano = 'Escolha uma conta, não um grupo.';
       else if (plano.tipo !== (n.tipo === 'receber' ? 'receita' : 'despesa')) campos.plano = 'Essa conta não é do mesmo tipo do lançamento.';
+      if (n.parcelas != null && n.recorrencia != null) campos.parcelas = 'Escolha parcelado ou recorrente, não os dois.';
+      if (n.parcelas != null && (!Number.isInteger(n.parcelas) || n.parcelas < 2 || n.parcelas > 60)) campos.parcelas = 'Use de 2 a 60 parcelas.';
+      if (n.recorrencia && !(n.recorrencia.dia_geracao >= 1 && n.recorrencia.dia_geracao <= 28)) campos.dia_geracao = 'Use um dia de 1 a 28.';
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
       await espera(500);
-      const id = 950 + LANC_CRIADOS.length;
       const parte = n.contato_id ? PESSOAS.find((p) => p.id === n.contato_id)?.nome ?? null : null;
-      LANC_CRIADOS.push({ id, tipo: n.tipo!, descricao: String(n.descricao).trim(), parte, valor: n.valor!, vencimento: n.vencimento!,
-        emissao: n.emissao ?? diaRel(0), competencia: n.competencia ?? diaRel(0).slice(0, 7), venda_em: null,
-        forma_pagamento: n.forma_pagamento ?? null, conta_id: n.conta_id ?? null, nf_numero: n.nf_numero ?? null, nosso_numero: null,
-        plano_codigo: plano!.codigo, plano_nome: plano!.nome, documento: n.documento ?? null, excluido: false });
-      if (chave) chavesLanc.set(chave, id);
-      return r({ id });
+      const desc = String(n.descricao).trim();
+      // Parcelado: o valor é o total, dividido pela mesma regra do app; uma parcela por mês a partir do vencimento.
+      const qtd = n.parcelas ?? 1;
+      const valores = n.parcelas ? dividirParcelas(n.valor!, qtd) : [n.valor!];
+      const ids: number[] = [];
+      valores.forEach((valor, i) => {
+        const id = 950 + LANC_CRIADOS.length;
+        ids.push(id);
+        LANC_CRIADOS.push({ id, tipo: n.tipo!, descricao: n.parcelas ? `${desc} (${i + 1}/${qtd})` : desc, parte, valor,
+          vencimento: somarMeses(n.vencimento!, i), emissao: n.emissao ?? diaRel(0), competencia: n.competencia ?? diaRel(0).slice(0, 7), venda_em: null,
+          forma_pagamento: n.forma_pagamento ?? null, conta_id: n.conta_id ?? null, nf_numero: n.nf_numero ?? null, nosso_numero: null,
+          plano_codigo: plano!.codigo, plano_nome: plano!.nome, documento: n.documento ? (n.parcelas ? `${n.documento}/${i + 1}` : n.documento) : null, excluido: false });
+      });
+      let recorrencia_id: number | null = null;
+      if (n.recorrencia) {
+        recorrencia_id = 805 + recorrencias().length;
+        recorrencias().unshift({ id: recorrencia_id, tipo: n.tipo!, descricao: desc, parte, plano_nome: plano!.nome, valor: n.valor!,
+          frequencia: n.recorrencia.frequencia, dia_geracao: n.recorrencia.dia_geracao, inicio: n.vencimento!, termino: n.recorrencia.termino,
+          gerados: 1, interrompida_em: null });
+      }
+      const resposta = { id: ids[0], ids, recorrencia_id };
+      if (chave) chavesLanc.set(chave, resposta);
+      return r(resposta);
+    }
+    if (metodo === 'GET' && caminho === '/api/app/financeiro/recorrencias') {
+      return r({ itens: recorrencias().map(verRecorrencia) });
+    }
+    const parar = caminho.match(/^\/api\/app\/financeiro\/recorrencias\/(\d+)\/interromper$/);
+    if (metodo === 'POST' && parar) {
+      const rec = recorrencias().find((x) => x.id === Number(parar[1]));
+      if (!rec) throw Object.assign(new Error('Recorrência não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      await espera(400);
+      rec.interrompida_em ??= diaRel(0);
+      return r(verRecorrencia(rec));
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';

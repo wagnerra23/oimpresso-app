@@ -553,6 +553,34 @@ a.p4-link { text-decoration: none; }
 .nl-parte { display: flex; align-items: center; gap: 6px; }
 .nl-parte .oi-btn { flex: 1; min-width: 0; min-height: 44px; justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nl-obs { width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
+.nl-rep { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); }
+.nl-previa { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.nl-previa li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--border-2); }
+.nl-previa li:last-child { border-bottom: 0; }
+.nl-previa span:first-child { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.nl-previa b { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nl-previa li.mais span { color: var(--text-dim); }
+.nl-proxima { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text); }
+.nl-proxima b { font-family: var(--font-mono); font-weight: 600; }
+.rc-card { padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 10px; }
+.rc-card.parada { border-style: dashed; }
+.rc-card.parada .rc-l1 b, .rc-card.parada .rc-valor { color: var(--text-dim); }
+.rc-l1 { display: flex; align-items: flex-start; gap: 10px; }
+.rc-l1 b { display: block; font-size: 13.5px; font-weight: 600; }
+.rc-l1 small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.rc-valor { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.rc-valor.pos { color: var(--ok); }
+.rc-valor.neg { color: var(--danger); }
+.rc-dados { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.rc-dados div { min-width: 0; }
+.rc-dados dt { font-size: 10.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--text-mute); }
+.rc-dados dd { margin: 2px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.rc-parar { min-height: 44px; align-self: flex-start; padding: 0 14px; color: var(--danger); font-weight: 600; }
+.rc-confirma { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px; background: var(--bg-2); }
+.rc-confirma p { margin: 0; font-size: 13px; line-height: 1.45; }
+.rc-confirma div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rc-confirma .oi-btn { min-height: 44px; }
+.rc-parar-sim { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
 .ff-situacoes { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .ff-check { position: relative; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
   display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text-dim); cursor: pointer; }

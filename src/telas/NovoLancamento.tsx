@@ -2,13 +2,16 @@
 // Regras, validação e corpo em ../lancamento-regras. Cliente/fornecedor vem da mesma rota da tela Pessoas.
 import { useEffect, useRef, useState } from 'react';
 import { api, camposDoErro, type PessoaResumo } from '../api';
-import { FORMAS_PADRAO } from '../financeiro-filtros';
-import { contaAnalitica, corpoLancamento, formVazio, planosDoTipo, validarLancamento, type FormLancamento, type TipoLancamento } from '../lancamento-regras';
+import { FORMAS_PADRAO, lerValor } from '../financeiro-filtros';
+import { contaAnalitica, corpoLancamento, formVazio, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
+  validarLancamento, type FormLancamento, type TipoLancamento } from '../lancamento-regras';
 import { novaChave } from '../venda';
 import { useVoltar } from '../voltar';
 import { Cabecalho } from './NovaOs';
 
 const hojeLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const br = (iso: string) => iso.split('-').reverse().join('/');
+const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const recuo = (codigo: string) => '   '.repeat(codigo.split('.').length - 1);
 
 export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, aoCriar, avisar }: {
@@ -17,7 +20,7 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
   formas?: string[];
   planos: Array<{ codigo: string; nome: string; tipo?: 'receita' | 'despesa' }>;
   aoVoltar: () => void;
-  aoCriar: (tipo: TipoLancamento) => void;
+  aoCriar: (tipo: TipoLancamento, recorrente: boolean) => void;
   avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 }) {
   const [f, setF] = useState<FormLancamento>(() => formVazio(tipoInicial, hojeLocal()));
@@ -51,8 +54,10 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
     try {
       await api.criarLancamento(corpo, chave.current.valor);
       chave.current = null;
-      avisar?.(f.tipo === 'receber' ? 'Conta a receber lançada.' : 'Conta a pagar lançada.', 'ok');
-      aoCriar(f.tipo);
+      const lado = f.tipo === 'receber' ? 'a receber' : 'a pagar';
+      avisar?.(f.repeticao === 'parcelado' ? `${corpo.parcelas} parcelas ${lado} lançadas.`
+        : f.repeticao === 'recorrente' ? `Conta ${lado} lançada. A recorrência está na aba Recorrências.` : `Conta ${lado} lançada.`, 'ok');
+      aoCriar(f.tipo, f.repeticao === 'recorrente');
     } catch (x) {
       const st = (x as { status?: number } | null)?.status ?? 0;
       // Rede, 5xx e 409 (o mesmo lançamento ainda processando) mantêm a chave: o reenvio não duplica.
@@ -67,6 +72,13 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
     return <BuscaParte tipo={f.tipo} aoVoltar={() => setBuscando(false)} aoEscolher={(p) => { mudar('parte', p); setBuscando(false); }} />;
   }
 
+  const total = lerValor(f.valor);
+  const nParcelas = Number(f.parcelas);
+  const previa = f.repeticao === 'parcelado' && total !== null && total > 0 && /^\d{4}-\d{2}-\d{2}$/.test(f.vencimento)
+    && Number.isInteger(nParcelas) && nParcelas >= 2 && nParcelas <= MAX_PARCELAS ? previaParcelas(total, f.vencimento, nParcelas) : null;
+  const dia = Number(f.dia_geracao);
+  const proxima = f.repeticao === 'recorrente' && /^\d{4}-\d{2}-\d{2}$/.test(f.vencimento) && Number.isInteger(dia) && dia >= 1 && dia <= 28
+    ? proximaRecorrencia(f.vencimento, f.frequencia, dia, f.termino || null, hojeLocal()) : undefined;
   const erro = (k: string) => erros[k] && <span id={'nl-e-' + k} className="np-erro">{erros[k]}</span>;
   const inv = (k: string) => ({ 'aria-invalid': !!erros[k], 'aria-describedby': erros[k] ? 'nl-e-' + k : undefined });
   return (
@@ -100,11 +112,11 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
           </div>
           <div className="ff-duas">
             <div className="p4-campo">
-              <label htmlFor="nl-valor">Valor (R$)</label>
+              <label htmlFor="nl-valor">{f.repeticao === 'parcelado' ? 'Valor total (R$)' : f.repeticao === 'recorrente' ? 'Valor de cada (R$)' : 'Valor (R$)'}</label>
               <input id="nl-valor" inputMode="decimal" value={f.valor} onChange={(e) => mudar('valor', e.target.value)} placeholder="0,00" {...inv('valor')} />
             </div>
             <div className="p4-campo">
-              <label htmlFor="nl-venc">Vencimento</label>
+              <label htmlFor="nl-venc">{f.repeticao === 'unico' ? 'Vencimento' : '1º vencimento'}</label>
               <input id="nl-venc" type="date" value={f.vencimento} min={f.emissao || undefined} onChange={(e) => mudar('vencimento', e.target.value)} {...inv('vencimento')} />
             </div>
           </div>
@@ -120,6 +132,58 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
             </div>
           </div>
           {erro('emissao')}{erro('competencia')}
+
+          <div className="p4-campo">
+            <label id="nl-l-rep">Repetição</label>
+            <div className="np-seg tres" role="radiogroup" aria-labelledby="nl-l-rep">
+              {REPETICOES.map((r) => (
+                <button key={r.id} role="radio" aria-checked={f.repeticao === r.id} className={f.repeticao === r.id ? 'on' : ''} onClick={() => mudar('repeticao', r.id)}>{r.label}</button>
+              ))}
+            </div>
+          </div>
+          {f.repeticao === 'parcelado' && (
+            <div className="nl-rep">
+              <div className="p4-campo">
+                <label htmlFor="nl-parcelas">Número de parcelas</label>
+                <input id="nl-parcelas" inputMode="numeric" value={f.parcelas} onChange={(e) => mudar('parcelas', e.target.value.replace(/\D/g, ''))} {...inv('parcelas')} />
+                {erro('parcelas')}
+              </div>
+              {previa ? (
+                <ol className="nl-previa" aria-label="Parcelas">
+                  {previa.slice(0, 6).map((p) => <li key={p.numero}><span>{p.numero}/{previa.length}</span><span>{br(p.vencimento)}</span><b>{reais(p.valor)}</b></li>)}
+                  {previa.length > 6 && <li className="mais"><span>…</span><span>última {br(previa[previa.length - 1].vencimento)}</span><b>{reais(previa[previa.length - 1].valor)}</b></li>}
+                </ol>
+              ) : <span className="np-ajuda">Informe o valor total e o 1º vencimento para ver as parcelas.</span>}
+              <span className="np-ajuda">Uma parcela por mês a partir do 1º vencimento. Centavos que sobram vão para a 1ª.</span>
+            </div>
+          )}
+          {f.repeticao === 'recorrente' && (
+            <div className="nl-rep">
+              <div className="p4-campo">
+                <label id="nl-l-freq">Frequência</label>
+                <div className="pd-chips ff-quebra" role="radiogroup" aria-labelledby="nl-l-freq">
+                  {FREQUENCIAS.map((x) => (
+                    <button key={x.id} role="radio" aria-checked={f.frequencia === x.id} className={'pd-chip' + (f.frequencia === x.id ? ' on' : '')}
+                      onClick={() => mudar('frequencia', x.id)}>{x.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="ff-duas">
+                <div className="p4-campo">
+                  <label htmlFor="nl-dia">Renova no dia</label>
+                  <input id="nl-dia" inputMode="numeric" value={f.dia_geracao} onChange={(e) => mudar('dia_geracao', e.target.value.replace(/\D/g, ''))} {...inv('dia_geracao')} />
+                </div>
+                <div className="p4-campo">
+                  <label htmlFor="nl-fim">Termina em</label>
+                  <input id="nl-fim" type="date" value={f.termino} min={f.vencimento || undefined} onChange={(e) => mudar('termino', e.target.value)} {...inv('termino')} />
+                </div>
+              </div>
+              {erro('dia_geracao')}{erro('termino')}
+              <span className="np-ajuda">Renova no dia: quando o ERP cria o lançamento do próximo ciclo (1 a 28). Termina em vazio = até interromper.</span>
+              {proxima && <p className="nl-proxima">Este lançamento entra agora. O próximo será criado em <b>{br(proxima.geracao)}</b>, vencendo <b>{br(proxima.vencimento)}</b>.</p>}
+              {proxima === null && <p className="nl-proxima">O contrato termina antes do próximo ciclo: só este lançamento será criado.</p>}
+            </div>
+          )}
 
           <div className="p4-campo">
             <label htmlFor="nl-plano">Plano de contas</label>
@@ -169,7 +233,8 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
       <div className="np-rodape">
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando} onClick={aoVoltar}>Cancelar</button>
         <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando} onClick={salvar}>
-          {salvando ? 'Lançando…' : f.tipo === 'receber' ? 'Lançar a receber' : 'Lançar a pagar'}
+          {salvando ? 'Lançando…' : f.repeticao === 'parcelado' && previa ? `Lançar ${previa.length} parcelas`
+            : f.repeticao === 'recorrente' ? 'Lançar recorrente' : f.tipo === 'receber' ? 'Lançar a receber' : 'Lançar a pagar'}
         </button>
       </div>
     </>

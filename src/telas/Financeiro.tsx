@@ -3,12 +3,13 @@
 // (Pagamentos), que mexe em valor e passa pela regra mestre. Mora dentro de Mais.
 // Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, ErroApi, FILTRO_FINANCEIRO, NOVO_LANCAMENTO, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
+import { api, ErroApi, FILTRO_FINANCEIRO, NOVO_LANCAMENTO, RECORRENCIAS, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
 import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, SITUACOES, type FiltrosFinanceiro, type Situacao } from '../financeiro-filtros';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { FiltroFinanceiro } from './FiltroFinanceiro';
 import { NovoLancamento } from './NovoLancamento';
+import { Recorrencias } from './Recorrencias';
 
 const ABAS: Array<{ id: AbaFinanceiro; label: string }> = [
   { id: 'receber', label: 'A receber' }, { id: 'pagar', label: 'A pagar' }, { id: 'extrato', label: 'Extrato' },
@@ -35,6 +36,7 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
   const [filtros, setFiltros] = useState<FiltrosFinanceiro>(FILTROS_VAZIOS);
   const [filtrando, setFiltrando] = useState(false);
   const [novo, setNovo] = useState(false);
+  const [vista, setVista] = useState<'lancamentos' | 'recorrencias'>('lancamentos');
   useVoltar(filtrando, () => setFiltrando(false));
   useVoltar(novo, () => setNovo(false));
 
@@ -96,7 +98,16 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
           </div>
           {NOVO_LANCAMENTO && dados && <button className="pd-novo" onClick={() => setNovo(true)}>+ Novo</button>}
         </div>
+        {RECORRENCIAS && (
+          <div className="p4-abas ofi-abas" role="tablist" aria-label="Financeiro">
+            <button role="tab" aria-selected={vista === 'lancamentos'} className={vista === 'lancamentos' ? 'on' : undefined} onClick={() => setVista('lancamentos')}>Lançamentos</button>
+            <button role="tab" aria-selected={vista === 'recorrencias'} className={vista === 'recorrencias' ? 'on' : undefined} onClick={() => setVista('recorrencias')}>Recorrências</button>
+          </div>
+        )}
       </div>
+      {vista === 'recorrencias' ? (
+        <div className="oi-scroll"><div className="pd-corpo"><Recorrencias avisar={avisar} /></div></div>
+      ) : (
       <div className="oi-scroll">
         <div className="pd-corpo">
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
@@ -190,6 +201,7 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
           {dados && <p className="p4-legal">Baixar títulos, pagar e conciliar continuam no computador.</p>}
         </div>
       </div>
+      )}
     </>
   );
 }
