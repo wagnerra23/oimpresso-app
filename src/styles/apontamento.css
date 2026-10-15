@@ -1,0 +1,60 @@
+/* Apontamento por QR — P8, tela 02 (Mobile Propostas.dc.html#p8). Importado pela própria tela. Cores só por token
+   (oi-v4.css), exceto o visor da câmera, escuro nos dois temas como no protótipo. */
+.ap-corpo { gap: 12px; }
+.ap-visor { position: relative; height: 340px; width: 100%; border: 0; border-radius: 16px; background: #0b0b0e; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: 0; font: inherit; }
+.ap-visor:disabled { opacity: .7; }
+.ap-mira { position: relative; width: 200px; height: 200px; margin-top: -30px; }
+.ap-mira i { position: absolute; width: 34px; height: 34px; border: 0 solid #fff; }
+.ap-mira i:nth-child(1) { left: 0; top: 0; border-left-width: 3px; border-top-width: 3px; border-top-left-radius: 10px; }
+.ap-mira i:nth-child(2) { right: 0; top: 0; border-right-width: 3px; border-top-width: 3px; border-top-right-radius: 10px; }
+.ap-mira i:nth-child(3) { left: 0; bottom: 0; border-left-width: 3px; border-bottom-width: 3px; border-bottom-left-radius: 10px; }
+.ap-mira i:nth-child(4) { right: 0; bottom: 0; border-right-width: 3px; border-bottom-width: 3px; border-bottom-right-radius: 10px; }
+.ap-mira b { position: absolute; left: 14px; right: 14px; top: 50%; height: 2px; background: oklch(0.72 0.12 295); }
+.ap-visor-t { position: absolute; left: 16px; right: 16px; bottom: 18px; text-align: center; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.4; }
+
+.ap-digitado { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; }
+.ap-digitado span { font-size: 12px; color: var(--text-mute); }
+.ap-digitado b { font-family: var(--font-mono); font-size: 40px; font-weight: 600; letter-spacing: 6px; min-height: 52px; }
+.ap-digitado em { font-style: normal; font-size: 12px; color: var(--warn); min-height: 16px; }
+.ap-teclado { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ap-teclado button { height: 56px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+.ap-teclado button.ok { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+.ap-job { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px;
+  display: flex; flex-direction: column; gap: 6px; }
+.ap-job-l1 { display: flex; align-items: center; gap: 8px; }
+.ap-job-l1 span { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-mute); }
+.ap-job-l1 b { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--accent-text); }
+.ap-job-d { font-size: 14px; font-weight: 600; }
+.ap-job-c { font-size: 12.5px; color: var(--text-dim); }
+.ap-crono { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 0; }
+.ap-crono span { font-size: 12px; color: var(--text-mute); }
+.ap-crono b { font-family: var(--font-mono); font-size: 52px; font-weight: 600; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+.ap-acoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.ap-btn { height: 52px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; }
+.ap-btn.primario { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.ap-btn:disabled { background: var(--bg-2); border-color: var(--border); color: var(--text-mute); }
+.ap-motivo { min-height: 88px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 10px 12px;
+  font: inherit; font-size: 14px; width: 100%; resize: vertical; }
+
+/* Entrada pela Produção (topo da fila). */
+.pr-apontar { min-height: 44px; flex-shrink: 0; gap: 6px; padding: 0 14px; }
+
+/* Rodando agora (etapa de pessoa + máquinas) e a fila do celular. */
+.ap-rodando { display: flex; flex-direction: column; gap: 6px; }
+.ap-rodando-item { min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; }
+.ap-rodando-item .ap-job-l1 { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ap-rodando-item .ap-job-l1 b { margin-left: 0; }
+.ap-rodando-t { font-family: var(--font-mono); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ap-link { min-height: 44px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 13px; font-weight: 600; }
+.ap-fila { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.ap-fila-item { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; background: var(--bg-2); }
+.ap-fila-item.recusado { border-style: solid; border-color: var(--danger); }
+.ap-fila-item .ap-link { align-self: flex-start; min-height: 44px; padding: 0; color: var(--danger); }
+.ap-fila-l1 { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.ap-fila-l1 span { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.ap-fila-l2 { font-size: 12px; color: var(--text-dim); }
+.ap-motivo[type], .ap-corpo input[type="time"] { font-family: var(--font-mono); }

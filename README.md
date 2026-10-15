@@ -10,7 +10,7 @@ Mobile mesmo"*). A 1ª versão traz o **ponto**: Início · Ponto (Bater ponto, 
 | appId / package | `com.oimpresso.app` (permanente nas lojas — decisão [W] 2026-10-01) |
 | Nome | oimpresso (Android e iOS — decisão [W] 2026-10-01) |
 | Capacitor | 8.5.2 (Node ≥ 22) · interface React 19 + Vite + TypeScript, em `src/` |
-| Android | AGP 8.13.0 · Gradle 8.14.3 · JDK 21 · compile/target SDK 36 · minSdk 24 |
+| Android | AGP 8.13.0 · Gradle 8.14.3 · JDK 21 · compile/target SDK 36 · minSdk 26 (era 24; o leitor de QR do PR 08 exige 26 = Android 8.0) |
 | iOS | SPM (abrir `ios/App/App.xcodeproj`, scheme `App`) · só iPhone · build no CI macOS (sessão iOS) |
 
 ## Desenho
@@ -63,13 +63,17 @@ Decisão [W] de 2026-10-05.
 
 Permissões hoje nos manifests:
 
-- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `CAMERA` (desde o PR 10, anexos da OS;
-  `android.hardware.camera` não obrigatório). **Sem** `ACCESS_BACKGROUND_LOCATION`.
+- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `CAMERA` (PR 10, anexos da OS, e PR 08, leitor de QR
+  do apontamento; `android.hardware.camera` não obrigatório). **Sem** `ACCESS_BACKGROUND_LOCATION`.
   `POST_NOTIFICATIONS` entra pelo plugin de push.
 - iOS: `NSLocationWhenInUseUsageDescription`, `NSPhotoLibraryUsageDescription` (anexo de OS) e
-  `NSCameraUsageDescription` (desde o PR 10). **Sem** microfone.
+  `NSCameraUsageDescription` (PRs 10 e 08). **Sem** microfone.
 - Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS). O `USE_FINGERPRINT`
   entra pelo `androidx.biometric` (a mesma permissão no Android 7–8.1, sem diálogo).
+
+Leitor de QR (PR 08): `@capacitor/barcode-scanner` (plugin oficial, Capacitor 8, SPM no iOS). A câmera é pedida pelo
+sistema na primeira leitura; negada, o app avisa e o número digitado continua valendo (exceto com
+`app_apontamento_exige_qr`).
 
 Câmera e biometria entram nos manifests **junto com o plugin que as usa**, não antes: permissão
 declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
