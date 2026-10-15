@@ -760,3 +760,30 @@ button.age-pill::before { content: ''; position: absolute; inset: -6px 0; }
 .vei-serv.mais::before, .vei-serv.vazio::before { content: ''; }
 .vei-peca-n { font-weight: 600; font-size: 12.5px; }
 .vei-mais-pecas { min-height: 44px; margin-top: 6px; }
+
+/* ── P6 · lucratividade e comissões (tela 13 e cartão da tela 35) ── */
+.rl-seg.rl-seg-2l { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rl-barra i.warn { background: var(--warn); }
+.lc-margem { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.lc-margem b { font-family: var(--font-mono); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lc-margem span { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.lc-margem .pos, .lc-linha .pos { color: var(--ok); }
+.lc-margem .neg, .lc-linha .neg { color: var(--danger); }
+.lc-linha .warn { color: var(--warn); }
+.lc-tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lc-tres > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lc-tres small { font-size: 11px; color: var(--text-dim); }
+.lc-tres b { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lc-linha { min-height: 44px; display: flex; align-items: center; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border-2, var(--border)); }
+.p4-rotulo + .lc-linha { padding-top: 0; border-top: 0; }
+.lc-linha > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lc-linha b { font-size: 13.5px; font-weight: 500; }
+.lc-linha small { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); }
+.lc-linha > span:not(.pd-avatar) { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lc-linha .pd-avatar { flex-shrink: 0; }
+.lc-nota { font-size: 12.5px; color: var(--text-dim); }
+.db-prog .in-barra i.db-warn { background: var(--warn); }
+.lc-linha > .lc-vend { gap: 3px; }
+.lc-vend > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.lc-vend b.lc-valor { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lc-vend small span { white-space: nowrap; }

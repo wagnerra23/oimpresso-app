@@ -318,6 +318,34 @@ const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' &&
 
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
 
+// P6 · lucratividade — abas `lucratividade` e `comissoes` da tela 13 (ERP #9448). Números do protótipo, escalados pelo período;
+// a demo faz o papel do ERP (as contas ficam aqui, nunca na tela). Usuário com "vendas" no nome é vendedor sem
+// commission_agent.view: vê só a própria linha, e nada se a empresa desliga `app_comissao_vendedor_ve_propria`.
+const VENDEDORES_DEMO: Array<[number, string, number, number, number]> = [
+  [7, 'Ana Souza', 3, 62100, 54300], [8, 'Bruno Lima', 3, 48400, 39800], [9, 'Carla Mendes', 3, 37700, 36100],
+];
+function relatoriosP6(aba: string, f: number) {
+  const v = (x: number) => Math.round(x * f * 100) / 100;
+  const lucratividade = () => {
+    const receita = v(148230), custo_variavel = v(79400), custo_fixo = v(41000);
+    const margem = Math.round((receita - custo_variavel) * 100) / 100;
+    return { receita, custo_variavel, custo_fixo, margem_contribuicao: margem,
+      margem_pct: receita > 0 ? Math.round((margem / receita) * 1000) / 10 : null,
+      ponto_equilibrio: receita > 0 && margem > 0 ? Math.round((custo_fixo / (margem / receita)) * 100) / 100 : null,
+      menores_margens: [{ pedido_id: 4819, numero: '4819', resumo: 'Placas PS 30 × 40 cm', valor: 452, margem_pct: 12 },
+        { pedido_id: 4807, numero: '4807', resumo: 'Kit PDV campanha verão', valor: 2315, margem_pct: 21 },
+        { pedido_id: 4815, numero: '4815', resumo: 'Banners formatura', valor: 1180, margem_pct: 28 }] };
+  };
+  const comissoes = () => {
+    if (semFinanceiro && !ajustesDemo.app_comissao_vendedor_ve_propria) return null;
+    const linhas = VENDEDORES_DEMO.filter(([id]) => !semFinanceiro || id === 7).map(([id, nome, percentual, vend, rec]) => ({
+      id, nome, percentual, vendido: v(vend), recebido: v(rec),
+      comissao: Math.round(v(rec) * percentual) / 100, a_liberar: Math.round(v(vend - rec) * percentual) / 100 }));
+    return { base: 'payment_received', vendedores: linhas.sort((a, b) => b.comissao - a.comissao) };
+  };
+  return { lucratividade: aba === 'lucratividade' ? lucratividade() : null, comissoes: aba === 'comissoes' ? comissoes() : null };
+}
+
 export const demo = {
   logado: () => logado,
   async entrar(usuario: string, senha: string) {
@@ -734,7 +762,8 @@ export const demo = {
           top_clientes: parte(v(61000), [['Papelaria Sol', 0.3], ['Clínica Vita', 0.25], ['Restaurante 88', 0.19], ['Bistrô do Forno', 0.16], ['Marília Costa', 0.1]]) },
         producao: aba !== 'producao' ? null : { por_etapa: etapas },
         estoque: aba !== 'estoque' ? null : { baixo: [{ nome: 'Lona 440 g', quantidade: 2, minimo: 5, unidade: 'un' },
-          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] } });
+          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] },
+        ...relatoriosP6(aba, f) });
     }
     if (metodo === 'GET' && caminho === '/api/app/dashboard') {
       // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
