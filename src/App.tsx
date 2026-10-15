@@ -172,7 +172,7 @@ export function App() {
       case 'pedidos': return <Pedidos voltar={voltar} avisar={avisar} online={online} />;
       case 'producao': return <Producao voltar={voltar} avisar={avisar} online={online} />;
       case 'pessoas': return <Pessoas avisar={avisar} voltar={voltar} />;
-      case 'orcamentos': return <Orcamentos voltar={voltar} />;
+      case 'orcamentos': return <Orcamentos voltar={voltar} avisar={avisar} online={online} />;
       case 'estoque': return <Estoque filtroInicial={estoqueFiltro} voltar={voltar} />;
       case 'produtos': return <Produtos avisar={avisar} voltar={voltar} />;
       case 'financeiro': return <Financeiro voltar={voltar} />;

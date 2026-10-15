@@ -523,6 +523,16 @@ export interface OrcamentoResumo {
 export interface ListaOrcamentos {
   itens: OrcamentoResumo[]; contadores: Record<FiltroOrcamentos, number>; pagina: number; tem_mais: boolean;
 }
+// P4 · orçamento rápido (tela 04, ERP PR 16 — memory/requisitos/AppMobile/api/tela-04-orcamento-rapido.md). Regra mestre:
+// o app nunca calcula; mostra o que o /calcular devolveu e manda o mesmo total em `total_previsto` (dupla prova no ERP).
+// Medidas e quantidade vão como TEXTO com ponto ("3.00", "1"): número em JSON é recusado (422).
+export interface MaterialOrcamento { id: number; nome: string; categoria: string; unidade: string; preco_m2: number }
+export interface CorpoCalculoOrcamento { material_id: number; largura_m: string; altura_m: string; quantidade: string }
+/** 200 do /calcular: os números do ERP (área com 3 casas, total com 2). Não grava nada. */
+export interface CalculoOrcamento { area_m2: number; preco_m2: number; total: number }
+export interface CorpoNovoOrcamento { cliente_id: number | null; itens: Array<CorpoCalculoOrcamento & { total_previsto: string }> }
+/** 201 do POST /orcamentos (200 na repetição da chave). `numero` = "ORC-<ano>-<5 dígitos>". */
+export interface OrcamentoCriado { id: number; numero: string; status: 'rascunho'; total: number }
 export interface PainelInicio {
   /** D6: colaborador abre direto no ponto; quem tem o ERP vê as abas da v1. */
   perfil: 'erp' | 'colaborador';
@@ -1045,6 +1055,14 @@ export const api = {
   salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
+  // P4 · orçamento rápido. Erros: 403 sem_permissao (sem módulo/permissão; no POST também com `app_orcamento_rapido`
+  // desligado) · 422 validacao { campos } (formato, material/cliente, "itens.N.total_previsto" = o total mudou) /
+  // idempotencia_conflito · 409 em_andamento · 503 sem_configuracao (nenhum material ativo) · 429.
+  materiaisOrcamento: () => chamar<{ itens: MaterialOrcamento[] }>('GET', '/api/app/orcamentos/materiais'),
+  calcularOrcamento: (c: CorpoCalculoOrcamento) => chamar<CalculoOrcamento>('POST', '/api/app/orcamentos/calcular', c),
+  /** Grava como rascunho. `chave` = Idempotency-Key da tentativa (só muda quando o corpo muda). */
+  criarOrcamento: (corpo: CorpoNovoOrcamento, chave: string) =>
+    chamar<OrcamentoCriado>('POST', '/api/app/orcamentos', corpo, { 'Idempotency-Key': chave }),
   financeiro: (aba: AbaFinanceiro, pagina = 1) => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
