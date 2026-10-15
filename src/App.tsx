@@ -164,7 +164,7 @@ export function App() {
     switch (k) {
       case 'tarefas': return <Tarefas avisar={avisar} abrirPonto={abrirPonto} abrir={tarefaPendente} aoAbrir={limparTarefaPendente} voltar={voltar} />;
       case 'pedidos': return <Pedidos voltar={voltar} avisar={avisar} online={online} />;
-      case 'producao': return <Producao voltar={voltar} />;
+      case 'producao': return <Producao voltar={voltar} avisar={avisar} online={online} />;
       case 'pessoas': return <Pessoas avisar={avisar} voltar={voltar} />;
       case 'orcamentos': return <Orcamentos voltar={voltar} />;
       case 'estoque': return <Estoque filtroInicial={estoqueFiltro} voltar={voltar} />;

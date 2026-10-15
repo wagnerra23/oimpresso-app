@@ -36,4 +36,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- Câmera (README §1, decisão [W] 2026-10-05): só para ler o QR da etiqueta no apontamento (PR 08) e foto de anexo
+         (PR 10), sempre a pedido de quem usa. Nunca no ponto. Não obrigatória: sem câmera, o apontamento aceita o número. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

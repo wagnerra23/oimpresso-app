@@ -964,3 +964,27 @@ export const api = {
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),
 };
+
+// ── Apontamento por QR (P8, tela 02 · PR 08 do playbook propostas-app). Contrato tela-02-apontamento.md (ERP #9447,
+// em rascunho: vai gravar pelo Modules/Producao, ADR 0431). Bloco próprio: as telas chamam pelo
+// src/apontamento-envio.ts, que trava sem internet e cuida da Idempotency-Key — trocar por fila depois é só lá. ──
+export interface PedidoApontamento { id: number; numero: string; resumo: string | null; cliente: string | null }
+export interface EtapaApontamento { chave: string; rotulo: string }
+/** GET /api/app/producao/etiqueta/{codigo}: QR (`oimpresso:p:<hash>:<id>`) ou número digitado. */
+export interface EtiquetaProducao { pedido: PedidoApontamento; etapa: EtapaApontamento; pode_apontar: boolean }
+/** Apontamento aberto do operador. `iniciado_em` é a hora do SERVIDOR: o cronômetro parte dela. */
+export interface ApontamentoAberto { id: number; pedido: PedidoApontamento; etapa: EtapaApontamento; iniciado_em: string }
+export const apontamentoApi = {
+  emAndamento: () => chamar<{ item: ApontamentoAberto | null }>('GET', '/api/app/producao/apontamentos/em-andamento'),
+  /** 404 nao_encontrado (outra empresa ou inexistente) · 422 campos.codigo (número com app_apontamento_exige_qr). */
+  etiqueta: (codigo: string) => chamar<EtiquetaProducao>('GET', `/api/app/producao/etiqueta/${encodeURIComponent(codigo)}`),
+  /** 201 { id, iniciado_em } · 409 em_andamento { item } · 409 etapa_mudou { etapa } · 422 bloqueado / campos.codigo. */
+  iniciar: (corpo: { pedido_id: number; etapa: string; codigo?: string }, chave: string) =>
+    chamar<{ id: number; iniciado_em: string }>('POST', '/api/app/producao/apontamentos/iniciar', corpo, { 'Idempotency-Key': chave }),
+  /** 200 { id, minutos }. `m2_produzido` com ponto e até 3 casas ("4.500"). */
+  finalizar: (id: number, corpo: { m2_produzido?: string }, chave: string) =>
+    chamar<{ id: number; minutos: number }>('POST', `/api/app/producao/apontamentos/${id}/finalizar`, corpo, { 'Idempotency-Key': chave }),
+  /** 200 { id, cancelado: true }; não conta tempo. `motivo` 5–500 letras. */
+  cancelar: (id: number, motivo: string, chave: string) =>
+    chamar<{ id: number; cancelado: true }>('POST', `/api/app/producao/apontamentos/${id}/cancelar`, { motivo }, { 'Idempotency-Key': chave }),
+};
