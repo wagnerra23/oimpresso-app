@@ -9,6 +9,7 @@ import { Ic } from '../icones';
 import { reais } from './Pedidos';
 import { Notificacoes } from './Notificacoes';
 import { useVoltar } from '../voltar';
+import { mostrarNoIcone } from '../badge';
 import type { DestinoNotificacao } from '../api';
 
 const saudacao = (h: number) => (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite');
@@ -36,7 +37,7 @@ export function Inicio({ irParaPonto, irParaPedidos, irParaTarefas, irParaEstoqu
   const [ponto, setPonto] = useState<{ escala: EscalaHoje; hoje: MarcacaoHoje[] } | null>(null);
 
   useEffect(() => {
-    api.inicio().then(setPainel).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'));
+    api.inicio().then((p) => { setPainel(p); mostrarNoIcone(p.nao_lidas); }).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'));
     Promise.all([api.escalaHoje(), api.marcacoesHoje()]).then(([escala, h]) => setPonto({ escala, hoje: h.marcacoes })).catch(() => setPonto(null));
   }, []);
 

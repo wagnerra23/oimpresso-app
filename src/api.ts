@@ -9,6 +9,17 @@ import { demo } from './demo';
 import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
+import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
+import { guardarAjustes, limparAjustes } from './ajustes';
+import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
+import type { CorpoEntrega } from './entrega-regras';
+// P5 · atendimento
+import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAtalho } from './atendimento-regras';
+
+import { biometriaLigada, celularTemBiometria, conferirBiometria, guardarTokenSeguro, lerTokenSeguro, marcarDesligada, marcarLigada } from './biometria';
+import type { ResultadoBiometria } from './biometria-regras';
+
+export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 import type { Situacao } from './financeiro-filtros';
 import type { AlteracaoLancamento, BaixaLancamento, Frequencia, NovoLancamento } from './lancamento-regras';
 import type { ReciboDados } from './recibo';
@@ -57,9 +68,20 @@ export interface ListaPedidos {
   itens: PedidoResumo[]; contadores: Record<FiltroPedidos, number>; pagina: number; tem_mais: boolean;
 }
 export interface PedidoDetalhe extends PedidoResumo {
-  itens_venda: Array<{ produto: string; quantidade: number; total: number }>;
+  /** `linha_id` = linha de topo da venda, devolvida na conferência da entrega (P3, ERP #9464). */
+  itens_venda: Array<{ produto: string; quantidade: number; total: number; linha_id?: number }>;
   etapas: Array<{ grupo: GrupoEtapa; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
   acoes: Array<{ chave: string; rotulo: string; pode: boolean }>;
+  /** P1 · histórico de etapas, mais recente primeiro (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = a tela não mostra. */
+  historico?: MudancaEtapa[];
+  /** P3 · `null` = a etapa não tem a ação `entregar`; `{ pode }` = o RBAC da FSM deixa (ERP #9464). Ausente = ERP antigo. */
+  entrega?: { pode: boolean } | null;
+}
+// P3 · entrega — 201 do POST /pedidos/{id}/entrega.
+export interface EntregaRegistrada {
+  protocolo: string; registrado_em: string; recebido_por: string; com_assinatura: boolean;
+  /** O mesmo JSON do GET /pedidos/{id}, já na etapa nova. */
+  pedido: PedidoDetalheApi;
 }
 /** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
@@ -325,7 +347,7 @@ export interface OsDetalhe {
   vistoria: { ok: number; atencao: number; critico: number } | null;
   itens: Array<{ tipo: TipoItemOs; descricao: string; quantidade: number; valor_unitario: number; valor: number }>;
   totais: { pecas: number; mao_de_obra: number; terceiros: number; total: number };
-  /** Fotos do laudo: só a contagem; o app não mostra nem tira foto (ADR 0383). */
+  /** Fotos do laudo: só a contagem. As fotos em si vêm de GET /os/{id}/arquivos (aba Anexos, P2). */
   fotos_laudo: number;
   /** Ações de avanço que saem da etapa atual (contrato tela-03, ERP #8637), na ordem do processo. OS terminal ou fora
    *  do pipeline: []. Cancelar, recusar e garantia nunca vêm (ficam na web). Ausente = ERP sem a rota ainda. */
@@ -346,6 +368,24 @@ export interface OsAcao {
 export const ESCRITA_OS = true;
 /** Liga cancelar OS e recusar orçamento na tela 03. Rota do ERP #8646 em produção desde 2026-10-05. */
 export const ENCERRAR_OS = true;
+
+// P2 · anexos — aba Anexos da OS (telas 03/22). Contrato tela-03-anexos do ERP (#9446): GET e POST /api/app/os/{id}/arquivos.
+/** Um anexo da OS. `url` e `miniatura` são assinadas e valem 10 min (abrem sem token); PDF vem com miniatura null. */
+export interface AnexoOs {
+  id: number; nome: string; tipo: string; tamanho: number;
+  legenda: string | null;
+  /** Chave da etapa da OS quando o anexo foi enviado (gravada pelo servidor); null nos arquivos antigos. */
+  etapa: string | null;
+  enviado_em: string; enviado_por: string | null;
+  url: string; miniatura: string | null;
+}
+export interface ListaAnexosOs { itens: AnexoOs[]; pode_enviar: boolean }
+/** Arquivo pronto para o POST: conteúdo em base64 (sem o prefixo data:), sempre jpg, png ou pdf. */
+export interface ArquivoAnexo { nome: string; tipo: string; base64: string }
+/** Parte do multipart como o CapacitorHttp nativo espera (dataType "formData"). */
+export interface ParteFormulario { key: string; value: string; type: 'string' | 'base64File'; fileName?: string; contentType?: string }
+/** Liga a aba Anexos na tela 03. Desligar se o app for às lojas antes do ERP #9446 em produção. */
+export const ANEXOS_OS = true;
 
 /** Tela 08 · Veículos. Formato fechado pela sessão ERP da Onda D (tabela vehicles do OficinaAuto). Busca no servidor
  *  por placa (a principal e a do reboque), tipo ou nome do dono. Sem oficinaauto.vehicle.view → 403 sem_permissao. */
@@ -442,7 +482,7 @@ export const HISTORICO_VEICULO = true;
 
 // ── Início (API-CONTRATO-v1 §6, ERP #8495). Bloco null = sem permissão: o app esconde o card. ──
 /** Áreas do app (contrato §6): cada uma segue a regra da rota dela — aba visível = rota que responde. */
-export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais';
+export type Area = 'inicio' | 'tarefas' | 'pedidos' | 'producao' | 'pessoas' | 'orcamentos' | 'produtos' | 'estoque' | 'financeiro' | 'fiscal' | 'relatorios' | 'dashboard' | 'assistente' | 'equipe' | 'oficina' | 'pagamentos' | 'ponto' | 'ponto_gestor' | 'mais' | 'atendimento';
 
 /** Tela 39 · Marcações a validar (D16, Onda E). Decisão [W] 2026-10-02: só marcações FORA DO GEOFENCE (as
  *  justificativas da tela 38 ficam para outra tela). Contrato §12.1 (ERP #8586).
@@ -518,6 +558,9 @@ export interface PainelInicio {
   proximas_tarefas: Tarefa[];
   /** Notificações não lidas, para o ponto no sino (pedido ao ERP; ausente = sem ponto). */
   nao_lidas?: number | null;
+  /** Ajustes da empresa (contrato §6.2, ERP #9442). O `api.inicio()` sempre devolve completo: o ERP antigo
+   *  não manda o bloco e o app usa o padrão (ajustes-regras.ts). As telas leem por `useAjustes()` (ajustes.ts). */
+  ajustes: AjustesEmpresa;
 }
 
 /** Tela 16 · Notificações (D16, Onda A). Contrato §6.1 (ERP #8557): tabela notifications do Laravel (o sino da web),
@@ -637,8 +680,8 @@ export interface ListaFiscal { itens: DocumentoFiscal[]; contadores: Record<Filt
  *  preenchido (os outros null). Permissão por bloco: `kpis` e `dre` seguem o Financeiro (sem ele, null), `vendas` o
  *  dashboard.data, `producao` quem vê vendas, `estoque` o stock_report.view. Exportar PDF/Excel fica no computador. */
 export type PeriodoRelatorio = 'mes' | 'trimestre' | 'ano';
-export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque';
-export interface Relatorios {
+export type AbaRelatorio = 'dre' | 'vendas' | 'producao' | 'estoque' | AbaRelatorioP6;
+export interface Relatorios extends RelatoriosP6 {
   periodo: { de: string; ate: string };
   /** null sem acesso ao Financeiro. `margem_pct` = saldo ÷ receitas × 100, null sem receita. */
   kpis: { receitas: number; despesas: number; saldo: number; margem_pct: number | null } | null;
@@ -649,6 +692,31 @@ export interface Relatorios {
   producao: { por_etapa: Array<{ rotulo: string; total: number }> } | null;
   /** Só com stock_report.view. */
   estoque: { baixo: Array<{ nome: string; quantidade: number; minimo: number; unidade: string | null }> } | null;
+}
+
+// P6 · lucratividade — abas `lucratividade` e `comissoes` da tela 13 (ERP #9448, api/tela-13-lucratividade.md). Só leitura:
+// o app mostra os números do ERP e não refaz conta nenhuma. Bloco sem permissão → null (o app avisa e o Dashboard esconde o cartão).
+export type AbaRelatorioP6 = 'lucratividade' | 'comissoes';
+export interface MenorMargem { pedido_id: number; numero: string; resumo: string; valor: number; margem_pct: number }
+/** Os números do Lucro/Prejuízo web no período (`getProfitLossDetails`). Exige `dashboard.data`. */
+export interface Lucratividade {
+  receita: number; custo_variavel: number; custo_fixo: number; margem_contribuicao: number;
+  /** null sem receita. */
+  margem_pct: number | null;
+  /** null sem receita ou com margem ≤ 0. */
+  ponto_equilibrio: number | null;
+  /** Até 5 vendas finais do período, menor margem primeiro. */
+  menores_margens: MenorMargem[];
+}
+/** `invoice_value` = sobre a venda; `payment_received` = sobre o recebido (pos_settings.cmmsn_calculation_type). */
+export type BaseComissao = 'invoice_value' | 'payment_received';
+export interface ComissaoVendedor { id: number; nome: string; percentual: number; vendido: number; recebido: number; comissao: number; a_liberar: number }
+/** Com `commission_agent.view`, todos; sem ela, o vendedor vê só a própria linha (ajuste `app_comissao_vendedor_ve_propria`). */
+export interface Comissoes { base: BaseComissao; vendedores: ComissaoVendedor[] }
+export interface RelatoriosP6 {
+  /** Ausente em ERP anterior ao #9448 — trate como null. */
+  lucratividade?: Lucratividade | null;
+  comissoes?: Comissoes | null;
 }
 
 /** Tela 35 · Dashboard (D16, Onda C) — só leitura. Contrato §10.4 (ERP #8599). Sem `dashboard.data` → 403 e a área
@@ -745,13 +813,56 @@ export async function entrar(usuario: string, senha: string): Promise<void> {
     throw new ErroApi(r.status, 'login', 'Não foi possível entrar agora. Tente de novo.');
   }
   token = String(r.data.access_token);
-  await Preferences.set({ key: CHAVE_TOKEN, value: token });
+  // Biometria ligada (P9): o token novo vai para o Keychain/Keystore, não para o Preferences.
+  if (await biometriaLigada()) await guardarTokenSeguro(token);
+  else await Preferences.set({ key: CHAVE_TOKEN, value: token });
 }
 
 export async function sair(): Promise<void> {
   token = null;
+  limparAjustes();
+  // A biometria é escolha de quem ligou (ADR 0432): saiu da conta, desliga e apaga o token seguro.
+  await marcarDesligada();
   if (DEMO) { demo.sair(); return; }
   await Preferences.remove({ key: CHAVE_TOKEN });
+}
+
+// ── Entrar com biometria (P9, ADR 0432 do ERP) ─────────────────────────────────────────────────────
+// A biometria só destrava o token guardado no aparelho; nada vai ao servidor. A senha continua valendo.
+
+/** Ao abrir o app: a biometria está ligada e o celular ainda a tem → a tela pede a digital antes de entrar.
+ *  Biometria apagada do celular: desliga e o token volta ao Preferences (o app abre como antes). */
+export async function precisaDestravar(): Promise<boolean> {
+  if (!(await biometriaLigada())) return false;
+  if (await celularTemBiometria()) return true;
+  await desligarBiometria();
+  return false;
+}
+
+/** Depois que a biometria confirmou: carrega o token do armazenamento seguro. false = não havia token (entra com senha). */
+export async function destravarToken(): Promise<boolean> {
+  const t = await lerTokenSeguro();
+  if (!t) return false;
+  token = t;
+  if (DEMO) demo.retomar();
+  return true;
+}
+
+/** Liga em Conta: pede a biometria uma vez (é a pessoa quem escolhe) e passa o token para o armazenamento seguro. */
+export async function ligarBiometria(): Promise<ResultadoBiometria> {
+  if (!token) return 'indisponivel';
+  const r = await conferirBiometria();
+  if (r !== 'ok') return r;
+  await marcarLigada(token);
+  if (!DEMO) await Preferences.remove({ key: CHAVE_TOKEN });
+  return 'ok';
+}
+
+/** Desliga (em Conta, ou porque a empresa desligou `app_biometria_login`): o token deixa de ficar preso à biometria. */
+export async function desligarBiometria(): Promise<void> {
+  if (!(await biometriaLigada())) return;
+  const t = (await marcarDesligada()) ?? token;
+  if (t && !DEMO) await Preferences.set({ key: CHAVE_TOKEN, value: t });
 }
 
 function medirDrift(r: HttpResponse) {
@@ -775,7 +886,9 @@ const dormir = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 /** 5xx com `erro` no corpo é resposta do ERP (ex.: 503 sem_configuracao da oficina): não é queda, não repete. */
 const respostaDoErp = (r: HttpResponse) => !!r.data && typeof r.data === 'object' && 'erro' in (r.data as object);
 
-async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, extra: Record<string, string> = {},
+  /** "formData" = multipart (corpo = ParteFormulario[]); o nativo monta o boundary. */
+  dataType?: 'formData'): Promise<T> {
   if (DEMO) return demo.chamar<T>(metodo, caminho, corpo, extra);
   let r: HttpResponse | null = null;
   for (let tentativa = 0; ; tentativa++) {
@@ -791,6 +904,7 @@ async function chamar<T>(metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', ca
           ...extra,
         },
         data: corpo,
+        dataType,
       });
     } catch { /* sem resposta: status 0 */ }
     const status = r ? r.status : 0;
@@ -890,6 +1004,16 @@ export const api = {
   executarAcaoOs: (id: number, chave: string, motivo: string | null = null) => (ESCRITA_OS
     ? chamar<OsDetalhe>('POST', `/api/app/os/${id}/acoes/${encodeURIComponent(chave)}`, motivo ? { motivo } : undefined)
     : Promise.reject(new ErroApi(0, 'indisponivel', 'Mudar a etapa pelo app ainda não está disponível.'))),
+  /** P2 · anexos da OS, do mais novo para o mais antigo (até 100). 403 sem_permissao · 404 nao_encontrado. */
+  anexosOs: (id: number) => chamar<ListaAnexosOs>('GET', `/api/app/os/${id}/arquivos`),
+  /** P2 · envia um anexo (multipart). 201 = o item · 413 arquivo_grande · 422 validacao (campos.arquivo, campos.origem com
+   *  a câmera desligada nos ajustes) ou idempotencia_conflito · 409 em_andamento · 403 · 404 · 429. `chave` = Idempotency-Key. */
+  enviarAnexoOs: (id: number, arquivo: ArquivoAnexo, origem: 'camera' | 'galeria', chave: string, legenda: string | null = null) =>
+    chamar<AnexoOs>('POST', `/api/app/os/${id}/arquivos`, [
+      { key: 'arquivo', value: arquivo.base64, type: 'base64File', fileName: arquivo.nome, contentType: arquivo.tipo },
+      { key: 'origem', value: origem, type: 'string' },
+      ...(legenda ? [{ key: 'legenda', value: legenda, type: 'string' as const }] : []),
+    ] satisfies ParteFormulario[], { 'Content-Type': 'multipart/form-data', 'Idempotency-Key': chave }, 'formData'),
   /** Tela 08 · Veículos. */
   /** Nova OS. 201 = o mesmo JSON do GET /api/app/os/{id} · 422 { erro: "validacao", campos } (vehicle_id, contact_id…) ·
    *  403 sem_permissao · 503 sem_configuracao (módulo ausente) · throttle 30/min. Contrato tela-07 (ERP #8639). */
@@ -949,7 +1073,13 @@ export const api = {
   marcarLida: (id: string) => chamar<{ nao_lidas: number }>('POST', `/api/app/notificacoes/${encodeURIComponent(id)}/lida`),
   /** Marca todas as notificações do usuário como lidas. Contrato §6.1 (ERP #8569). */
   marcarTodasLidas: () => chamar<{ nao_lidas: number; marcadas: number }>('POST', '/api/app/notificacoes/lidas'),
-  inicio: () => chamar<PainelInicio>('GET', '/api/app/inicio'),
+  /** Painel do Início. Completa o bloco `ajustes` com o padrão e o guarda para o `useAjustes()`. */
+  inicio: () => chamar<Omit<PainelInicio, 'ajustes'> & { ajustes?: unknown }>('GET', '/api/app/inicio').then((p): PainelInicio => {
+    const ajustes = completarAjustes(p.ajustes);
+    guardarAjustes(ajustes);
+    if (!ajustes.app_biometria_login) void desligarBiometria(); // P9: a empresa desligou a entrada com biometria
+    return { ...p, ajustes };
+  }),
   /** Tela 11 · busca de produto. Mesma permissão do POST (sell.create ou direct_sell.access). */
   produtosVenda: (q = '') => chamar<ListaProdutosVenda>('GET', `/api/app/venda/produtos${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   /** Tela 11 · cria a venda. 201 VendaCriada (200 na repetição da chave) · 422 { erro: "validacao", campos } com
@@ -957,6 +1087,18 @@ export const api = {
    *  422 { erro: "idempotencia_conflito" } (mesma chave, corpo diferente) · 409 { erro: "em_andamento" } · 403 sem_permissao
    *  ou sem_local. `chave` = Idempotency-Key da tentativa. */
   criarVenda: (corpo: CorpoVenda, chave: string) => chamar<VendaCriada>('POST', '/api/app/vendas', corpo, { 'Idempotency-Key': chave }),
+  // P1 · avançar etapa do pedido (tela 22, ERP #9445).
+  /** 200 = o mesmo JSON do GET /pedidos/{id}, já na etapa nova (a mesma chave + mesmo corpo devolve a resposta gravada) ·
+   *  403 sem_permissao (fora da lista liberada ou RBAC da FSM) · 404 nao_encontrado · 409 etapa_mudou / em_andamento ·
+   *  422 validacao { campos } / idempotencia_conflito · 429 (30/min). `chave` = Idempotency-Key da tentativa. */
+  avancarPedido: (id: number, corpo: ReturnType<typeof corpoAcao>, chave: string) =>
+    chamar<PedidoDetalheApi>('POST', `/api/app/pedidos/${id}/acao`, corpo, { 'Idempotency-Key': chave }),
+  // P3 · entrega (tela 22, ERP #9464).
+  /** 201 EntregaRegistrada (a mesma chave + mesmo corpo devolve a resposta gravada) · 403 sem_permissao · 404 nao_encontrado ·
+   *  409 etapa_mudou / em_andamento · 422 validacao { campos } / idempotencia_conflito / bloqueado · 503 sem_configuracao ·
+   *  429 (20/min). `chave` = Idempotency-Key da tentativa. */
+  registrarEntrega: (id: number, corpo: CorpoEntrega, chave: string) =>
+    chamar<EntregaRegistrada>('POST', `/api/app/pedidos/${id}/entrega`, corpo, { 'Idempotency-Key': chave }),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
    *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */
@@ -1017,4 +1159,15 @@ export const api = {
   // Lembrete de ponto (ADR 0423, sessão PUSH — PR #8457 no ERP).
   registrarPush: (t: string, plataforma: 'android' | 'ios') =>
     chamar<{ ativo: boolean }>('POST', '/ponto/api/push/dispositivo', { token: t, plataforma }),
+  // P5 · atendimento — tela 41 (ERP PR 18, AtendimentoController). Área `atendimento` só vem em `areas` com o canal ligado.
+  // Erros: 403 sem_permissao · 404 nao_encontrado · 409 em_andamento · 422 validacao / idempotencia_conflito /
+  // sem_consentimento / janela_fechada / bloqueado · 502 falha_envio · 503 sem_configuracao. Throttle 20/min no envio.
+  atendimento: (pagina = 1) => chamar<ListaAtendimento>('GET', `/api/app/atendimento?pagina=${pagina}`),
+  conversaAtendimento: (id: number) => chamar<DetalheAtendimento>('GET', `/api/app/atendimento/${id}`),
+  /** Texto livre. `modelo` e `anexo` vão null na v1. 201 (200 na repetição da chave com o mesmo corpo). */
+  enviarAtendimento: (id: number, texto: string, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/mensagens`, { texto, modelo: null, anexo: null }, { 'Idempotency-Key': chave }),
+  /** O ERP monta o texto do registro `ref_id` (do cliente da conversa). 403 com `app_atendimento_atalhos` desligado. */
+  atalhoAtendimento: (id: number, tipo: TipoAtalho, ref_id: number, chave: string) =>
+    chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/atalho`, { tipo, ref_id }, { 'Idempotency-Key': chave }),
 };
