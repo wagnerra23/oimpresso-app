@@ -18,6 +18,7 @@ import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAta
 
 import { biometriaLigada, celularTemBiometria, conferirBiometria, guardarTokenSeguro, lerTokenSeguro, marcarDesligada, marcarLigada } from './biometria';
 import type { ResultadoBiometria } from './biometria-regras';
+import { guardarDono } from './apontamento-dono';
 
 export type { AjustesEmpresa, ChaveAjuste } from './ajustes-regras';
 
@@ -763,7 +764,7 @@ export async function carregarToken(): Promise<boolean> {
 }
 
 export async function entrar(usuario: string, senha: string): Promise<void> {
-  if (DEMO) { await demo.entrar(usuario, senha); token = 'demo'; return; }
+  if (DEMO) { await demo.entrar(usuario, senha); token = 'demo'; await guardarDono(usuario); return; }
   if (!CLIENT_ID) {
     throw new ErroApi(0, 'sem_client', 'Este build do app não tem o client_id do ERP configurado.');
   }
@@ -782,6 +783,8 @@ export async function entrar(usuario: string, senha: string): Promise<void> {
   // Biometria ligada (P9): o token novo vai para o Keychain/Keystore, não para o Preferences.
   if (await biometriaLigada()) await guardarTokenSeguro(token);
   else await Preferences.set({ key: CHAVE_TOKEN, value: token });
+  // Fila do apontamento (P8): os toques guardados sem internet são de quem entrou.
+  await guardarDono(usuario);
 }
 
 export async function sair(): Promise<void> {
@@ -1121,4 +1124,41 @@ export const api = {
   /** O ERP monta o texto do registro `ref_id` (do cliente da conversa). 403 com `app_atendimento_atalhos` desligado. */
   atalhoAtendimento: (id: number, tipo: TipoAtalho, ref_id: number, chave: string) =>
     chamar<{ mensagem: MensagemAtendimento }>('POST', `/api/app/atendimento/${id}/atalho`, { tipo, ref_id }, { 'Idempotency-Key': chave }),
+};
+
+// ── Apontamento por QR (P8, tela 02 · PR 08 do playbook propostas-app). Contrato tela-02-apontamento.md (ERP #9447):
+// grava no PCP (Modules/Producao, ADR 0431). Bloco próprio: a tela escreve só pela fila (src/apontamento-fila.ts), que
+// guarda o toque sem internet e reenvia com a mesma Idempotency-Key e o `momento` do toque (decisão [W] 2026-10-15). ──
+export interface PedidoApontamento { id: number; numero: string | null; resumo: string | null; cliente: string | null }
+/** Etapa = linha de `pcp_programacoes` (OS × posto × responsável). `posto.tipo`: 'pessoa' ou 'maquina'. */
+export interface EtapaApontamento {
+  programacao_id: number; status: string;
+  posto: { id: number; nome: string; tipo: string } | null;
+  inicio_previsto: string | null;
+  responsavel: { id: number; nome: string } | null;
+}
+/** GET /api/app/producao/etiqueta/{codigo}: QR (`oimpresso:p:<hash>:<id>`) ou número digitado. Etapa de outra pessoa
+ *  vem com `pode_apontar: false` e o responsável. */
+export interface EtiquetaProducao { pedido: PedidoApontamento; etapa: EtapaApontamento; pode_apontar: boolean }
+/** Apontamento aberto. `id` é o da linha de início; `iniciado_em` é a hora gravada no ERP. */
+export interface ApontamentoAberto { id: number; tipo: string; pedido: PedidoApontamento | null; etapa: EtapaApontamento | null; iniciado_em: string }
+export interface EmAndamento {
+  pessoa: ApontamentoAberto | null; maquinas: ApontamentoAberto[];
+  ponto: { entrada: string | null; saida: string | null; presenca_minutos: number | null } | null;
+}
+export interface Encerramento { id: number; encerrado_por: string; origem: string; encerrado_em: string; minutos: number | null }
+export const apontamentoApi = {
+  emAndamento: () => chamar<EmAndamento>('GET', '/api/app/producao/apontamentos/em-andamento'),
+  /** 404 nao_encontrado (outra empresa ou inexistente) · 422 campos.codigo (número com app_apontamento_exige_qr). */
+  etiqueta: (codigo: string) => chamar<EtiquetaProducao>('GET', `/api/app/producao/etiqueta/${encodeURIComponent(codigo)}`),
+  /** 201/200 { id, programacao_id, iniciado_em } · 409 etapa_alheia { etapa } · 409 em_andamento { apontamento_id } ·
+   *  422 bloqueado / campos.codigo / campos.momento. */
+  iniciar: (corpo: { programacao_id: number; momento: string; codigo?: string }, chave: string) =>
+    chamar<{ id: number; programacao_id: number; iniciado_em: string }>('POST', '/api/app/producao/apontamentos/iniciar', corpo, { 'Idempotency-Key': chave }),
+  /** 201/200 Encerramento (200 com origem "turno"/"ponto" quando o fechamento automático veio antes). */
+  concluir: (id: number, corpo: { momento: string }, chave: string) =>
+    chamar<Encerramento>('POST', `/api/app/producao/apontamentos/${id}/concluir`, corpo, { 'Idempotency-Key': chave }),
+  /** Pedido de correção de horário para o gestor (append-only). `momento` = a hora certa. */
+  corrigir: (id: number, corpo: { momento: string; justificativa: string }, chave: string) =>
+    chamar<{ id: number; apontamento_id: number; situacao: string }>('POST', `/api/app/producao/apontamentos/${id}/corrigir`, corpo, { 'Idempotency-Key': chave }),
 };

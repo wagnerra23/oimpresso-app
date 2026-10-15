@@ -430,6 +430,57 @@ const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
 
+// ── Apontamento por QR (P8, tela 02 · PR 08). Imita o contrato tela-02-apontamento.md do ERP (#9447, grava no PCP):
+// QR com o hash da empresa, etapa = programação (OS × posto × responsável), uma etapa de pessoa aberta por operador,
+// etapa de máquina rodando junto, `momento` do toque com os limites do serviço, Idempotency-Key e
+// app_apontamento_exige_qr. ──
+const HASH_EMPRESA_DEMO = 'a1b2c3d4e5f6';
+/** O que o leitor devolve na demo pelo navegador (sem câmera): a etiqueta da OS 4812. */
+export const QR_DEMO = `oimpresso:p:${HASH_EMPRESA_DEMO}:comvis_os:4812`;
+const EU_DEMO = { id: 1, nome: 'Você' };
+const OS_APONTAMENTO = [
+  { id: 4812, numero: 'OS-2026-04812', resumo: 'Fachada ACM + Letra caixa', cliente: 'Ótica Visão Clara',
+    etapa: { programacao_id: 77, status: 'pendente', posto: { id: 3, nome: 'Impressão', tipo: 'pessoa' }, responsavel: EU_DEMO } },
+  { id: 4820, numero: 'OS-2026-04820', resumo: 'Lona frontlight 6 × 1,6 m', cliente: 'Supermercado Bom Preço',
+    etapa: { programacao_id: 80, status: 'pendente', posto: { id: 5, nome: 'Roland VG3-640', tipo: 'maquina' }, responsavel: EU_DEMO } },
+  { id: 4815, numero: 'OS-2026-04815', resumo: 'Banners formatura', cliente: 'Escola Aprender',
+    etapa: { programacao_id: 78, status: 'pendente', posto: { id: 4, nome: 'Laminação', tipo: 'pessoa' }, responsavel: { id: 7, nome: 'Felipe Andrade' } } },
+  { id: 4790, numero: 'OS-2026-04790', resumo: 'Placas de sinalização', cliente: 'Clínica Vita',
+    etapa: { programacao_id: 79, status: 'concluida', posto: { id: 3, nome: 'Impressão', tipo: 'pessoa' }, responsavel: EU_DEMO } },
+];
+type OsApontamentoDemo = (typeof OS_APONTAMENTO)[number];
+interface AbertoDemo { id: number; os: OsApontamentoDemo; iniciado_em: string }
+let apontamentosAbertos: AbertoDemo[] = [];
+let idApontamento = 700;
+/** Idempotency-Key → rota + corpo + resposta (repetição devolve a mesma, sem apontar de novo). */
+const APONTAMENTOS_POR_CHAVE: Record<string, { pedido: string; resposta: unknown }> = {};
+const erroDemo = (status: number, codigo: string, mensagem: string, extra: Record<string, unknown> = {}) =>
+  Object.assign(new Error(mensagem), { status, codigo, ...extra });
+const pedidoApontamento = (o: OsApontamentoDemo) => ({ id: o.id, numero: o.numero, resumo: o.resumo, cliente: o.cliente });
+const etapaApontamento = (o: OsApontamentoDemo) => ({ ...o.etapa, inicio_previsto: null });
+const abertoDemo = (a: AbertoDemo) => ({ id: a.id, tipo: a.os.etapa.posto.tipo, pedido: pedidoApontamento(a.os), etapa: etapaApontamento(a.os), iniciado_em: a.iniciado_em });
+/** QR ou número → OS. QR de outra empresa ou OS inexistente → undefined (404 sem dizer se existe). */
+function osDoCodigo(codigo: string): OsApontamentoDemo | undefined | 'numero' {
+  // Formato do PR 07 (`…:<os_tipo>:<id>`) ou o antigo sem tipo (= comvis_os). Outro tipo de OS → 404, como o ERP.
+  const qr = /^oimpresso:p:([0-9a-f]{12}):(?:([a-z_]+):)?(\d+)$/.exec(codigo.toLowerCase());
+  if (qr) return qr[1] === HASH_EMPRESA_DEMO && (qr[2] ?? 'comvis_os') === 'comvis_os' ? OS_APONTAMENTO.find((o) => o.id === Number(qr[3])) : undefined;
+  if (ajustesDemo.app_apontamento_exige_qr) return 'numero';
+  const t = codigo.trim().toUpperCase();
+  return OS_APONTAMENTO.find((o) => String(o.id) === t || o.numero === t);
+}
+const NUMERO_RECUSADO = 'Leia o QR da etiqueta: esta empresa não aceita número digitado.';
+/** `momento` do toque como o serviço do PCP confere: ISO com fuso, até 5 min à frente e até 72 h para trás. */
+function momentoDemo(m: unknown): string {
+  if (m === undefined || m === null || m === '') return new Date().toISOString();
+  if (typeof m !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(m)) {
+    throw erroDemo(422, 'validacao', 'Use data e hora ISO 8601 com fuso.', { campos: { momento: 'Use data e hora ISO 8601 com fuso.' } });
+  }
+  const t = Date.parse(m), agora = Date.now();
+  if (t > agora + 5 * 60000) throw erroDemo(422, 'validacao', 'Hora do aparelho errada; acerte o relógio', { campos: { momento: 'Hora do aparelho errada; acerte o relógio' } });
+  if (t < agora - 72 * 3600000) throw erroDemo(422, 'validacao', 'Envio vencido; peça a correção ao gestor', { campos: { momento: 'Envio vencido; peça a correção ao gestor' } });
+  return new Date(t).toISOString();
+}
+
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
 
 // P5 · atendimento — tela 41 (contrato tela-41-atendimento.md, ERP PR 18). Clientes da demo para os atalhos acharem
@@ -596,6 +647,73 @@ export const demo = {
       return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
+    }
+    // ── Apontamento por QR (P8 · PR 08) ──
+    if (caminho.startsWith('/api/app/producao/')) {
+      if (metodo === 'GET' && caminho === '/api/app/producao/apontamentos/em-andamento') {
+        return r({ pessoa: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'pessoa').map(abertoDemo)[0] ?? null,
+          maquinas: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'maquina').map(abertoDemo),
+          ponto: { entrada: '07:02', saida: null, presenca_minutos: null } });
+      }
+      if (metodo === 'GET' && caminho.startsWith('/api/app/producao/etiqueta/')) {
+        const o = osDoCodigo(decodeURIComponent(caminho.slice('/api/app/producao/etiqueta/'.length)));
+        if (o === 'numero') throw erroDemo(422, 'validacao', NUMERO_RECUSADO, { campos: { codigo: NUMERO_RECUSADO } });
+        if (!o) throw erroDemo(404, 'nao_encontrado', 'Etiqueta não encontrada.');
+        return r({ pedido: pedidoApontamento(o), etapa: etapaApontamento(o), pode_apontar: o.etapa.responsavel.id === EU_DEMO.id && o.etapa.status !== 'concluida' });
+      }
+      if (metodo === 'POST' && caminho.startsWith('/api/app/producao/apontamentos/')) {
+        const chave = cabecalhos['Idempotency-Key'];
+        if (!chave) throw erroDemo(422, 'validacao', 'Envie o header Idempotency-Key.', { campos: { idempotency_key: 'Envie o header Idempotency-Key.' } });
+        const pedido = caminho + ' ' + JSON.stringify(corpo ?? {});
+        const ja = APONTAMENTOS_POR_CHAVE[chave];
+        if (ja && ja.pedido !== pedido) throw erroDemo(422, 'idempotencia_conflito', 'Chave já usada em outro apontamento.');
+        if (ja) return r(ja.resposta);
+        const c = (corpo ?? {}) as { programacao_id?: number; codigo?: string; momento?: string; justificativa?: string };
+        let resposta: unknown;
+        if (caminho === '/api/app/producao/apontamentos/iniciar') {
+          const o = OS_APONTAMENTO.find((x) => x.etapa.programacao_id === c.programacao_id);
+          if (ajustesDemo.app_apontamento_exige_qr) {
+            if (!c.codigo) throw erroDemo(422, 'validacao', NUMERO_RECUSADO, { campos: { codigo: NUMERO_RECUSADO } });
+            if (osDoCodigo(c.codigo) !== o) throw erroDemo(404, 'nao_encontrado', 'Etiqueta não encontrada.');
+          }
+          if (!o) throw erroDemo(404, 'nao_encontrado', 'Etapa não encontrada.');
+          const momento = momentoDemo(c.momento);
+          if (o.etapa.responsavel.id !== EU_DEMO.id) {
+            throw erroDemo(409, 'etapa_alheia', `Esta etapa está em ${o.etapa.posto.nome}, com ${o.etapa.responsavel.nome}. Nada foi apontado.`, { etapa: etapaApontamento(o) });
+          }
+          if (o.etapa.status === 'concluida') throw erroDemo(422, 'bloqueado', 'Esta etapa já foi concluída.');
+          const ocupado = apontamentosAbertos.find((a) => a.os.etapa.posto.tipo === 'pessoa');
+          if (o.etapa.posto.tipo === 'pessoa' && ocupado) throw erroDemo(409, 'em_andamento', 'Você já tem uma etapa aberta.', { apontamento_id: ocupado.id });
+          if (apontamentosAbertos.some((a) => a.os === o)) throw erroDemo(422, 'bloqueado', 'Esta etapa já está em andamento.');
+          idApontamento += 1;
+          apontamentosAbertos.push({ id: idApontamento, os: o, iniciado_em: momento });
+          resposta = { id: idApontamento, programacao_id: o.etapa.programacao_id, iniciado_em: momento };
+        } else {
+          const m = /^\/api\/app\/producao\/apontamentos\/(\d+)\/(concluir|corrigir|pausar)$/.exec(caminho);
+          if (!m) throw new Error('Rota sem simulação: ' + caminho);
+          const id = Number(m[1]);
+          const aberto = apontamentosAbertos.find((a) => a.id === id);
+          if (m[2] === 'corrigir') {
+            const n = (c.justificativa ?? '').trim().length;
+            if (!c.momento) throw erroDemo(422, 'validacao', 'Informe a hora certa.', { campos: { momento: 'Informe a hora certa.' } });
+            if (n < 5 || n > 500) throw erroDemo(422, 'validacao', 'A justificativa precisa de 5 a 500 letras.', { campos: { justificativa: 'A justificativa precisa de 5 a 500 letras.' } });
+            if (!(id > 700 && id <= idApontamento)) throw erroDemo(404, 'nao_encontrado', 'Apontamento não encontrado.');
+            resposta = { id: 9000 + id, apontamento_id: id, situacao: 'aguardando_gestor' };
+          } else {
+            // O de outro operador dá o mesmo 404 do de outra empresa; já encerrado → 422 bloqueado.
+            if (!aberto) {
+              if (id > 700 && id <= idApontamento) throw erroDemo(422, 'bloqueado', 'Este apontamento já foi encerrado.');
+              throw erroDemo(404, 'nao_encontrado', 'Apontamento não encontrado.');
+            }
+            const momento = momentoDemo(c.momento);
+            resposta = { id, encerrado_por: m[2] === 'pausar' ? 'pausa' : 'fim', origem: 'app', encerrado_em: momento,
+              minutos: Math.max(0, Math.floor((Date.parse(momento) - Date.parse(aberto.iniciado_em)) / 60000)) };
+            apontamentosAbertos = apontamentosAbertos.filter((a) => a !== aberto);
+          }
+        }
+        APONTAMENTOS_POR_CHAVE[chave] = { pedido, resposta };
+        return r(resposta);
+      }
     }
     // P1 · POST /api/app/pedidos/{id}/acao, como o ERP #9445: chave obrigatória, etapa_esperada, lista liberada, idempotência.
     if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/acao$/.test(caminho)) {

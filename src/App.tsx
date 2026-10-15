@@ -31,6 +31,7 @@ import { Estoque } from './telas/Estoque';
 import { Financeiro } from './telas/Financeiro';
 import { Fiscal } from './telas/Fiscal';
 import { useVoltar } from './voltar';
+import { enviarFila } from './apontamento-fila';
 import { Login } from './telas/Login';
 import { Inicio } from './telas/Inicio';
 import { Ponto } from './telas/Ponto';
@@ -127,6 +128,7 @@ export function App() {
     if (!logado) return;
     carregarNav();
     renovarLembrete(abrirPonto).catch(() => {});
+    void enviarFila().catch(() => {});
   }, [logado, abrirPonto, carregarNav]);
   // Sem conta (saiu ou o token expirou): o ícone não mostra as não lidas de quem saiu (P7).
   useEffect(() => { if (pronto && !logado) limparIcone(); }, [pronto, logado]);
@@ -139,6 +141,8 @@ export function App() {
   logadoRef.current = logado;
   const recuperar = useCallback(() => {
     if (!logadoRef.current) return;
+    // P8: o apontamento guardado no celular sem internet vai agora (a fila só envia o do usuário logado).
+    void enviarFila().catch(() => {});
     if (navProvisoria.current) { carregarNav(); return; }
     if (houveFalhaDeLeitura()) setRecarga((x) => x + 1);
   }, [carregarNav]);
