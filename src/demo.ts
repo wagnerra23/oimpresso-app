@@ -4,6 +4,8 @@
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
+import type { AnexoOs, ParteFormulario } from './api';
+import { assinaturaValida } from './entrega-regras';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -41,7 +43,6 @@ const respostaJana = (t: string) => {
 
 // Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const ACAO: Record<string, string> = { orcamento: 'Enviar para aprovação', aprovacao: 'Aprovar pedido', producao: 'Liberar para entrega', entrega: 'Confirmar entrega' };
 const PEDIDOS = [
   { id: 106, numero: '0043', cliente: 'Papelaria Sol', valor: 360.0, prazo: diaRel(2), atrasado: false, progresso: 0.4,
     etapa: { chave: 'quote_approved', rotulo: 'Aprovado pelo cliente', grupo: 'aprovacao' as const },
@@ -71,6 +72,70 @@ const PEDIDOS = [
     etapa: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' as const },
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
 ];
+
+// P1 · avançar etapa (tela 22, ERP #9445). Só a lista segura do ERP (AcoesDoPedido::SEGURAS), cada uma saindo de uma
+// etapa só, como no processo venda_com_producao. As outras ações ficam na web e não vêm em acoes[].
+const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: { chave: string; rotulo: string; grupo: 'producao' | 'concluido' }; progresso: number }> = {
+  quote_approved: { chave: 'iniciar_producao', rotulo: 'Iniciar produção', para: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' }, progresso: 0.5 },
+  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: { chave: 'on_hold', rotulo: 'Em espera', grupo: 'producao' }, progresso: 0.5 },
+  delivered: { chave: 'concluir', rotulo: 'Concluir', para: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' }, progresso: 1 },
+};
+/** `false` simula o usuário sem o RBAC da FSM (a ação vem com pode: false). Só para teste. */
+let podeAcoesPedidoDemo = true;
+/** Histórico de etapas por pedido (mais recente primeiro), criado na 1ª leitura. */
+const HISTORICO_PEDIDO: Record<number, Array<{ em: string; quem: string | null; de: string | null; para: string; origem: 'app' | 'web' }>> = {};
+/** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem mover de novo). */
+const ACOES_PEDIDO_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
+const horasAtras = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
+function historicoPedidoDemo(p: (typeof PEDIDOS)[number]) {
+  if (!HISTORICO_PEDIDO[p.id]) {
+    const h: (typeof HISTORICO_PEDIDO)[number] = [{ em: horasAtras(72), quem: 'Ana Souza', de: null, para: 'Orçamento', origem: 'web' }];
+    if (p.etapa.grupo !== 'orcamento') h.unshift({ em: horasAtras(30), quem: 'Ana Souza', de: 'Orçamento', para: 'Aprovado pelo cliente', origem: 'web' });
+    if (p.etapa.chave !== 'quote_approved' && p.etapa.grupo !== 'orcamento' && p.etapa.chave !== 'awaiting_approval') {
+      h.unshift({ em: horasAtras(5), quem: 'Bruno Lima', de: 'Aprovado pelo cliente', para: p.etapa.rotulo, origem: 'app' });
+    }
+    HISTORICO_PEDIDO[p.id] = h;
+  }
+  return HISTORICO_PEDIDO[p.id];
+}
+const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
+  const a = ACOES_SEGURAS_DEMO[etapa];
+  return a && (liberadas.length === 0 || liberadas.includes(a.chave)) ? [{ chave: a.chave, rotulo: a.rotulo, pode: podeAcoesPedidoDemo }] : [];
+};
+
+// P3 · entrega (tela 22, ERP #9464). A ação `entregar` da FSM sai de uma etapa só e NÃO vem em acoes[]: o detalhe manda
+// `entrega: { pode }`. Na demo, sai de "Saiu para entrega" e vai para "Entregue" (de onde o P1 oferece "Concluir").
+const ENTREGA_DEMO = { de: 'out_for_delivery', para: { chave: 'delivered', rotulo: 'Entregue', grupo: 'entrega' as const }, progresso: 0.9 };
+/** Linha de topo da venda (`itens_venda[].linha_id`), estável por pedido. */
+const linhaIdDemo = (pedidoId: number, i: number) => pedidoId * 100 + i + 1;
+/** Próximo número do protocolo (ENT-NNNN por business). */
+let protocoloEntregaDemo = 418;
+/** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem registrar de novo). */
+const ENTREGAS_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
+const entregaDemo = (etapa: string) => (etapa === ENTREGA_DEMO.de ? { pode: podeAcoesPedidoDemo } : null);
+/** Os erros por campo do contrato (422 validacao), na ordem em que o ERP confere. */
+function camposEntregaDemo(p: (typeof PEDIDOS)[number], n: Record<string, unknown>, chave: string | undefined) {
+  const campos: Record<string, string> = {};
+  const txt = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  if (!chave) campos.idempotency_key = 'Falta a chave de idempotência.';
+  if (!txt(n.etapa_esperada)) campos.etapa_esperada = 'Informe a etapa esperada.';
+  const itens = Array.isArray(n.itens) ? (n.itens as Array<{ linha_id?: unknown; conferido?: unknown }>) : [];
+  const linhas = p.itens.map((_, i) => linhaIdDemo(p.id, i));
+  const vindas = itens.filter((i) => i.conferido === true).map((i) => Number(i.linha_id));
+  if (itens.length !== linhas.length || !linhas.every((l) => vindas.includes(l))) campos.itens = 'Confira todos os itens do pedido.';
+  const nome = txt(n.recebido_por);
+  if (nome.length < 2 || nome.length > 120) campos.recebido_por = 'Informe quem recebeu (2 a 120 caracteres).';
+  const png = typeof n.assinatura_png === 'string' && n.assinatura_png ? n.assinatura_png : null;
+  const motivo = txt(n.sem_assinatura_motivo);
+  if (png && !assinaturaValida(png)) campos.assinatura_png = 'A assinatura precisa ser um PNG de até 200 KB.';
+  else if (!png && ajustesDemo.app_entrega_exige_assinatura) campos.assinatura_png = 'A empresa exige a assinatura de quem recebeu.';
+  else if (!png && (motivo.length < 5 || motivo.length > 200)) campos.assinatura_png = 'Colha a assinatura ou diga por que ficou sem (5 a 200 caracteres).';
+  const temLat = typeof n.lat === 'number', temLng = typeof n.lng === 'number';
+  if (temLat && !temLng) campos.lng = 'Informe a longitude junto com a latitude.';
+  if (temLng && !temLat) campos.lat = 'Informe a latitude junto com a longitude.';
+  if (!temLat && !temLng && ajustesDemo.app_entrega_exige_localizacao) campos.lat = 'A empresa exige a localização da entrega.';
+  return campos;
+}
 
 // Produtos da demo (contrato §9.1), imitando o protótipo da tela 19.
 const CATEGORIAS = [{ id: 1, nome: 'Comunicação visual' }, { id: 2, nome: 'Adesivos' }, { id: 3, nome: 'Gráfica rápida' }, { id: 4, nome: 'Sinalização' }, { id: 5, nome: 'Brindes' }];
@@ -312,6 +377,19 @@ let bloqueiaPrecoZeroDemo = false;
 let ajustesDemo: AjustesEmpresa = { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] };
 /** Idempotency-Key → corpo enviado + venda criada (repetição com o mesmo corpo devolve a mesma, sem baixar estoque de novo). */
 const VENDAS_POR_CHAVE: Record<string, { corpo: string; venda: Record<string, unknown> }> = {};
+// P2 · anexos — anexos por OS (handoff propostas-app, demo-propostas.ts). Sem URL assinada na demo: as fotos de exemplo
+// aparecem como miniatura listrada; as enviadas na demo voltam com a própria imagem (data:).
+const ANEXOS_OS: Record<number, AnexoOs[]> = {
+  1042: [
+    { id: 830, nome: 'IMG_0430.jpg', tipo: 'image/jpeg', tamanho: 412330, legenda: 'Peça trocada', etapa: 'em_execucao', enviado_em: '2026-10-05T15:02:00Z', enviado_por: 'Bruno Lima', url: '', miniatura: '' },
+    { id: 820, nome: 'orcamento-v3.pdf', tipo: 'application/pdf', tamanho: 1204551, legenda: 'Orçamento assinado', etapa: 'em_diagnostico', enviado_em: '2026-10-05T14:10:00Z', enviado_por: 'Bruno Lima', url: '', miniatura: null },
+    { id: 813, nome: 'IMG_0413.jpg', tipo: 'image/jpeg', tamanho: 301877, legenda: 'Painel na entrada', etapa: 'recepcao', enviado_em: '2026-10-05T12:43:00Z', enviado_por: 'Ana Souza', url: '', miniatura: '' },
+    { id: 812, nome: 'IMG_0412.jpg', tipo: 'image/jpeg', tamanho: 284113, legenda: 'Lateral · antes', etapa: 'recepcao', enviado_em: '2026-10-05T12:41:00Z', enviado_por: 'Ana Souza', url: '', miniatura: '' },
+  ],
+};
+/** Idempotency-Key → corpo (OS + arquivo + legenda) e o anexo gravado, como o `app_idempotencia` do ERP. */
+const ANEXOS_POR_CHAVE: Record<string, { corpo: string; anexo: AnexoOs }> = {};
+let proximoAnexo = 900;
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
@@ -348,6 +426,78 @@ function osDoCodigo(codigo: string): (typeof OS_APONTAMENTO)[number] | undefined
 
 const hashFake = (n: number) => (n * 2654435761 >>> 0).toString(16).padStart(8, '0').repeat(2).slice(0, 16);
 
+// P5 · atendimento — tela 41 (contrato tela-41-atendimento.md, ERP PR 18). Clientes da demo para os atalhos acharem
+// orçamento e pedido: 77 com janela aberta e consentimento; 78 com consentimento e janela fechada (envio ativo ok);
+// 79 sem consentimento e janela aberta (só responde); 80 sem consentimento e janela fechada (envio travado); 81 sem
+// cliente ligado (sem atalhos). Datas criadas na 1ª chamada (nada de Date no topo do módulo). Texto com "#falha" = 502.
+let canalAtendimentoDemo = true;
+type MsgDemo = { id: number; de: 'cliente' | 'eu' | 'sistema'; texto: string | null; midia: { tipo: string; nome: string | null } | null; min: number; status: string };
+type ConversaDemo = { id: number; contato: { id: number | null; nome: string }; consentimento: boolean; janelaH: number | null; nao_lidas: number; msgs: MsgDemo[]; base: number };
+let conversasDemo: ConversaDemo[] | null = null;
+let idMsgAtendimento = 9000;
+/** Rota + Idempotency-Key → corpo (hash) + resposta, como a tabela app_idempotencia do ERP. */
+const ENVIOS_ATENDIMENTO: Record<string, { hash: string; resp: { mensagem: unknown } | null }> = {};
+/** Ordens de produção da Comunicação Visual com arte (cv_ordens_producao), para o atalho link_arte. */
+const OPS_ARTE = [{ id: 501, contato_id: 9, codigo: 'OP-0045', arte_url: 'https://oimpresso.com/a/0045' }, { id: 502, contato_id: 10, codigo: 'OP-0044', arte_url: 'https://oimpresso.com/a/0044' }];
+const areaAtendimentoDemo = (): string[] => (canalAtendimentoDemo ? ['atendimento'] : []);
+function atendimentoDemo(): ConversaDemo[] {
+  if (conversasDemo) return conversasDemo;
+  const base = Date.now();
+  const m = (id: number, de: MsgDemo['de'], texto: string | null, min: number, midia: MsgDemo['midia'] = null): MsgDemo =>
+    ({ id, de, texto, midia, min, status: de === 'cliente' ? 'received' : 'delivered' });
+  conversasDemo = [
+    { id: 77, contato: { id: 9, nome: 'Bistrô do Forno' }, consentimento: true, janelaH: 23, nao_lidas: 2, base,
+      msgs: [m(1, 'sistema', 'Olá! Recebemos sua mensagem. Já já um atendente responde.', 70), m(2, 'cliente', 'Bom dia! O cardápio já ficou pronto?', 62),
+        m(3, 'cliente', 'Pode mandar o orçamento da fachada?', 60)] },
+    { id: 78, contato: { id: 10, nome: 'Clínica Vita' }, consentimento: true, janelaH: null, nao_lidas: 0, base,
+      msgs: [m(4, 'cliente', 'Recebi as placas, obrigado!', 60 * 30), m(5, 'eu', 'Nós que agradecemos! Qualquer coisa é só chamar.', 60 * 30 - 5)] },
+    { id: 79, contato: { id: 14, nome: 'Restaurante 88' }, consentimento: false, janelaH: 20, nao_lidas: 1, base,
+      msgs: [m(6, 'cliente', null, 245, { tipo: 'image', nome: 'logo-novo.png' }), m(7, 'cliente', 'Qual o prazo das etiquetas?', 240)] },
+    { id: 80, contato: { id: 12, nome: 'Marília Costa' }, consentimento: false, janelaH: null, nao_lidas: 0, base,
+      msgs: [m(8, 'cliente', 'Vou ver com meu marido e te aviso.', 60 * 50)] },
+    { id: 81, contato: { id: null, nome: '+55 48 99999-0007' }, consentimento: false, janelaH: 22, nao_lidas: 1, base,
+      msgs: [m(9, 'cliente', 'Oi, vocês fazem adesivo para carro?', 120)] },
+  ];
+  return conversasDemo;
+}
+const isoSemMs = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z');
+function itemAtendimento(c: ConversaDemo) {
+  const ultima = c.msgs[c.msgs.length - 1];
+  const fim = c.janelaH === null ? null : c.base + c.janelaH * 3600000;
+  return { id: c.id, contato: c.contato, ultima: ultima ? (ultima.texto ?? `[${ultima.midia?.tipo}]`) : null, quando: ultima ? isoSemMs(c.base - ultima.min * 60000) : null,
+    nao_lidas: c.nao_lidas, consentimento: c.consentimento, janela_aberta_ate: fim !== null && fim > Date.now() ? isoSemMs(fim) : null };
+}
+const msgAtendimento = (c: ConversaDemo, x: MsgDemo) => ({ id: x.id, de: x.de, texto: x.texto, midia: x.midia, quando: isoSemMs(c.base - x.min * 60000), status: x.status });
+const reaisDemo = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// P6 · lucratividade — abas `lucratividade` e `comissoes` da tela 13 (ERP #9448). Números do protótipo, escalados pelo período;
+// a demo faz o papel do ERP (as contas ficam aqui, nunca na tela). Usuário com "vendas" no nome é vendedor sem
+// commission_agent.view: vê só a própria linha, e nada se a empresa desliga `app_comissao_vendedor_ve_propria`.
+const VENDEDORES_DEMO: Array<[number, string, number, number, number]> = [
+  [7, 'Ana Souza', 3, 62100, 54300], [8, 'Bruno Lima', 3, 48400, 39800], [9, 'Carla Mendes', 3, 37700, 36100],
+];
+function relatoriosP6(aba: string, f: number) {
+  const v = (x: number) => Math.round(x * f * 100) / 100;
+  const lucratividade = () => {
+    const receita = v(148230), custo_variavel = v(79400), custo_fixo = v(41000);
+    const margem = Math.round((receita - custo_variavel) * 100) / 100;
+    return { receita, custo_variavel, custo_fixo, margem_contribuicao: margem,
+      margem_pct: receita > 0 ? Math.round((margem / receita) * 1000) / 10 : null,
+      ponto_equilibrio: receita > 0 && margem > 0 ? Math.round((custo_fixo / (margem / receita)) * 100) / 100 : null,
+      menores_margens: [{ pedido_id: 4819, numero: '4819', resumo: 'Placas PS 30 × 40 cm', valor: 452, margem_pct: 12 },
+        { pedido_id: 4807, numero: '4807', resumo: 'Kit PDV campanha verão', valor: 2315, margem_pct: 21 },
+        { pedido_id: 4815, numero: '4815', resumo: 'Banners formatura', valor: 1180, margem_pct: 28 }] };
+  };
+  const comissoes = () => {
+    if (semFinanceiro && !ajustesDemo.app_comissao_vendedor_ve_propria) return null;
+    const linhas = VENDEDORES_DEMO.filter(([id]) => !semFinanceiro || id === 7).map(([id, nome, percentual, vend, rec]) => ({
+      id, nome, percentual, vendido: v(vend), recebido: v(rec),
+      comissao: Math.round(v(rec) * percentual) / 100, a_liberar: Math.round(v(vend - rec) * percentual) / 100 }));
+    return { base: 'payment_received', vendedores: linhas.sort((a, b) => b.comissao - a.comissao) };
+  };
+  return { lucratividade: aba === 'lucratividade' ? lucratividade() : null, comissoes: aba === 'comissoes' ? comissoes() : null };
+}
+
 export const demo = {
   logado: () => logado,
   async entrar(usuario: string, senha: string) {
@@ -359,8 +509,14 @@ export const demo = {
     semVendas = /gestor/i.test(usuario);
   },
   sair() { logado = false; },
+  /** Biometria destravou o token guardado (P9): volta a sessão sem senha. */
+  retomar() { logado = true; },
   /** Só para teste: liga/desliga o ajuste de preço zero da empresa da demo. */
   definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
+  /** P1 · só para teste: `false` = o usuário não passa no RBAC da FSM (acoes[] com pode: false; POST → 403). */
+  definirPodeAcoesPedido(v: boolean) { podeAcoesPedidoDemo = v; },
+  /** P5 · atendimento — só para teste: canal do WhatsApp ligado/desligado (desligado = área some de `areas`). Recomeça as conversas. */
+  definirCanalAtendimento(ligado: boolean) { canalAtendimentoDemo = ligado; conversasDemo = null; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
   definirAjustes(a: Partial<AjustesEmpresa> = {}) { ajustesDemo = Object.keys(a).length ? { ...ajustesDemo, ...a } : { ...AJUSTES_PADRAO, app_acoes_fsm_liberadas: [] }; },
   async chamar<T>(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}): Promise<T> {
@@ -424,8 +580,8 @@ export const demo = {
         const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
         const pos = ordem.indexOf(p.etapa.grupo);
         return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
-          itens_venda: p.itens, etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
-          acoes: p.etapa.grupo === 'concluido' ? [] : [{ chave: 'avancar', rotulo: ACAO[p.etapa.grupo], pode: true }] });
+          itens_venda: p.itens.map((it, i) => ({ ...it, linha_id: linhaIdDemo(p.id, i) })), entrega: entregaDemo(p.etapa.chave), etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
+          acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p) });
       }
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
       const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
@@ -487,6 +643,63 @@ export const demo = {
         APONTAMENTOS_POR_CHAVE[chave] = { pedido, resposta };
         return r(resposta);
       }
+    }
+    // P1 · POST /api/app/pedidos/{id}/acao, como o ERP #9445: chave obrigatória, etapa_esperada, lista liberada, idempotência.
+    if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/acao$/.test(caminho)) {
+      const chave = cabecalhos['Idempotency-Key'];
+      const n = (corpo ?? {}) as { acao?: string; motivo?: string | null; etapa_esperada?: string };
+      const campos: Record<string, string> = {};
+      if (!chave) campos.idempotency_key = 'Falta a chave de idempotência.';
+      if (!n.acao) campos.acao = 'Informe a ação.';
+      if (!n.etapa_esperada) campos.etapa_esperada = 'Informe a etapa esperada.';
+      if (n.motivo && n.motivo.length > 500) campos.motivo = 'O motivo tem no máximo 500 caracteres.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = ACOES_PEDIDO_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra ação.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r(ja.resposta);
+      const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      const liberadas = ajustesDemo.app_acoes_fsm_liberadas;
+      const segura = Object.values(ACOES_SEGURAS_DEMO).some((a) => a.chave === n.acao);
+      if (!segura || (liberadas.length && !liberadas.includes(n.acao!)) || !podeAcoesPedidoDemo) {
+        throw Object.assign(new Error('Seu usuário não pode executar esta ação no app.'), { status: 403, codigo: 'sem_permissao' });
+      }
+      const a = ACOES_SEGURAS_DEMO[p.etapa.chave];
+      if (n.etapa_esperada !== p.etapa.chave || !a || a.chave !== n.acao) {
+        throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
+      }
+      const de = p.etapa.rotulo;
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de, para: a.para.rotulo, origem: 'app' });
+      p.etapa = { ...a.para }; p.progresso = a.progresso;
+      const resposta = await demo.chamar('GET', `/api/app/pedidos/${p.id}`);
+      ACOES_PEDIDO_POR_CHAVE[chave] = { corpo: corpoTxt, resposta };
+      return r(resposta);
+    }
+    // P3 · entrega — POST /api/app/pedidos/{id}/entrega, como o ERP #9464: chave, etapa_esperada, conferência, assinatura
+    // ou motivo, ajustes da empresa, protocolo ENT-NNNN e idempotência.
+    if (metodo === 'POST' && /^\/api\/app\/pedidos\/\d+\/entrega$/.test(caminho)) {
+      const chave = cabecalhos['Idempotency-Key'];
+      const n = (corpo ?? {}) as Record<string, unknown>;
+      const corpoTxt = JSON.stringify(corpo ?? {});
+      const ja = chave ? ENTREGAS_POR_CHAVE[chave] : undefined;
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outra entrega.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r(ja.resposta);
+      const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
+      if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      if (!podeAcoesPedidoDemo) throw Object.assign(new Error('Seu usuário não pode registrar esta entrega.'), { status: 403, codigo: 'sem_permissao' });
+      if (n.etapa_esperada && (n.etapa_esperada !== p.etapa.chave || p.etapa.chave !== ENTREGA_DEMO.de)) {
+        throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
+      }
+      const campos = camposEntregaDemo(p, n, chave);
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      const protocolo = 'ENT-' + String(protocoloEntregaDemo++).padStart(4, '0');
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de: p.etapa.rotulo, para: ENTREGA_DEMO.para.rotulo, origem: 'app' });
+      p.etapa = { ...ENTREGA_DEMO.para }; p.progresso = ENTREGA_DEMO.progresso;
+      const resposta = { protocolo, registrado_em: new Date().toISOString(), recebido_por: String(n.recebido_por).trim(),
+        com_assinatura: typeof n.assinatura_png === 'string' && !!n.assinatura_png, pedido: await demo.chamar('GET', `/api/app/pedidos/${p.id}`) };
+      ENTREGAS_POR_CHAVE[chave!] = { corpo: corpoTxt, resposta };
+      return r(resposta);
     }
     if (metodo === 'GET' && caminho === '/api/app/producao') {
       const rotulos: Record<string, string> = { quote_approved: 'Aprovado pelo cliente', in_production: 'Em produção', on_hold: 'Em espera', ready_for_invoice: 'Pronto pra faturar' };
@@ -627,7 +840,7 @@ export const demo = {
         return r({ perfil: 'colaborador', abre_em: 'ponto', areas: ['ponto', 'mais'], usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
           faturado_hoje: null, meta_dia: null, kpis: { pedidos_ativos: null, pedidos_atrasados: null, estoque_baixo: null }, financeiro: null, proximas_tarefas: [], ajustes: { ...ajustesDemo } });
       }
-      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais'],
+      return r({ perfil: 'erp', abre_em: 'inicio', areas: ['inicio', 'tarefas', 'pedidos', 'producao', 'pessoas', 'orcamentos', 'produtos', 'estoque', 'financeiro', 'fiscal', 'relatorios', 'dashboard', 'assistente', 'equipe', 'oficina', 'pagamentos', 'ponto', 'ponto_gestor', 'mais', ...areaAtendimentoDemo()],
         usuario: 'Colaborador', empresa: 'Gráfica Demonstração',
         faturado_hoje: { valor: 1520, ontem: 1300, variacao_pct: 16.9 }, meta_dia: { valor: 2000, derivada: true },
         kpis: { pedidos_ativos: ativos.length, pedidos_atrasados: PEDIDOS.filter((x) => x.atrasado).length, estoque_baixo: ESTOQUE.filter((x) => x.minimo !== null && x.qtd <= x.minimo).length },
@@ -817,7 +1030,8 @@ export const demo = {
           top_clientes: parte(v(61000), [['Papelaria Sol', 0.3], ['Clínica Vita', 0.25], ['Restaurante 88', 0.19], ['Bistrô do Forno', 0.16], ['Marília Costa', 0.1]]) },
         producao: aba !== 'producao' ? null : { por_etapa: etapas },
         estoque: aba !== 'estoque' ? null : { baixo: [{ nome: 'Lona 440 g', quantidade: 2, minimo: 5, unidade: 'un' },
-          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] } });
+          { nome: 'Vinil adesivo branco', quantidade: 8, minimo: 10, unidade: 'm' }] },
+        ...relatoriosP6(aba, f) });
     }
     if (metodo === 'GET' && caminho === '/api/app/dashboard') {
       // Números fictícios do protótipo; datas calculadas aqui (o build de produção precisa descartar o demo).
@@ -1004,6 +1218,41 @@ export const demo = {
       return r({ itens, total: itens.length, pagina: 1, tem_mais: false, pode_criar: true, pode_editar: true,
         revisao_proxima: VEICULOS.filter(proxima).length, revisao_aviso_km: AVISO });
     }
+    // P2 · anexos — GET/POST /api/app/os/{id}/arquivos, com as recusas do contrato tela-03-anexos (ERP #9446).
+    if (caminho.startsWith('/api/app/os/') && caminho.endsWith('/arquivos')) {
+      const idOs = Number(caminho.split('/')[4]);
+      const os = ORDENS.find((x) => x.id === idOs);
+      if (!os && !Object.values(HISTORICO_ANTIGO).some((l) => l.some((h) => h.os_id === idOs))) {
+        throw Object.assign(new Error('Ordem de serviço não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      }
+      const lista = (ANEXOS_OS[idOs] ??= []);
+      if (metodo === 'GET') return r({ itens: lista.map((a) => ({ ...a })), pode_enviar: true });
+      const partes = (Array.isArray(corpo) ? corpo : []) as ParteFormulario[];
+      const valor = (k: string) => partes.find((p) => p.key === k);
+      const arq = valor('arquivo'), origem = valor('origem')?.value ?? null, legenda = valor('legenda')?.value?.slice(0, 160) || null;
+      const chave = cabecalhos['Idempotency-Key'];
+      if (!chave) throw Object.assign(new Error('Falta a chave de idempotência.'), { status: 422, codigo: 'validacao', campos: { idempotency_key: 'Falta a chave de idempotência.' } });
+      if (origem === 'camera' && !ajustesDemo.app_anexos_camera) {
+        throw Object.assign(new Error('A empresa desligou anexos pela câmera.'), { status: 422, codigo: 'validacao', campos: { origem: 'A empresa desligou anexos pela câmera. Escolha da galeria.' } });
+      }
+      if (!arq || arq.type !== 'base64File' || !['image/jpeg', 'image/png', 'application/pdf'].includes(arq.contentType ?? '')) {
+        throw Object.assign(new Error('Envie uma foto (JPG ou PNG) ou um PDF.'), { status: 422, codigo: 'validacao', campos: { arquivo: 'Envie uma foto (JPG ou PNG) ou um PDF.' } });
+      }
+      const tamanho = Math.floor((arq.value.length * 3) / 4);
+      if (tamanho > 10 * 1024 * 1024) throw Object.assign(new Error('O arquivo passa de 10 MB.'), { status: 413, codigo: 'arquivo_grande' });
+      const corpoTxt = JSON.stringify([idOs, arq.value.length, arq.value.slice(0, 64), arq.value.slice(-64), legenda]);
+      const ja = ANEXOS_POR_CHAVE[chave];
+      if (ja && ja.corpo !== corpoTxt) throw Object.assign(new Error('Chave já usada em outro envio.'), { status: 422, codigo: 'idempotencia_conflito' });
+      if (ja) return r({ ...ja.anexo });
+      await espera(600);
+      const dataUrl = `data:${arq.contentType};base64,${arq.value}`;
+      const anexo: AnexoOs = { id: proximoAnexo++, nome: arq.fileName ?? 'arquivo', tipo: arq.contentType as string, tamanho, legenda,
+        etapa: os?.etapa ?? 'entregue', enviado_em: new Date().toISOString(), enviado_por: 'Você',
+        url: dataUrl, miniatura: arq.contentType === 'application/pdf' ? null : dataUrl };
+      lista.unshift(anexo);
+      ANEXOS_POR_CHAVE[chave] = { corpo: corpoTxt, anexo };
+      return r({ ...anexo });
+    }
     if (metodo === 'POST' && caminho.startsWith('/api/app/os/') && caminho.includes('/acoes/')) {
       const partes = caminho.split('/');
       const o = ORDENS.find((x) => x.id === Number(partes[4]));
@@ -1114,6 +1363,61 @@ export const demo = {
         etapa: { chave: o.etapa, rotulo: ETAPAS_OS[pos(o.etapa)][1], indice: pos(o.etapa) + 1, total_etapas: ETAPAS_OS.length } }));
       const etapas = ETAPAS_OS.map(([chave, rotulo]) => ({ chave, rotulo, total: ativas.filter((o) => o.etapa === chave).length }));
       return r({ itens, etapas, total: ativas.length, travadas: ativas.filter((o) => OS_TRAVA.includes(o.etapa)).length, pagina: 1, tem_mais: false, pode_criar: true });
+    }
+    // P5 · atendimento — tela 41.
+    if (caminho.startsWith('/api/app/atendimento')) {
+      const erro = (status: number, codigo: string, msg: string, campos?: Record<string, string>) => Object.assign(new Error(msg), { status, codigo, campos });
+      const cs = atendimentoDemo();
+      if (metodo === 'GET' && /^\/api\/app\/atendimento(\?|$)/.test(caminho)) {
+        if (!canalAtendimentoDemo) return r({ canal: { ligado: false, numero: null }, conversas: [], pagina: 1, tem_mais: false });
+        return r({ canal: { ligado: true, numero: '+55 48 3626-0400' }, conversas: cs.map(itemAtendimento), pagina: 1, tem_mais: false });
+      }
+      const mm = caminho.match(/^\/api\/app\/atendimento\/(\d+)(\/mensagens|\/atalho)?$/);
+      const c = mm ? cs.find((x) => x.id === Number(mm[1])) : undefined;
+      if (!mm || !c) throw erro(404, 'nao_encontrado', 'Conversa não encontrada.');
+      if (metodo === 'GET' && !mm[2]) { c.nao_lidas = 0; return r({ conversa: itemAtendimento(c), mensagens: c.msgs.map((x) => msgAtendimento(c, x)) }); }
+      if (metodo !== 'POST' || !mm[2]) throw new Error('Rota sem simulação: ' + caminho);
+      const atalho = mm[2] === '/atalho';
+      if (atalho && !ajustesDemo.app_atendimento_atalhos) throw erro(403, 'sem_permissao', 'Os atalhos do atendimento estão desligados nas configurações da empresa.');
+      const chave = (cabecalhos['Idempotency-Key'] ?? '').trim();
+      if (!chave) throw erro(422, 'validacao', 'Envie o header Idempotency-Key.', { idempotency_key: 'Envie o header Idempotency-Key.' });
+      const b = (corpo ?? {}) as { texto?: string; modelo?: unknown; anexo?: unknown; tipo?: string; ref_id?: number };
+      let texto: string;
+      if (atalho) {
+        if (c.contato.id === null) throw erro(422, 'validacao', 'Vincule a conversa a um cliente antes de usar o atalho.', { ref_id: 'Vincule a conversa a um cliente antes de usar o atalho.' });
+        const nome = c.contato.nome, ref = Number(b.ref_id);
+        const orc = b.tipo === 'orcamento' ? ORCAMENTOS.find((o) => o.id === ref && o.cliente === nome && o.status !== 'convertido') : undefined;
+        const ped = b.tipo === 'status_pedido' ? PEDIDOS.find((p) => p.id === ref && p.cliente === nome && p.etapa.grupo !== 'orcamento') : undefined;
+        const op = b.tipo === 'link_arte' ? OPS_ARTE.find((o) => o.id === ref && o.contato_id === c.contato.id) : undefined;
+        const t = orc ? `Orçamento #${orc.numero}: total R$ ${reaisDemo(orc.valor)}.` : ped ? `Seu pedido #${ped.numero} está em ${ped.etapa.rotulo}.`
+          : op ? `Arte do pedido ${op.codigo}: ${op.arte_url}` : null;
+        if (!t) throw erro(404, 'nao_encontrado', 'Registro não encontrado para este cliente.');
+        texto = t;
+      } else {
+        if (b.modelo != null || b.anexo != null) throw erro(422, 'validacao', 'Anexo ainda não está no app.');
+        texto = (b.texto ?? '').trim();
+        if (!texto) throw erro(422, 'validacao', 'Escreva a mensagem.', { texto: 'Escreva a mensagem.' });
+      }
+      if (!canalAtendimentoDemo) throw erro(503, 'sem_configuracao', 'O canal do WhatsApp está desligado.');
+      if (!itemAtendimento(c).janela_aberta_ate && !c.consentimento)
+        throw erro(422, 'sem_consentimento', 'Este cliente não autorizou mensagens no WhatsApp. Só dá para responder quando ele escrever.');
+      const hash = atalho ? `${b.tipo}|${b.ref_id}` : texto;
+      const ja = ENVIOS_ATENDIMENTO[mm[2] + chave];
+      if (ja) {
+        if (ja.hash !== hash) throw erro(422, 'idempotencia_conflito', 'Esta chave já foi usada com outra mensagem.');
+        if (!ja.resp) throw erro(502, 'falha_envio', 'O WhatsApp não aceitou a mensagem agora. Tente de novo.');
+        return r(ja.resp);
+      }
+      await espera(500);
+      if (texto.includes('#falha')) {
+        ENVIOS_ATENDIMENTO[mm[2] + chave] = { hash, resp: null };
+        throw erro(502, 'falha_envio', 'O WhatsApp não aceitou a mensagem agora. Tente de novo.');
+      }
+      const nova: MsgDemo = { id: ++idMsgAtendimento, de: 'eu', texto, midia: null, min: (c.base - Date.now()) / 60000, status: 'sent' };
+      c.msgs.push(nova);
+      const resp = { mensagem: msgAtendimento(c, nova) };
+      ENVIOS_ATENDIMENTO[mm[2] + chave] = { hash, resp };
+      return r(resp);
     }
     if (caminho.endsWith('/push/dispositivo')) return r({ ativo: true });
     throw new Error('Rota sem simulação: ' + caminho);

@@ -17,10 +17,9 @@ const TINTA: Record<ColunaProducao, string> = {
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
-
-/** `voltar`: botão para Mais, quando Produção não está na barra (tela 30). */
-export function Producao({ voltar, avisar, online = true }: { voltar?: ReactNode; avisar?: Aviso; online?: boolean } = {}) {
+/** `voltar`: botão para Mais, quando Produção não está na barra (tela 30). `avisar`/`online`: o rodapé do Detalhe do
+ *  pedido move a etapa (P1); sem `online` a escrita fica travada. */
+export function Producao({ voltar, avisar = () => {}, online = false }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void; online?: boolean } = {}) {
   const [aberto, setAberto] = useState<number | null>(null);
   const [apontando, setApontando] = useState(false);
   useVoltar(aberto !== null, () => setAberto(null));
@@ -28,10 +27,10 @@ export function Producao({ voltar, avisar, online = true }: { voltar?: ReactNode
   // A fila fica montada por baixo do detalhe para não recarregar nem perder a coluna escolhida.
   return (
     <>
-      {aberto !== null && <Detalhe id={aberto} aoVoltar={() => setAberto(null)} />}
-      {apontando && avisar && <Apontamento aoVoltar={() => setApontando(false)} avisar={avisar} online={online} />}
+      {aberto !== null && <Detalhe id={aberto} aoVoltar={() => setAberto(null)} avisar={avisar} online={online} />}
+      {apontando && <Apontamento aoVoltar={() => setApontando(false)} avisar={avisar} online={online} />}
       <div style={{ display: aberto !== null || apontando ? 'none' : 'contents' }}>
-        <Fila aoAbrir={setAberto} voltar={voltar} aoApontar={avisar ? () => setApontando(true) : undefined} />
+        <Fila aoAbrir={setAberto} voltar={voltar} aoApontar={() => setApontando(true)} />
       </div>
     </>
   );

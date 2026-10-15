@@ -10,12 +10,14 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>O oimpresso acessa as suas fotos somente quando você escolhe uma imagem para anexar a uma ordem de serviço.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O oimpresso acessa as suas fotos somente quando você escolhe uma imagem para anexar a uma ordem de serviço.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O oimpresso usa a localização somente quando você bate o ponto, para registrar onde a marcação foi feita.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>O oimpresso usa o Face ID somente para você entrar no app. A biometria fica no seu celular e não é enviada ao servidor.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>pt-BR</string>
   <key>CAPACITOR_DEBUG</key>

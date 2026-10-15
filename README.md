@@ -25,7 +25,9 @@ de design) por `npm run tokens` → `src/styles/oi-v4.css` — não editar o CSS
 
 - **Pacote local**, não o site: o Vite gera `www/` e o Capacitor empacota. Sem `server.url`.
 - **Login por token**: usuário e senha do ERP vão para `POST /oauth/token` (Passport, password grant,
-  client **público** — o app não guarda segredo). O token fica em `@capacitor/preferences`.
+  client **público** — o app não guarda segredo). O token fica em `@capacitor/preferences`; com a
+  biometria ligada em Conta (P9), fica no Keychain/Keystore (`@capgo/capacitor-native-biometric`) e só
+  é lido depois que o celular confirma a digital ou o rosto. A senha nunca é guardada.
 - **API do ponto**: `/ponto/api/*` (`auth:api`), contrato de `MobileMarcacaoController`.
 - **HTTP nativo** (`CapacitorHttp`): as chamadas não passam por CORS — nada a mudar no ERP por isso.
 - **Relógio**: a diferença aparelho × servidor sai do header `Date` das respostas; acima de 30 s o botão
@@ -55,16 +57,19 @@ Decisão [W] de 2026-10-05.
 - **Câmera:** só para tirar foto de anexo (OS e pedido) e ler o QR da etiqueta no apontamento.
   Sempre a pedido de quem usa, nunca em segundo plano.
 - **Biometria:** só para entrar no app. A biometria do celular destrava o token guardado no
-  aparelho e nada vai ao servidor (LGPD, Art. 11). A ADR do ERP sobre biometria no login é o PR
-  00b.
+  aparelho e nada vai ao servidor (LGPD, Art. 11). ADR 0432 do ERP. Opção em Conta, desligada até a
+  pessoa ligar; três falhas seguidas pedem a senha; sair da conta desliga; a empresa pode tirar a
+  opção (`app_biometria_login`).
 
 Permissões hoje nos manifests:
 
-- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `CAMERA` (PR 08, leitor de QR do apontamento;
-  `android.hardware.camera` não obrigatória). **Sem** `ACCESS_BACKGROUND_LOCATION`. `POST_NOTIFICATIONS` entra pelo
-  plugin de push.
+- Android: `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `CAMERA` (PR 10, anexos da OS, e PR 08, leitor de QR
+  do apontamento; `android.hardware.camera` não obrigatório). **Sem** `ACCESS_BACKGROUND_LOCATION`.
+  `POST_NOTIFICATIONS` entra pelo plugin de push.
 - iOS: `NSLocationWhenInUseUsageDescription`, `NSPhotoLibraryUsageDescription` (anexo de OS) e
-  `NSCameraUsageDescription` (PR 08, com o texto da tabela abaixo). **Sem** microfone.
+  `NSCameraUsageDescription` (PRs 10 e 08). **Sem** microfone.
+- Biometria (PR 15): `USE_BIOMETRIC` (Android) e `NSFaceIDUsageDescription` (iOS). O `USE_FINGERPRINT`
+  entra pelo `androidx.biometric` (a mesma permissão no Android 7–8.1, sem diálogo).
 
 Leitor de QR (PR 08): `@capacitor/barcode-scanner` (plugin oficial, Capacitor 8, SPM no iOS). A câmera é pedida pelo
 sistema na primeira leitura; negada, o app avisa e o número digitado continua valendo (exceto com
@@ -75,8 +80,8 @@ declarada sem uso pesa na revisão das lojas. Os textos já estão decididos:
 
 | Permissão | Onde | Entra no PR | Texto |
 |---|---|---|---|
-| `CAMERA` | Android | 08 (QR) ou 10 (anexos), o que vier primeiro | — (o Android não mostra texto; o pedido aparece na hora de usar) |
-| `NSCameraUsageDescription` | iOS | 08 ou 10, junto com o `CAMERA` | O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento. |
+| `CAMERA` | Android | 10 (anexos) ✅ — o 08 (QR) reaproveita | — (o Android não mostra texto; o pedido aparece na hora de usar) |
+| `NSCameraUsageDescription` | iOS | 10 ✅, junto com o `CAMERA` | O oimpresso usa a câmera somente quando você tira uma foto para anexar a uma OS ou a um pedido, ou lê o QR da etiqueta no apontamento. |
 | `USE_BIOMETRIC` | Android | 15 (biometria no login) | — (permissão sem diálogo) |
 | `NSFaceIDUsageDescription` | iOS | 15, junto com o `USE_BIOMETRIC` | O oimpresso usa o Face ID somente para você entrar no app. A biometria fica no seu celular e não é enviada ao servidor. |
 
