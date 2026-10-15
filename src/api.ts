@@ -11,6 +11,7 @@ import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import type { Situacao } from './financeiro-filtros';
 import type { AlteracaoLancamento, BaixaLancamento, Frequencia, NovoLancamento } from './lancamento-regras';
+import type { ReciboDados } from './recibo';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -579,6 +580,9 @@ export interface Lancamento {
 export interface LancamentoDetalhe extends Lancamento {
   parte_id: number | null; observacao: string | null; recorrencia_id: number | null; parcela: string | null;
   conta_nome: string | null; motivo_exclusao: string | null; historico: Array<{ quando: string; texto: string }>;
+  /** Pagamento parcial: o lançamento novo criado com o restante (neste) e de onde este restante veio (no novo). */
+  restante: { id: number; valor: number; vencimento: string } | null;
+  origem_id: number | null;
 }
 export interface PainelFinanceiro {
   /** `vencido` = parte vencida do a receber (já contida em `a_receber`). */
@@ -987,7 +991,9 @@ export const api = {
   /** Baixa (receber/pagar) pelo valor do lançamento. `chave` = Idempotency-Key: repetir não baixa duas vezes. */
   baixarLancamento: (id: number, corpo: BaixaLancamento, chave: string) =>
     chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/baixar`, corpo, { 'Idempotency-Key': chave }),
-  /** Desfaz a baixa (retornar a receber/pagar). */
+  /** Dados do recibo de um lançamento liquidado (409 estado se não estiver). O PDF é montado no app (recibo.ts). */
+  recibo: (id: number) => chamar<ReciboDados>('GET', `/api/app/financeiro/lancamentos/${id}/recibo`),
+  /** Desfaz a baixa (retornar a receber/pagar). Num parcial, junta o restante de volta (409 se o restante já foi pago). */
   estornarLancamento: (id: number, chave: string) =>
     chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/estornar`, undefined, { 'Idempotency-Key': chave }),
   excluirLancamento: (id: number, motivo: string | null) => chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/excluir`, { motivo }),

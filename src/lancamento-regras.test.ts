@@ -1,7 +1,7 @@
 // Novo lançamento (tela 06): validação por campo e corpo que vai ao ERP. Mexe em valor (regra mestre): o corpo
 // leva só os campos do contrato, montados um a um, e o valor arredondado em centavos.
 import { describe, expect, it } from 'vitest';
-import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
+import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, corpoBaixa, formBaixa, restanteDaBaixa, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
   validarLancamento, type FormLancamento } from './lancamento-regras';
 
 const PLANOS = [
@@ -133,9 +133,10 @@ describe('ações do detalhe', () => {
     expect(rotuloAcao('reativar', 'pagar')).toBe('Reativar lançamento');
   });
   it('baixa: data obrigatória e não no futuro', () => {
-    expect(validarBaixa({ pago_em: '', conta_id: null, forma_pagamento: null }, '2026-10-15').pago_em).toMatch(/Escolha/);
-    expect(validarBaixa({ pago_em: '2026-10-16', conta_id: null, forma_pagamento: null }, '2026-10-15').pago_em).toMatch(/futuro/);
-    expect(validarBaixa({ pago_em: '2026-10-15', conta_id: 1, forma_pagamento: 'Pix' }, '2026-10-15')).toEqual({});
+    const b = formBaixa({ valor: 1260 }, '2026-10-15');
+    expect(validarBaixa({ ...b, pago_em: '' }, 1260, '2026-10-15').pago_em).toMatch(/Escolha/);
+    expect(validarBaixa({ ...b, pago_em: '2026-10-16' }, 1260, '2026-10-15').pago_em).toMatch(/futuro/);
+    expect(validarBaixa(b, 1260, '2026-10-15')).toEqual({});
   });
 });
 
@@ -153,5 +154,26 @@ describe('alterar lançamento', () => {
     expect(Object.keys(c)).not.toContain('parcelas');
     expect(Object.keys(c)).not.toContain('recorrencia');
     expect([c.valor, c.contrato, c.contato_id]).toEqual([3500, 'CT-2025/014', 20]);
+  });
+});
+
+describe('pagamento parcial', () => {
+  const b = (x: Partial<ReturnType<typeof formBaixa>> = {}) => ({ ...formBaixa({ valor: 1260, conta_id: 1, forma_pagamento: 'Boleto' }, '2026-10-15'), ...x });
+  it('o formulário já vem com o valor total', () => expect(b().valor).toBe('1.260,00'));
+  it('restante só quando paga menos', () => {
+    expect(restanteDaBaixa(1260, '1.260,00')).toBeNull();
+    expect(restanteDaBaixa(1260, '500')).toBe(760);
+    expect(restanteDaBaixa(100, '33,33')).toBe(66.67);
+    expect(restanteDaBaixa(1260, '0')).toBeNull();
+  });
+  it('parcial pede o vencimento do restante, depois do pagamento', () => {
+    expect(validarBaixa(b({ valor: '500,00' }), 1260, '2026-10-15').vencimento_restante).toMatch(/Escolha/);
+    expect(validarBaixa(b({ valor: '500,00', vencimento_restante: '2026-10-14' }), 1260, '2026-10-15').vencimento_restante).toMatch(/antes do pagamento/);
+    expect(validarBaixa(b({ valor: '500,00', vencimento_restante: '2026-11-15' }), 1260, '2026-10-15')).toEqual({});
+  });
+  it('não aceita pagar mais que o lançamento', () => expect(validarBaixa(b({ valor: '1.300,00' }), 1260, '2026-10-15').valor).toMatch(/não pode passar/));
+  it('corpo: total sem vencimento do restante; parcial com', () => {
+    expect(corpoBaixa(b({ vencimento_restante: '2026-11-15' }), 1260)).toEqual({ pago_em: '2026-10-15', conta_id: 1, forma_pagamento: 'Boleto', valor_pago: 1260, vencimento_restante: null });
+    expect(corpoBaixa(b({ valor: '500,00', vencimento_restante: '2026-11-15' }), 1260).vencimento_restante).toBe('2026-11-15');
   });
 });

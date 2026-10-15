@@ -330,7 +330,10 @@ const CONTAS_DEMO = [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 00
 const CONTRATO_BASE: Record<number, { contrato: string; recorrencia_id: number }> = { 910: { contrato: 'CT-2025/014', recorrencia_id: 801 } };
 // Mudanças feitas pelo detalhe do lançamento (baixa, estorno, alteração, exclusão), por cima da semente e dos criados.
 type AjusteLanc = { pago_em?: string | null; excluido?: boolean; motivo?: string | null; campos?: Partial<LancDemo>;
-  historico: Array<{ quando: string; texto: string }> };
+  historico: Array<{ quando: string; texto: string }>;
+  /** Pagamento parcial: valor antes da baixa e o lançamento criado com o restante. `origem`: no restante, de onde veio. */
+  valor_original?: number; restante_id?: number | null; origem_id?: number };
+const EMPRESA_DEMO = { nome: 'Gráfica Demonstração', documento: '00.000.000/0001-91', cidade: 'Tubarão/SC' };
 const ajustesLanc = new Map<number, AjusteLanc>();
 const chavesAcaoLanc = new Set<string>();
 const brDemo = (iso: string) => iso.split('-').reverse().join('/');
@@ -360,7 +363,9 @@ function detalheDemo(l: LancDemo) {
   const historico = [{ quando: l.emissao, texto: semente ? 'Lançamento criado no ERP' : 'Lançamento criado pelo app' }];
   if (semente?.pago) historico.push({ quando: diaRel(semente.dias), texto: recebe ? 'Recebido' : 'Pago' });
   if (semente?.exc) historico.push({ quando: diaRel(semente.emi + 1), texto: 'Excluído: lançado em duplicidade' });
+  const resto = a?.restante_id ? lancamentosDemo().find((x) => x.id === a.restante_id) : undefined;
   return { ...l, conta_nome: CONTAS_DEMO.find((c) => c.id === l.conta_id)?.nome ?? null,
+    restante: resto ? { id: resto.id, valor: resto.valor, vencimento: resto.vencimento } : null, origem_id: a?.origem_id ?? null,
     motivo_exclusao: l.excluido ? (a?.motivo !== undefined ? a.motivo : semente?.exc ? 'Lançado em duplicidade' : null) : null,
     historico: [...historico, ...(a?.historico ?? [])] };
 }
@@ -831,7 +836,7 @@ export const demo = {
       if (chave) chavesLanc.set(chave, resposta);
       return r(resposta);
     }
-    const detLanc = caminho.match(/^\/api\/app\/financeiro\/lancamentos\/(\d+)(?:\/(baixar|estornar|excluir|reativar))?$/);
+    const detLanc = caminho.match(/^\/api\/app\/financeiro\/lancamentos\/(\d+)(?:\/(baixar|estornar|excluir|reativar|recibo))?$/);
     if (detLanc) {
       const id = Number(detLanc[1]);
       const acao = detLanc[2];
@@ -839,6 +844,13 @@ export const demo = {
       const l = achar();
       if (!l) throw Object.assign(new Error('Lançamento não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
       if (metodo === 'GET' && !acao) return r(detalheDemo(l));
+      if (metodo === 'GET' && acao === 'recibo') {
+        if (l.status !== 'liquidado' || l.excluido) throw Object.assign(new Error('Recibo só de lançamento recebido ou pago.'), { status: 409, codigo: 'estado' });
+        const p = l.parte_id ? PESSOAS.find((x) => x.id === l.parte_id) : PESSOAS.find((x) => x.nome === l.parte);
+        return r({ numero: `REC-${l.pago_em!.slice(0, 4)}-${String(l.id).padStart(5, '0')}`, tipo: l.tipo, valor: l.valor, data: l.pago_em!,
+          referente: l.descricao, forma: l.forma_pagamento, documento: l.documento, empresa: EMPRESA_DEMO,
+          parte: l.parte ? { nome: l.parte, documento: p?.documento ?? null } : null });
+      }
       const falha = (msg: string): never => { throw Object.assign(new Error(msg), { status: 409, codigo: 'estado' }); };
       const chave = cabecalhos['Idempotency-Key'];
       if (chave && chavesAcaoLanc.has(chave)) return r(detalheDemo(l));
@@ -875,12 +887,48 @@ export const demo = {
         const quando = String(n.pago_em ?? '');
         if (!/^\d{4}-\d{2}-\d{2}$/.test(quando) || quando > hoje)
           throw Object.assign(new Error('Data do pagamento inválida.'), { status: 422, codigo: 'validacao', campos: { pago_em: 'Data do pagamento inválida.' } });
+        const pagoC = Math.round(Number(n.valor_pago ?? l.valor) * 100), totalC = Math.round(l.valor * 100);
+        if (!(pagoC > 0) || pagoC > totalC)
+          throw Object.assign(new Error('Valor pago inválido.'), { status: 422, codigo: 'validacao', campos: { valor: 'O valor pago precisa ser maior que zero e até o valor do lançamento.' } });
+        const venceResto = String(n.vencimento_restante ?? '');
+        if (pagoC < totalC && (!/^\d{4}-\d{2}-\d{2}$/.test(venceResto) || venceResto < quando))
+          throw Object.assign(new Error('Escolha o vencimento do restante.'), { status: 422, codigo: 'validacao', campos: { vencimento_restante: 'Escolha o vencimento do restante.' } });
         aj.pago_em = quando;
         aj.campos = { ...aj.campos, conta_id: (n.conta_id as number | null) ?? l.conta_id, forma_pagamento: (n.forma_pagamento as string | null) ?? l.forma_pagamento };
-        aj.historico.push({ quando: hoje, texto: `${recebe ? 'Recebido' : 'Pago'} em ${brDemo(quando)}` });
+        const rs = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (pagoC < totalC) {
+          // Parcial: este fica liquidado com o valor pago; o restante vira um lançamento novo em aberto.
+          const novoId = 950 + LANC_CRIADOS.length;
+          LANC_CRIADOS.push({ id: novoId, tipo: l.tipo, descricao: `${l.descricao.replace(/ \(restante\)$/, '')} (restante)`, parte: l.parte, valor: (totalC - pagoC) / 100,
+            vencimento: venceResto, emissao: l.emissao, competencia: l.competencia, venda_em: null, forma_pagamento: l.forma_pagamento, conta_id: l.conta_id,
+            nf_numero: l.nf_numero, nosso_numero: null, plano_codigo: l.plano_codigo, plano_nome: l.plano_nome, documento: l.documento, excluido: false,
+            parte_id: l.parte_id, observacao: null, contrato: l.contrato, recorrencia_id: l.recorrencia_id, parcela: l.parcela });
+          ajustesLanc.set(novoId, { origem_id: id, historico: [{ quando: hoje, texto: `Criado com o restante do lançamento #${id} (pagamento parcial de ${rs(pagoC)})` }] });
+          aj.valor_original = l.valor; aj.restante_id = novoId;
+          aj.campos = { ...aj.campos, valor: pagoC / 100 };
+          aj.historico.push({ quando: hoje, texto: `${recebe ? 'Recebido' : 'Pago'} parcialmente: ${rs(pagoC)} em ${brDemo(quando)}. Restante de ${rs(totalC - pagoC)} no lançamento #${novoId}, vencendo ${brDemo(venceResto)}` });
+        } else {
+          aj.historico.push({ quando: hoje, texto: `${recebe ? 'Recebido' : 'Pago'} em ${brDemo(quando)}` });
+        }
       } else if (metodo === 'POST' && acao === 'estornar') {
         if (l.status !== 'liquidado') falha(recebe ? 'Este lançamento ainda não foi recebido.' : 'Este lançamento ainda não foi pago.');
-        aj.historico.push({ quando: hoje, texto: `${recebe ? 'Retornado a receber' : 'Retornado a pagar'} (baixa de ${brDemo(l.pago_em!)} desfeita)` });
+        let junta = '';
+        if (aj.restante_id) {
+          // Parcial: o restante volta para este lançamento (se ainda estiver em aberto).
+          const resto = lancamentosDemo().find((x) => x.id === aj.restante_id);
+          if (resto && resto.status === 'liquidado' && !resto.excluido)
+            falha(`O restante (lançamento #${resto.id}) já foi ${recebe ? 'recebido' : 'pago'}: retorne ele antes.`);
+          if (resto && !resto.excluido) {
+            const ar = ajustesLanc.get(resto.id) ?? { historico: [] };
+            ar.excluido = true; ar.motivo = `Juntado de volta ao lançamento #${id}`;
+            ar.historico.push({ quando: hoje, texto: `Juntado de volta ao lançamento #${id} (retorno do pagamento parcial)` });
+            ajustesLanc.set(resto.id, ar);
+          }
+          aj.campos = { ...aj.campos, valor: aj.valor_original ?? l.valor };
+          junta = `; o restante #${aj.restante_id} voltou para este lançamento`;
+          aj.restante_id = null; aj.valor_original = undefined;
+        }
+        aj.historico.push({ quando: hoje, texto: `${recebe ? 'Retornado a receber' : 'Retornado a pagar'} (baixa de ${brDemo(l.pago_em!)} desfeita${junta})` });
         aj.pago_em = null;
       } else if (metodo === 'POST' && acao === 'excluir') {
         if (l.status === 'liquidado') falha(recebe ? 'Já recebido: retorne a receber antes de excluir.' : 'Já pago: retorne a pagar antes de excluir.');

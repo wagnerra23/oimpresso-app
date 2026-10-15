@@ -79,8 +79,8 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
   function fecharDetalhe() { setAberto(null); carregar(consulta, filtros); }
   const nFiltros = contarFiltros(filtros);
   if (aberto !== null && dados) {
-    return <LancamentoDetalhe id={aberto} contas={dados.contas} formas={dados.formas_pagamento} planos={dados.planos_conta ?? []}
-      avisar={avisar} aoVoltar={fecharDetalhe} />;
+    return <LancamentoDetalhe key={aberto} id={aberto} contas={dados.contas} formas={dados.formas_pagamento} planos={dados.planos_conta ?? []}
+      avisar={avisar} aoVoltar={fecharDetalhe} aoAbrir={setAberto} />;
   }
   if (novo && dados) {
     // Abre no lado que a tela mostra (só "A pagar" marcado → a pagar). Ao lançar, garante a caixa do lado marcada.

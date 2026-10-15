@@ -568,6 +568,28 @@ button.fn-lanc:active { background: var(--surface-2); }
 .ld-dica { font-size: 12px; color: var(--text-dim); text-align: center; }
 .ld-acao-t { font-size: 15px; }
 .ld-acao-p { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.ld-acao { max-height: 72vh; overflow-y: auto; }
+.ld-restante { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px; border: 1px dashed var(--warn); background: var(--bg-2); font-size: 13px; line-height: 1.45; }
+.ld-restante b { font-family: var(--font-mono); font-weight: 600; }
+.ld-vinculo { display: flex; flex-direction: column; gap: 6px; }
+.ld-link { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--accent);
+  background: var(--accent-soft); color: var(--text); font: inherit; font-size: 13px; line-height: 1.4; text-align: left; cursor: pointer; }
+.ld-link span { flex: 1; min-width: 0; }
+.ld-link b { font-family: var(--font-mono); font-weight: 600; }
+.ld-link i { font-style: normal; font-size: 20px; color: var(--accent-text); }
+/* Recibo: folha clara nos dois temas, como o papel que vai sair */
+.rb-folha { padding: 18px 16px; border-radius: 6px; background: #fffefb; color: #1d1a15; border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.55; }
+.rb-folha header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid #d9d6cf; }
+.rb-folha header b { display: block; font-size: 18px; letter-spacing: 1px; }
+.rb-folha header small { font-family: var(--font-mono); font-size: 11px; color: #66635d; }
+.rb-folha header span { font-family: var(--font-mono); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rb-folha p { margin: 0; }
+.rb-local { color: #3b3832; }
+.rb-folha footer { margin-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.rb-folha footer i { width: 72%; height: 1px; background: #1d1a15; margin-bottom: 4px; }
+.rb-folha footer b { font-size: 13px; }
+.rb-folha footer small { font-family: var(--font-mono); font-size: 11px; color: #66635d; }
 .fn-lanc.excluido b, .fn-lanc.excluido .fn-lanc-v span { text-decoration: line-through; }
 /* Filtro avançado do Financeiro */
 .ff-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

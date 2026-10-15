@@ -206,12 +206,55 @@ export function rotuloAcao(a: AcaoLancamento, tipo: TipoLancamento): string {
 
 /** Corpo do POST /api/app/financeiro/lancamentos/{id}/baixar. O valor baixado é o do lançamento (o ERP não aceita
  *  valor aqui: baixa parcial, juros e desconto ficam no computador). */
-export interface BaixaLancamento { pago_em: string; conta_id: number | null; forma_pagamento: string | null }
+export interface BaixaLancamento {
+  pago_em: string; conta_id: number | null; forma_pagamento: string | null;
+  /** Valor pago agora. Menor que o do lançamento = pagamento parcial: o lançamento fica liquidado com este valor e o
+   *  ERP cria um novo lançamento em aberto com o restante, vencendo em `vencimento_restante`. */
+  valor_pago: number;
+  /** Obrigatório no parcial; null no pagamento total. */
+  vencimento_restante: string | null;
+}
 
-export function validarBaixa(b: BaixaLancamento, hoje: string): Record<string, string> {
-  if (!DATA.test(b.pago_em)) return { pago_em: 'Escolha a data do pagamento.' };
-  if (b.pago_em > hoje) return { pago_em: 'A data do pagamento não pode ser no futuro.' };
-  return {};
+/** Como a tela guarda a baixa: valor como digitado. */
+export interface FormBaixa { pago_em: string; conta_id: number | null; forma: string; valor: string; vencimento_restante: string }
+
+export function formBaixa(l: { valor: number; conta_id?: number | null; forma_pagamento?: string | null }, hoje: string): FormBaixa {
+  return { pago_em: hoje, conta_id: l.conta_id ?? null, forma: l.forma_pagamento ?? '',
+    valor: l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), vencimento_restante: '' };
+}
+
+/** Restante em reais quando o valor digitado é menor que o do lançamento; null quando paga tudo ou o valor é inválido. */
+export function restanteDaBaixa(valorLancamento: number, digitado: string): number | null {
+  const v = lerValor(digitado);
+  if (v === null || v <= 0) return null;
+  const resto = Math.round(valorLancamento * 100) - Math.round(v * 100);
+  return resto > 0 ? resto / 100 : null;
+}
+
+export function validarBaixa(f: FormBaixa, valorLancamento: number, hoje: string): Record<string, string> {
+  const e: Record<string, string> = {};
+  if (!DATA.test(f.pago_em)) e.pago_em = 'Escolha a data do pagamento.';
+  else if (f.pago_em > hoje) e.pago_em = 'A data do pagamento não pode ser no futuro.';
+  const v = lerValor(f.valor);
+  if (f.valor.trim() === '') e.valor = 'Informe o valor pago.';
+  else if (v === null) e.valor = 'Valor inválido. Use números, ex.: 500,00.';
+  else if (v <= 0) e.valor = 'O valor precisa ser maior que zero.';
+  else if (Math.round(v * 100) !== Math.round(v * 1000) / 10) e.valor = 'Use no máximo 2 casas depois da vírgula.';
+  else if (Math.round(v * 100) > Math.round(valorLancamento * 100)) e.valor = 'O valor pago não pode passar do valor do lançamento. Juros e multa ficam no computador.';
+  if (!e.valor && restanteDaBaixa(valorLancamento, f.valor) !== null) {
+    if (!DATA.test(f.vencimento_restante)) e.vencimento_restante = 'Escolha o vencimento do restante.';
+    else if (DATA.test(f.pago_em) && f.vencimento_restante < f.pago_em) e.vencimento_restante = 'O restante não pode vencer antes do pagamento.';
+  }
+  return e;
+}
+
+/** Corpo da baixa. Chame só depois de validar. */
+export function corpoBaixa(f: FormBaixa, valorLancamento: number): BaixaLancamento {
+  const v = lerValor(f.valor);
+  if (v === null || v <= 0) throw new Error('Valor inválido.');
+  const parcial = restanteDaBaixa(valorLancamento, f.valor) !== null;
+  return { pago_em: f.pago_em, conta_id: f.conta_id, forma_pagamento: f.forma || null, valor_pago: Math.round(v * 100) / 100,
+    vencimento_restante: parcial ? f.vencimento_restante : null };
 }
 
 /** Corpo do PATCH /api/app/financeiro/lancamentos/{id}: os campos do novo lançamento, sem tipo nem repetição. */
