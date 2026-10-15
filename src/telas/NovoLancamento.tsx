@@ -1,9 +1,9 @@
 // Novo lançamento do Financeiro (tela 06, "+ Novo"). Nasce em aberto; baixar fica na tela 15 (Pagamentos).
 // Regras, validação e corpo em ../lancamento-regras. Cliente/fornecedor vem da mesma rota da tela Pessoas.
 import { useEffect, useRef, useState } from 'react';
-import { api, camposDoErro, type PessoaResumo } from '../api';
+import { api, camposDoErro, type LancamentoDetalhe, type PessoaResumo } from '../api';
 import { FORMAS_PADRAO, lerValor } from '../financeiro-filtros';
-import { contaAnalitica, corpoLancamento, formVazio, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
+import { contaAnalitica, corpoAlteracao, corpoLancamento, formVazio, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
   validarLancamento, type FormLancamento, type TipoLancamento } from '../lancamento-regras';
 import { novaChave } from '../venda';
 import { useVoltar } from '../voltar';
@@ -14,7 +14,8 @@ const br = (iso: string) => iso.split('-').reverse().join('/');
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const recuo = (codigo: string) => '   '.repeat(codigo.split('.').length - 1);
 
-export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, aoCriar, avisar }: {
+/** `editar`: abre como "Alterar lançamento" (sem tipo nem repetição) e salva com PATCH; devolve o lançamento em `aoSalvar`. */
+export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, aoCriar, avisar, editar, aoSalvar }: {
   tipoInicial: TipoLancamento;
   contas: Array<{ id: number; nome: string; detalhe: string | null }>;
   formas?: string[];
@@ -22,8 +23,10 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
   aoVoltar: () => void;
   aoCriar: (tipo: TipoLancamento, recorrente: boolean) => void;
   avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
+  editar?: { id: number; inicial: FormLancamento };
+  aoSalvar?: (l: LancamentoDetalhe) => void;
 }) {
-  const [f, setF] = useState<FormLancamento>(() => formVazio(tipoInicial, hojeLocal()));
+  const [f, setF] = useState<FormLancamento>(() => editar?.inicial ?? formVazio(tipoInicial, hojeLocal()));
   const [erros, setErros] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -47,6 +50,19 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
     const e = validarLancamento(f, doTipo);
     setErros(e);
     if (Object.keys(e).length) return;
+    if (editar) {
+      setSalvando(true);
+      try {
+        const novo = await api.alterarLancamento(editar.id, corpoAlteracao(f));
+        avisar?.('Alterações salvas.', 'ok');
+        aoSalvar?.(novo);
+      } catch (x) {
+        const campos = camposDoErro(x);
+        if (Object.keys(campos).length) setErros(campos);
+        avisar?.(x instanceof Error ? x.message : 'Não foi possível salvar.', 'erro');
+      } finally { setSalvando(false); }
+      return;
+    }
     const corpo = corpoLancamento(f);
     const sig = JSON.stringify(corpo);
     if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
@@ -83,16 +99,18 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
   const inv = (k: string) => ({ 'aria-invalid': !!erros[k], 'aria-describedby': erros[k] ? 'nl-e-' + k : undefined });
   return (
     <>
-      <Cabecalho titulo="Novo lançamento" rotulo="Financeiro" aoVoltar={aoVoltar} />
+      <Cabecalho titulo={editar ? 'Alterar lançamento' : 'Novo lançamento'} rotulo={editar ? (f.tipo === 'receber' ? 'Conta a receber' : 'Conta a pagar') : 'Financeiro'} aoVoltar={aoVoltar} />
       <div className="oi-scroll">
         <div className="pd-corpo np-form">
-          <div className="np-seg" role="radiogroup" aria-label="Tipo do lançamento">
-            {(['receber', 'pagar'] as const).map((t) => (
-              <button key={t} role="radio" aria-checked={f.tipo === t} className={f.tipo === t ? 'on' : ''} onClick={() => mudar('tipo', t)}>
-                {t === 'receber' ? 'A receber' : 'A pagar'}
-              </button>
-            ))}
-          </div>
+          {!editar && (
+            <div className="np-seg" role="radiogroup" aria-label="Tipo do lançamento">
+              {(['receber', 'pagar'] as const).map((t) => (
+                <button key={t} role="radio" aria-checked={f.tipo === t} className={f.tipo === t ? 'on' : ''} onClick={() => mudar('tipo', t)}>
+                  {t === 'receber' ? 'A receber' : 'A pagar'}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="p4-campo">
             <label htmlFor="nl-descricao">Descrição</label>
@@ -133,14 +151,14 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
           </div>
           {erro('emissao')}{erro('competencia')}
 
-          <div className="p4-campo">
+          {!editar && <div className="p4-campo">
             <label id="nl-l-rep">Repetição</label>
             <div className="np-seg tres" role="radiogroup" aria-labelledby="nl-l-rep">
               {REPETICOES.map((r) => (
                 <button key={r.id} role="radio" aria-checked={f.repeticao === r.id} className={f.repeticao === r.id ? 'on' : ''} onClick={() => mudar('repeticao', r.id)}>{r.label}</button>
               ))}
             </div>
-          </div>
+          </div>}
           {f.repeticao === 'parcelado' && (
             <div className="nl-rep">
               <div className="p4-campo">
@@ -159,6 +177,11 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
           )}
           {f.repeticao === 'recorrente' && (
             <div className="nl-rep">
+              <div className="p4-campo">
+                <label htmlFor="nl-contrato">Nº do contrato</label>
+                <input id="nl-contrato" value={f.contrato} onChange={(e) => mudar('contrato', e.target.value)} maxLength={40} placeholder="Opcional. Ex.: CT-2026/031" {...inv('contrato')} />
+                {erro('contrato')}
+              </div>
               <div className="p4-campo">
                 <label id="nl-l-freq">Frequência</label>
                 <div className="pd-chips ff-quebra" role="radiogroup" aria-labelledby="nl-l-freq">
@@ -223,17 +246,24 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
               <input id="nl-nf" inputMode="numeric" value={f.nf} onChange={(e) => mudar('nf', e.target.value)} placeholder="Opcional" />
             </div>
           </div>
+          {editar && (
+            <div className="p4-campo">
+              <label htmlFor="nl-contrato-ed">Nº do contrato</label>
+              <input id="nl-contrato-ed" value={f.contrato} onChange={(e) => mudar('contrato', e.target.value)} maxLength={40} placeholder="Opcional" {...inv('contrato')} />
+              {erro('contrato')}
+            </div>
+          )}
           <div className="p4-campo">
             <label htmlFor="nl-obs">Observação</label>
             <textarea id="nl-obs" className="nl-obs" rows={3} value={f.observacao} onChange={(e) => mudar('observacao', e.target.value)} placeholder="Opcional" />
           </div>
-          <p className="p4-legal">O lançamento entra em aberto. Para dar baixa, use Pagamentos ou o oimpresso no computador.</p>
+          <p className="p4-legal">{editar ? 'A alteração fica registrada no histórico do lançamento.' : 'O lançamento entra em aberto. Para receber ou pagar, abra o lançamento na lista.'}</p>
         </div>
       </div>
       <div className="np-rodape">
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando} onClick={aoVoltar}>Cancelar</button>
         <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando} onClick={salvar}>
-          {salvando ? 'Lançando…' : f.repeticao === 'parcelado' && previa ? `Lançar ${previa.length} parcelas`
+          {salvando ? (editar ? 'Salvando…' : 'Lançando…') : editar ? 'Salvar alterações' : f.repeticao === 'parcelado' && previa ? `Lançar ${previa.length} parcelas`
             : f.repeticao === 'recorrente' ? 'Lançar recorrente' : f.tipo === 'receber' ? 'Lançar a receber' : 'Lançar a pagar'}
         </button>
       </div>

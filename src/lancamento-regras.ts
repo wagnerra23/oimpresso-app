@@ -44,6 +44,8 @@ export interface FormLancamento {
   dia_geracao: string;
   /** Fim do contrato (AAAA-MM-DD); vazio = até interromper. */
   termino: string;
+  /** Nº do contrato (recorrência); também buscável no filtro avançado. */
+  contrato: string;
 }
 
 /** Corpo do POST /api/app/financeiro/lancamentos (formato proposto ao ERP). */
@@ -65,13 +67,13 @@ export interface NovoLancamento {
   /** null = não parcelado. Parcelas mensais a partir de `vencimento`. */
   parcelas: number | null;
   /** null = não recorrente. */
-  recorrencia: { frequencia: Frequencia; dia_geracao: number; termino: string | null } | null;
+  recorrencia: { frequencia: Frequencia; dia_geracao: number; termino: string | null; contrato: string | null } | null;
 }
 
 export function formVazio(tipo: TipoLancamento, hoje: string): FormLancamento {
   return { tipo, descricao: '', parte: null, valor: '', vencimento: '', emissao: hoje, competencia: hoje.slice(0, 7),
     forma: '', conta_id: null, plano: '', documento: '', nf: '', observacao: '',
-    repeticao: 'unico', parcelas: '2', frequencia: 'mensal', dia_geracao: '1', termino: '' };
+    repeticao: 'unico', parcelas: '2', frequencia: 'mensal', dia_geracao: '1', termino: '', contrato: '' };
 }
 
 /** Só contas sem filhas recebem lançamento: "2.1" é grupo quando existe "2.1.01". */
@@ -161,6 +163,7 @@ export function validarLancamento(f: FormLancamento, planos: Array<{ codigo: str
     if (f.termino && !DATA.test(f.termino)) e.termino = 'Data de término inválida.';
     else if (f.termino && DATA.test(f.vencimento) && f.termino < f.vencimento) e.termino = 'O término não pode ser antes do 1º vencimento.';
   }
+  if (f.contrato.trim().length > 40) e.contrato = 'Use até 40 caracteres.';
   return e;
 }
 
@@ -174,6 +177,60 @@ export function corpoLancamento(f: FormLancamento): NovoLancamento {
     vencimento: f.vencimento, emissao: f.emissao, competencia: f.competencia, forma_pagamento: ou(f.forma),
     conta_id: f.conta_id, plano_codigo: f.plano, documento: ou(f.documento), nf_numero: ou(f.nf), observacao: ou(f.observacao),
     parcelas: f.repeticao === 'parcelado' ? Number(f.parcelas) : null,
-    recorrencia: f.repeticao === 'recorrente' ? { frequencia: f.frequencia, dia_geracao: Number(f.dia_geracao), termino: f.termino || null } : null,
+    recorrencia: f.repeticao === 'recorrente'
+      ? { frequencia: f.frequencia, dia_geracao: Number(f.dia_geracao), termino: f.termino || null, contrato: ou(f.contrato) } : null,
   };
+}
+
+// ── Detalhe do lançamento: ações por situação, baixa e alteração ──
+
+export type AcaoLancamento = 'baixar' | 'alterar' | 'excluir' | 'estornar' | 'reativar';
+
+/** Em aberto: receber/pagar, alterar e excluir. Liquidado: só retornar a receber/pagar (excluir pede estornar antes).
+ *  Excluído: só reativar. */
+export function acoesDoLancamento(l: { status: string; excluido?: boolean }): AcaoLancamento[] {
+  if (l.excluido) return ['reativar'];
+  if (l.status === 'liquidado') return ['estornar'];
+  return ['baixar', 'alterar', 'excluir'];
+}
+
+export function rotuloAcao(a: AcaoLancamento, tipo: TipoLancamento): string {
+  switch (a) {
+    case 'baixar': return tipo === 'receber' ? 'Receber' : 'Pagar';
+    case 'estornar': return tipo === 'receber' ? 'Retornar a receber' : 'Retornar a pagar';
+    case 'reativar': return 'Reativar lançamento';
+    case 'alterar': return 'Alterar';
+    case 'excluir': return 'Excluir';
+  }
+}
+
+/** Corpo do POST /api/app/financeiro/lancamentos/{id}/baixar. O valor baixado é o do lançamento (o ERP não aceita
+ *  valor aqui: baixa parcial, juros e desconto ficam no computador). */
+export interface BaixaLancamento { pago_em: string; conta_id: number | null; forma_pagamento: string | null }
+
+export function validarBaixa(b: BaixaLancamento, hoje: string): Record<string, string> {
+  if (!DATA.test(b.pago_em)) return { pago_em: 'Escolha a data do pagamento.' };
+  if (b.pago_em > hoje) return { pago_em: 'A data do pagamento não pode ser no futuro.' };
+  return {};
+}
+
+/** Corpo do PATCH /api/app/financeiro/lancamentos/{id}: os campos do novo lançamento, sem tipo nem repetição. */
+export type AlteracaoLancamento = Omit<NovoLancamento, 'tipo' | 'parcelas' | 'recorrencia'> & { contrato: string | null };
+
+export function corpoAlteracao(f: FormLancamento): AlteracaoLancamento {
+  const { tipo: _t, parcelas: _p, recorrencia: _r, ...resto } = corpoLancamento({ ...f, repeticao: 'unico' });
+  return { ...resto, contrato: f.contrato.trim() ? f.contrato.trim() : null };
+}
+
+/** Formulário de alteração a partir do lançamento salvo. */
+export function formDoLancamento(l: {
+  tipo: TipoLancamento; descricao: string; parte_id?: number | null; parte: string | null; valor: number; vencimento: string | null;
+  emissao?: string | null; competencia?: string | null; forma_pagamento?: string | null; conta_id?: number | null; plano_codigo?: string | null;
+  documento?: string | null; nf_numero?: string | null; observacao?: string | null; contrato?: string | null;
+}, hoje: string): FormLancamento {
+  const v = l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return { ...formVazio(l.tipo, l.emissao ?? hoje), descricao: l.descricao,
+    parte: l.parte_id && l.parte ? { id: l.parte_id, nome: l.parte } : null, valor: v, vencimento: l.vencimento ?? '',
+    competencia: l.competencia ?? (l.emissao ?? hoje).slice(0, 7), forma: l.forma_pagamento ?? '', conta_id: l.conta_id ?? null,
+    plano: l.plano_codigo ?? '', documento: l.documento ?? '', nf: l.nf_numero ?? '', observacao: l.observacao ?? '', contrato: l.contrato ?? '' };
 }

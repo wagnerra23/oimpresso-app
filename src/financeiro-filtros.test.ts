@@ -116,3 +116,21 @@ describe('plano de contas, documento e status', () => {
     expect(contarFiltros(x)).toBe(3);
   });
 });
+
+describe('contrato no filtro avançado', () => {
+  const C = [
+    { id: 1, descricao: 'Aluguel', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, contrato: 'CT-2025/014' },
+    { id: 2, descricao: 'Manutenção', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, contrato: 'CT-2026/031' },
+    { id: 3, descricao: 'Avulso', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, contrato: null },
+  ];
+  it('acha por parte do número, sem barra nem hífen', () => {
+    expect(filtrarLancamentos(C, f({ contrato: '2025014' })).map((l) => l.id)).toEqual([1]);
+    expect(filtrarLancamentos(C, f({ contrato: 'ct-2026' })).map((l) => l.id)).toEqual([2]);
+  });
+  it('vai e volta pela rota e conta como filtro', () => {
+    const x = f({ contrato: 'CT-2025/014' });
+    expect(paramsFiltros(x)).toBe('&contrato=CT-2025%2F014');
+    expect(lerParams('?aba=pagar' + paramsFiltros(x))).toEqual(x);
+    expect(contarFiltros(x)).toBe(1);
+  });
+});

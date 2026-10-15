@@ -3,12 +3,13 @@
 // (Pagamentos), que mexe em valor e passa pela regra mestre. Mora dentro de Mais.
 // Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, ErroApi, FILTRO_FINANCEIRO, NOVO_LANCAMENTO, RECORRENCIAS, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
+import { api, ErroApi, FILTRO_FINANCEIRO, LANCAMENTO_ACOES, NOVO_LANCAMENTO, RECORRENCIAS, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
 import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, SITUACOES, type FiltrosFinanceiro, type Situacao } from '../financeiro-filtros';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { FiltroFinanceiro } from './FiltroFinanceiro';
 import { NovoLancamento } from './NovoLancamento';
+import { LancamentoDetalhe } from './LancamentoDetalhe';
 import { Recorrencias } from './Recorrencias';
 
 const ABAS: Array<{ id: AbaFinanceiro; label: string }> = [
@@ -24,6 +25,9 @@ const VAZIO: Record<AbaFinanceiro, string> = {
   receber: 'Nada a receber em aberto.', pagar: 'Nada a pagar em aberto.', extrato: 'Nenhum lançamento liquidado neste mês.',
 };
 
+/** Cartão do lançamento: botão quando o detalhe está ligado, senão só leitura. */
+const Cartao = LANCAMENTO_ACOES ? 'button' : 'article';
+
 export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (texto: string, tom?: 'ok' | 'warn' | 'erro') => void }) {
   const [aba, setAba] = useState<AbaFinanceiro>('receber');
   // Com o filtro avançado ligado, as abas viram caixas de seleção (dá para juntar, ex.: A pagar + Pagas).
@@ -36,6 +40,8 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
   const [filtros, setFiltros] = useState<FiltrosFinanceiro>(FILTROS_VAZIOS);
   const [filtrando, setFiltrando] = useState(false);
   const [novo, setNovo] = useState(false);
+  const [aberto, setAberto] = useState<number | null>(null);
+  useVoltar(aberto !== null, () => fecharDetalhe());
   const [vista, setVista] = useState<'lancamentos' | 'recorrencias'>('lancamentos');
   useVoltar(filtrando, () => setFiltrando(false));
   useVoltar(novo, () => setNovo(false));
@@ -69,7 +75,13 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
   };
 
   const r = dados?.resumo;
+  // Volta do detalhe recarregando: a ação feita lá (receber, excluir…) muda a lista e os totais.
+  function fecharDetalhe() { setAberto(null); carregar(consulta, filtros); }
   const nFiltros = contarFiltros(filtros);
+  if (aberto !== null && dados) {
+    return <LancamentoDetalhe id={aberto} contas={dados.contas} formas={dados.formas_pagamento} planos={dados.planos_conta ?? []}
+      avisar={avisar} aoVoltar={fecharDetalhe} />;
+  }
   if (novo && dados) {
     // Abre no lado que a tela mostra (só "A pagar" marcado → a pagar). Ao lançar, garante a caixa do lado marcada.
     const tipo = FILTRO_FINANCEIRO ? (situacoes.includes('a_receber') || !situacoes.includes('a_pagar') ? 'receber' : 'pagar') : (aba === 'pagar' ? 'pagar' : 'receber');
@@ -184,7 +196,8 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
             const s = l.excluido ? { label: 'Excluído', cor: 'var(--text-mute)' } : STATUS[l.status];
             const data = l.status === 'liquidado' ? `pago ${dataCurta(l.pago_em)}` : l.status === 'vencido' ? `venceu ${dataCurta(l.vencimento)}` : `vence ${dataCurta(l.vencimento)}`;
             return (
-              <article key={l.id} className={'fn-lanc' + (l.excluido ? ' excluido' : '')} aria-label={l.descricao}>
+              <Cartao key={l.id} className={'fn-lanc' + (l.excluido ? ' excluido' : '')} aria-label={l.descricao}
+                {...(LANCAMENTO_ACOES ? { onClick: () => setAberto(l.id) } : {})}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{l.descricao}</b>
                   <small>{l.parte ? `${l.parte} · ` : ''}{data}</small>
@@ -194,7 +207,7 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
                   <span className={l.tipo === 'receber' ? 'pos' : 'neg'}>{l.tipo === 'receber' ? '+ ' : '− '}{reais(l.valor)}</span>
                   <small style={{ color: s.cor }}>{s.label}</small>
                 </div>
-              </article>
+              </Cartao>
             );
           })}
           {dados?.tem_mais && <button className="oi-btn block" style={{ minHeight: 44 }} disabled={carregandoMais} onClick={mais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</button>}

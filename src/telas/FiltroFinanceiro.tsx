@@ -79,9 +79,15 @@ export function FiltroFinanceiro({ inicial, contas, formas, planos, aoAplicar, a
             <label htmlFor="ff-texto">Razão social ou descrição</label>
             <input id="ff-texto" type="search" value={f.texto} onChange={(e) => mudar('texto', e.target.value)} placeholder="Ex.: Clínica Vita, aluguel, #0044" enterKeyHint="search" />
           </div>
-          <div className="p4-campo">
-            <label htmlFor="ff-doc">Nº do documento</label>
-            <input id="ff-doc" value={f.documento} onChange={(e) => mudar('documento', e.target.value)} placeholder="Ex.: PED-0043/1" />
+          <div className="ff-duas">
+            <div className="p4-campo">
+              <label htmlFor="ff-doc">Nº do documento</label>
+              <input id="ff-doc" value={f.documento} onChange={(e) => mudar('documento', e.target.value)} placeholder="Ex.: PED-0043/1" />
+            </div>
+            <div className="p4-campo">
+              <label htmlFor="ff-contrato">Nº do contrato</label>
+              <input id="ff-contrato" value={f.contrato} onChange={(e) => mudar('contrato', e.target.value)} placeholder="Ex.: CT-2025/014" />
+            </div>
           </div>
           <div className="ff-duas">
             <div className="p4-campo">

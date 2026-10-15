@@ -1,7 +1,7 @@
 // Novo lançamento (tela 06): validação por campo e corpo que vai ao ERP. Mexe em valor (regra mestre): o corpo
 // leva só os campos do contrato, montados um a um, e o valor arredondado em centavos.
 import { describe, expect, it } from 'vitest';
-import { contaAnalitica, corpoLancamento, dataGeracao, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
+import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
   validarLancamento, type FormLancamento } from './lancamento-regras';
 
 const PLANOS = [
@@ -104,6 +104,54 @@ describe('recorrente', () => {
   });
   it('corpo leva a recorrência e não leva parcelas', () => {
     const c = corpoLancamento(ok({ repeticao: 'recorrente', frequencia: 'anual', dia_geracao: '5', termino: '' }));
-    expect([c.parcelas, c.recorrencia]).toEqual([null, { frequencia: 'anual', dia_geracao: 5, termino: null }]);
+    expect([c.parcelas, c.recorrencia]).toEqual([null, { frequencia: 'anual', dia_geracao: 5, termino: null, contrato: null }]);
+  });
+});
+
+describe('contrato da recorrência', () => {
+  it('vai dentro da recorrência, sem espaços nas pontas', () => {
+    const c = corpoLancamento(ok({ repeticao: 'recorrente', contrato: '  CT-2026/031 ' }));
+    expect(c.recorrencia?.contrato).toBe('CT-2026/031');
+  });
+  it('até 40 caracteres', () => expect(validarLancamento(ok({ contrato: 'x'.repeat(41) }), PLANOS).contrato).toMatch(/40/));
+});
+
+describe('ações do detalhe', () => {
+  it('em aberto ou vencido: receber/pagar, alterar e excluir', () => {
+    expect(acoesDoLancamento({ status: 'aberto' })).toEqual(['baixar', 'alterar', 'excluir']);
+    expect(acoesDoLancamento({ status: 'vencido', excluido: false })).toEqual(['baixar', 'alterar', 'excluir']);
+  });
+  it('liquidado: só retornar; excluído: só reativar', () => {
+    expect(acoesDoLancamento({ status: 'liquidado' })).toEqual(['estornar']);
+    expect(acoesDoLancamento({ status: 'aberto', excluido: true })).toEqual(['reativar']);
+  });
+  it('rótulos pelo lado do lançamento', () => {
+    expect(rotuloAcao('baixar', 'receber')).toBe('Receber');
+    expect(rotuloAcao('baixar', 'pagar')).toBe('Pagar');
+    expect(rotuloAcao('estornar', 'receber')).toBe('Retornar a receber');
+    expect(rotuloAcao('estornar', 'pagar')).toBe('Retornar a pagar');
+    expect(rotuloAcao('reativar', 'pagar')).toBe('Reativar lançamento');
+  });
+  it('baixa: data obrigatória e não no futuro', () => {
+    expect(validarBaixa({ pago_em: '', conta_id: null, forma_pagamento: null }, '2026-10-15').pago_em).toMatch(/Escolha/);
+    expect(validarBaixa({ pago_em: '2026-10-16', conta_id: null, forma_pagamento: null }, '2026-10-15').pago_em).toMatch(/futuro/);
+    expect(validarBaixa({ pago_em: '2026-10-15', conta_id: 1, forma_pagamento: 'Pix' }, '2026-10-15')).toEqual({});
+  });
+});
+
+describe('alterar lançamento', () => {
+  const salvo = { tipo: 'pagar' as const, descricao: 'Aluguel do galpão', parte_id: 20, parte: 'Imobiliária Centro', valor: 3500,
+    vencimento: '2026-10-30', emissao: '2026-10-01', competencia: '2026-10', forma_pagamento: 'Transferência', conta_id: 1,
+    plano_codigo: '2.1.01', documento: 'ALG-10/2026', nf_numero: null, observacao: null, contrato: 'CT-2025/014' };
+  it('o formulário volta preenchido com o valor em reais', () => {
+    const f = formDoLancamento(salvo, '2026-10-15');
+    expect([f.valor, f.parte?.nome, f.contrato, f.repeticao, f.emissao]).toEqual(['3.500,00', 'Imobiliária Centro', 'CT-2025/014', 'unico', '2026-10-01']);
+  });
+  it('o corpo não leva tipo nem repetição, e leva o contrato', () => {
+    const c = corpoAlteracao({ ...formDoLancamento(salvo, '2026-10-15'), repeticao: 'parcelado', parcelas: '3' });
+    expect(Object.keys(c)).not.toContain('tipo');
+    expect(Object.keys(c)).not.toContain('parcelas');
+    expect(Object.keys(c)).not.toContain('recorrencia');
+    expect([c.valor, c.contrato, c.contato_id]).toEqual([3500, 'CT-2025/014', 20]);
   });
 });

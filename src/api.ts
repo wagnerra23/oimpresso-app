@@ -10,7 +10,7 @@ import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import type { Situacao } from './financeiro-filtros';
-import type { Frequencia, NovoLancamento } from './lancamento-regras';
+import type { AlteracaoLancamento, BaixaLancamento, Frequencia, NovoLancamento } from './lancamento-regras';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -572,6 +572,13 @@ export interface Lancamento {
   conta_id?: number | null; nf_numero?: string | null; nosso_numero?: string | null;
   /** Conta do plano de contas (código "2.1.01") e nome; nº do documento; excluído no ERP (só vem com `registro=`). */
   plano_codigo?: string | null; plano_nome?: string | null; documento?: string | null; excluido?: boolean;
+  /** Nº do contrato (lançamentos de recorrência). */
+  contrato?: string | null;
+}
+/** GET /api/app/financeiro/lancamentos/{id} (formato proposto). `historico`: o que aconteceu, do mais antigo ao mais novo. */
+export interface LancamentoDetalhe extends Lancamento {
+  parte_id: number | null; observacao: string | null; recorrencia_id: number | null; parcela: string | null;
+  conta_nome: string | null; motivo_exclusao: string | null; historico: Array<{ quando: string; texto: string }>;
 }
 export interface PainelFinanceiro {
   /** `vencido` = parte vencida do a receber (já contida em `a_receber`). */
@@ -594,13 +601,16 @@ export const FILTRO_FINANCEIRO = DEMO;
 export const NOVO_LANCAMENTO = DEMO;
 /** Liga a aba Recorrências do Financeiro (contratos e contas fixas, com "Interromper"). Só na demo até o ERP ter as rotas. */
 export const RECORRENCIAS = DEMO;
+/** Liga o detalhe do lançamento (tocar no cartão) com Receber/Pagar, Alterar, Excluir, Retornar e Reativar.
+ *  Baixa e estorno mexem em valor: regra mestre Tier 0. Só na demo até o ERP ter as rotas. */
+export const LANCAMENTO_ACOES = DEMO;
 /** Recorrência (contrato ou conta fixa). `proxima_geracao`: dia em que o ERP cria o próximo lançamento (null se o
  *  contrato terminou); `gerados`: quantos lançamentos ela já criou. */
 export interface Recorrencia {
   id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
   frequencia: Frequencia; dia_geracao: number; dia_vencimento: number; inicio: string; termino: string | null;
   proxima_geracao: string | null; proximo_vencimento: string | null; gerados: number;
-  status: 'ativa' | 'interrompida'; interrompida_em: string | null;
+  status: 'ativa' | 'interrompida'; interrompida_em: string | null; contrato: string | null;
 }
 
 /** Tela 14 · Fiscal (D16, Onda C) — só leitura. Contrato §10.2 (ERP #8593). Emitir, consultar a SEFAZ,
@@ -970,6 +980,18 @@ export const api = {
   criarLancamento: (corpo: NovoLancamento, chave: string) =>
     chamar<{ id: number; ids: number[]; recorrencia_id: number | null }>('POST', '/api/app/financeiro/lancamentos', corpo, { 'Idempotency-Key': chave }),
   recorrencias: () => chamar<{ itens: Recorrencia[] }>('GET', '/api/app/financeiro/recorrencias'),
+  // Detalhe e ações do lançamento. Todas devolvem o lançamento atualizado; 409 { erro: "estado" } quando a situação
+  // não permite (ex.: receber o que já foi recebido, excluir o que está pago).
+  lancamento: (id: number) => chamar<LancamentoDetalhe>('GET', `/api/app/financeiro/lancamentos/${id}`),
+  alterarLancamento: (id: number, corpo: AlteracaoLancamento) => chamar<LancamentoDetalhe>('PATCH', `/api/app/financeiro/lancamentos/${id}`, corpo),
+  /** Baixa (receber/pagar) pelo valor do lançamento. `chave` = Idempotency-Key: repetir não baixa duas vezes. */
+  baixarLancamento: (id: number, corpo: BaixaLancamento, chave: string) =>
+    chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/baixar`, corpo, { 'Idempotency-Key': chave }),
+  /** Desfaz a baixa (retornar a receber/pagar). */
+  estornarLancamento: (id: number, chave: string) =>
+    chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/estornar`, undefined, { 'Idempotency-Key': chave }),
+  excluirLancamento: (id: number, motivo: string | null) => chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/excluir`, { motivo }),
+  reativarLancamento: (id: number) => chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/reativar`),
   /** Para de gerar daqui pra frente; idempotente (interromper de novo devolve a mesma). */
   interromperRecorrencia: (id: number) => chamar<Recorrencia>('POST', `/api/app/financeiro/recorrencias/${id}/interromper`),
   pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),

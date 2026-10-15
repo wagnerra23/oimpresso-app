@@ -25,12 +25,12 @@ export interface FiltrosFinanceiro {
   campo_data: CampoData; de: string; ate: string;
   texto: string; forma: string; conta_id: number | null; nf: string; nosso_numero: string;
   valor_min: string; valor_max: string;
-  plano: string; documento: string; registro: Registro;
+  plano: string; documento: string; registro: Registro; contrato: string;
 }
 
 export const FILTROS_VAZIOS: FiltrosFinanceiro = {
   campo_data: 'vencimento', de: '', ate: '', texto: '', forma: '', conta_id: null, nf: '', nosso_numero: '', valor_min: '', valor_max: '',
-  plano: '', documento: '', registro: 'ativos',
+  plano: '', documento: '', registro: 'ativos', contrato: '',
 };
 
 /** "1.500,50" → 1500.5; "1.000" → 1000; vazio ou inválido → null. */
@@ -46,7 +46,7 @@ export function lerValor(v: string): number | null {
 /** Quantos filtros estão ligados (o período conta como um). */
 export function contarFiltros(f: FiltrosFinanceiro): number {
   return [f.de || f.ate, f.texto.trim(), f.forma, f.conta_id !== null, f.nf.trim(), f.nosso_numero.trim(),
-    lerValor(f.valor_min) !== null || lerValor(f.valor_max) !== null, f.plano, f.documento.trim(), f.registro !== 'ativos'].filter(Boolean).length;
+    lerValor(f.valor_min) !== null || lerValor(f.valor_max) !== null, f.plano, f.documento.trim(), f.registro !== 'ativos', f.contrato.trim()].filter(Boolean).length;
 }
 
 /** Parâmetros da rota, só os ligados. Ex.: "&data_campo=emissao&de=2026-10-01&ate=2026-10-15&forma_pagamento=Pix". */
@@ -64,6 +64,7 @@ export function paramsFiltros(f: FiltrosFinanceiro): string {
   if (f.plano) p.set('plano_conta', f.plano);
   if (f.documento.trim()) p.set('documento', f.documento.trim());
   if (f.registro !== 'ativos') p.set('registro', f.registro);
+  if (f.contrato.trim()) p.set('contrato', f.contrato.trim());
   const s = p.toString();
   return s ? '&' + s : '';
 }
@@ -80,7 +81,7 @@ export function lerParams(query: string): FiltrosFinanceiro {
     conta_id: conta && /^\d+$/.test(conta) ? Number(conta) : null, nf: p.get('nf') ?? '', nosso_numero: p.get('nosso_numero') ?? '',
     valor_min: p.get('valor_min') ?? '', valor_max: p.get('valor_max') ?? '',
     plano: p.get('plano_conta') ?? '', documento: p.get('documento') ?? '',
-    registro: registro && REGISTROS.some((r) => r.id === registro) ? registro : 'ativos',
+    registro: registro && REGISTROS.some((r) => r.id === registro) ? registro : 'ativos', contrato: p.get('contrato') ?? '',
   };
 }
 
@@ -89,7 +90,7 @@ export interface LancamentoFiltravel {
   descricao: string; parte: string | null; vencimento: string | null; pago_em: string | null; valor: number;
   emissao?: string | null; competencia?: string | null; venda_em?: string | null; forma_pagamento?: string | null;
   conta_id?: number | null; nf_numero?: string | null; nosso_numero?: string | null;
-  plano_codigo?: string | null; documento?: string | null; excluido?: boolean;
+  plano_codigo?: string | null; documento?: string | null; excluido?: boolean; contrato?: string | null;
 }
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -113,6 +114,7 @@ export function filtrarLancamentos<T extends LancamentoFiltravel>(itens: T[], f:
   const nosso = soDigitos(f.nosso_numero);
   const min = lerValor(f.valor_min), max = lerValor(f.valor_max);
   const doc = compacto(f.documento);
+  const contrato = compacto(f.contrato);
   const mes = f.campo_data === 'competencia';
   const de = mes ? f.de.slice(0, 7) : f.de;
   const ate = mes ? f.ate.slice(0, 7) : f.ate;
@@ -132,6 +134,7 @@ export function filtrarLancamentos<T extends LancamentoFiltravel>(itens: T[], f:
     if (f.registro === 'excluidos' && !l.excluido) return false;
     if (f.plano && !(l.plano_codigo === f.plano || (l.plano_codigo ?? '').startsWith(f.plano + '.'))) return false;
     if (doc && !compacto(l.documento ?? '').includes(doc)) return false;
+    if (contrato && !compacto(l.contrato ?? '').includes(contrato)) return false;
     return true;
   });
 }
@@ -200,6 +203,7 @@ export function resumoFiltros(f: FiltrosFinanceiro, contas: Array<{ id: number; 
   const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   if (f.plano) r.push(`${f.plano} ${planos.find((p) => p.codigo === f.plano)?.nome ?? ''}`.trim());
   if (f.documento.trim()) r.push(`Doc. ${f.documento.trim()}`);
+  if (f.contrato.trim()) r.push(`Contrato ${f.contrato.trim()}`);
   if (f.registro !== 'ativos') r.push(f.registro === 'excluidos' ? 'Só excluídos' : 'Ativos e excluídos');
   if (min !== null || max !== null) r.push(min !== null && max !== null ? `${reais(min)} a ${reais(max)}` : min !== null ? `a partir de ${reais(min)}` : `até ${reais(max!)}`);
   return r;

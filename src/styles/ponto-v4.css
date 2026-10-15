@@ -539,6 +539,35 @@ a.p4-link { text-decoration: none; }
 .fn-lanc-v span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fn-lanc-v small { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; }
 .fn-lanc.excluido { border-style: dashed; opacity: .75; }
+button.fn-lanc { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+button.fn-lanc:active { background: var(--surface-2); }
+/* Detalhe do lançamento */
+.ld-topo { padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ld-topo.excluido { border-style: dashed; }
+.ld-topo.excluido .ld-valor { text-decoration: line-through; color: var(--text-dim); }
+.ld-valor { font-family: var(--font-mono); font-size: 26px; font-weight: 600; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.ld-valor.pos { color: var(--ok); }
+.ld-valor.neg { color: var(--danger); }
+.ld-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 99px; border: 1px solid; font-size: 11.5px; font-weight: 600; }
+.ld-status i { width: 6px; height: 6px; border-radius: 99px; }
+.ld-nota { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--text-dim); }
+.ld-dados { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+.ld-dados div { min-width: 0; }
+.ld-dados dt { font-size: 10.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--text-mute); }
+.ld-dados dd { margin: 2px 0 0; font-size: 13.5px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.ld-obs p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
+.ld-hist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ld-hist li { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.ld-hist small { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); padding-top: 1px; }
+.ld-rodape { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface); }
+.ld-rodape .oi-btn { min-height: 44px; }
+.ld-principal { width: 100%; font-weight: 600; }
+.ld-secundarias { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ld-perigo { color: var(--danger); font-weight: 600; }
+.ld-perigo-sim { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+.ld-dica { font-size: 12px; color: var(--text-dim); text-align: center; }
+.ld-acao-t { font-size: 15px; }
+.ld-acao-p { margin: 0; font-size: 13.5px; line-height: 1.45; }
 .fn-lanc.excluido b, .fn-lanc.excluido .fn-lanc-v span { text-decoration: line-through; }
 /* Filtro avançado do Financeiro */
 .ff-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

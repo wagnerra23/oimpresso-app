@@ -74,7 +74,7 @@ export function Recorrencias({ avisar }: { avisar?: (texto: string, tom?: 'ok' |
               ) : (
                 <div><dt>Interrompida em</dt><dd>{br(r.interrompida_em)}</dd></div>
               )}
-              <div><dt>Contrato</dt><dd>{br(r.inicio)} a {r.termino ? br(r.termino) : 'sem término'}</dd></div>
+              <div><dt>Contrato{r.contrato ? ` ${r.contrato}` : ''}</dt><dd>{br(r.inicio)} a {r.termino ? br(r.termino) : 'sem término'}</dd></div>
               <div><dt>Já criados</dt><dd>{r.gerados} {r.gerados === 1 ? 'lançamento' : 'lançamentos'}</dd></div>
             </dl>
             {ativa && confirmando !== r.id && (
