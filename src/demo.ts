@@ -3,7 +3,7 @@
 // app. NUNCA entra no build de loja — a tela mostra uma faixa "Modo demonstração".
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
-import { filtrarLancamentos, lerParams } from './financeiro-filtros';
+import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -714,7 +714,11 @@ export const demo = {
       // Filtro avançado: a mesma regra que o ERP vai aplicar. Resumo e contas não mudam; lista e contadores, sim.
       const f = lerParams(caminho);
       const ordenados = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-      const itens = filtrarLancamentos(ordenados, f);
+      // Caixas de seleção (situacao=a_receber,pagas): no lugar da aba, junta em aberto e liquidados dos dois lados.
+      const situacoes = lerSituacoes(caminho);
+      const itens = situacoes ? filtrarLancamentos(ordenarLancamentos(todos.filter((l) => situacoes.includes(situacaoDe(l)))), f) : filtrarLancamentos(ordenados, f);
+      const filtrados = filtrarLancamentos(todos, f);
+      const contadores_situacao = Object.fromEntries(SITUACOES.map((s) => [s.id, filtrados.filter((l) => situacaoDe(l) === s.id).length]));
       const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
       const recebido = 148230, pago = 96410;
       return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
@@ -723,7 +727,7 @@ export const demo = {
           { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
         itens, contadores: { receber: filtrarLancamentos(abertos('receber'), f).length, pagar: filtrarLancamentos(abertos('pagar'), f).length,
           extrato: filtrarLancamentos(extrato, f).length }, pagina: 1, tem_mais: false,
-        formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
+        contadores_situacao, formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

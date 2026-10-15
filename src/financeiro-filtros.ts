@@ -114,6 +114,33 @@ export function filtrarLancamentos<T extends LancamentoFiltravel>(itens: T[], f:
   });
 }
 
+/** Caixas de seleção do Financeiro (no lugar das abas, junto com o filtro avançado): em aberto e liquidados,
+ *  de cada lado. Vão para a rota como `situacao=a_receber,pagas` (o ERP ainda só conhece `aba`). */
+export type Situacao = 'a_receber' | 'a_pagar' | 'recebidas' | 'pagas';
+export const SITUACOES: Array<{ id: Situacao; label: string }> = [
+  { id: 'a_receber', label: 'A receber' }, { id: 'a_pagar', label: 'A pagar' }, { id: 'recebidas', label: 'Recebidas' }, { id: 'pagas', label: 'Pagas' },
+];
+
+export function situacaoDe(l: { tipo: 'receber' | 'pagar'; status: string }): Situacao {
+  const liquidado = l.status === 'liquidado';
+  return l.tipo === 'receber' ? (liquidado ? 'recebidas' : 'a_receber') : (liquidado ? 'pagas' : 'a_pagar');
+}
+
+/** Lê `situacao=` da rota; ignora valores desconhecidos. Sem o parâmetro, null (a rota usa `aba`). */
+export function lerSituacoes(query: string): Situacao[] | null {
+  const p = new URLSearchParams(query.includes('?') ? query.slice(query.indexOf('?') + 1) : query);
+  const v = p.get('situacao');
+  if (v === null) return null;
+  return SITUACOES.map((s) => s.id).filter((id) => v.split(',').includes(id));
+}
+
+/** Em aberto primeiro, pelo vencimento mais próximo; depois os liquidados, do pagamento mais recente. */
+export function ordenarLancamentos<T extends { status: string; vencimento: string | null; pago_em: string | null }>(itens: T[]): T[] {
+  const abertos = itens.filter((l) => l.status !== 'liquidado').sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''));
+  const pagos = itens.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
+  return [...abertos, ...pagos];
+}
+
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export type Atalho = 'hoje' | '7d' | '30d' | 'mes' | 'mes_passado';

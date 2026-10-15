@@ -4,7 +4,7 @@
 // Rota GET /api/app/financeiro, contrato §10.1 (ERP #8584).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ErroApi, FILTRO_FINANCEIRO, type AbaFinanceiro, type PainelFinanceiro, type StatusLancamento } from '../api';
-import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, type FiltrosFinanceiro } from '../financeiro-filtros';
+import { contarFiltros, FILTROS_VAZIOS, paramsFiltros, resumoFiltros, SITUACOES, type FiltrosFinanceiro, type Situacao } from '../financeiro-filtros';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { FiltroFinanceiro } from './FiltroFinanceiro';
@@ -24,6 +24,10 @@ const VAZIO: Record<AbaFinanceiro, string> = {
 
 export function Financeiro({ voltar }: { voltar?: ReactNode }) {
   const [aba, setAba] = useState<AbaFinanceiro>('receber');
+  // Com o filtro avançado ligado, as abas viram caixas de seleção (dá para juntar, ex.: A pagar + Pagas).
+  const [situacoes, setSituacoes] = useState<Situacao[]>(['a_receber']);
+  const consulta = FILTRO_FINANCEIRO ? situacoes : aba;
+  const marcar = (id: Situacao) => setSituacoes((x) => (x.includes(id) ? x.filter((s) => s !== id) : SITUACOES.map((s) => s.id).filter((s) => s === id || x.includes(s))));
   const [dados, setDados] = useState<PainelFinanceiro | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
@@ -34,7 +38,7 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
   const [lendo, setLendo] = useState(true);
   // Troca rápida de aba: só a resposta do pedido mais recente entra na tela.
   const pedido = useRef(0);
-  const carregar = useCallback(async (a: AbaFinanceiro, f: FiltrosFinanceiro) => {
+  const carregar = useCallback(async (a: AbaFinanceiro | Situacao[], f: FiltrosFinanceiro) => {
     const n = ++pedido.current;
     setErro(null); setLendo(true);
     // Troca de aba mantém resumo e contas na tela; só a lista recarrega.
@@ -47,13 +51,13 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
     }
     finally { if (n === pedido.current) setLendo(false); }
   }, []);
-  useEffect(() => { carregar(aba, filtros); }, [aba, filtros, carregar]);
+  useEffect(() => { carregar(consulta, filtros); }, [consulta, filtros, carregar]);
 
   const mais = async () => {
     if (!dados) return;
     setCarregandoMais(true);
     try {
-      const prox = await api.financeiro(aba, dados.pagina + 1, paramsFiltros(filtros));
+      const prox = await api.financeiro(consulta, dados.pagina + 1, paramsFiltros(filtros));
       setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
     } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
     finally { setCarregandoMais(false); }
@@ -110,7 +114,20 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
               </div>
             </>
           )}
-          {dados && (
+          {dados && FILTRO_FINANCEIRO && (
+            <fieldset className="ff-situacoes">
+              <legend className="sr-only">Mostrar lançamentos</legend>
+              {SITUACOES.map((s) => (
+                <label key={s.id} className={'ff-check' + (situacoes.includes(s.id) ? ' on' : '')}>
+                  <input type="checkbox" checked={situacoes.includes(s.id)} onChange={() => marcar(s.id)} aria-label={s.label} />
+                  <i aria-hidden="true">{situacoes.includes(s.id) ? '✓' : ''}</i>
+                  <span>{s.label}</span>
+                  {dados.contadores_situacao && <b>{dados.contadores_situacao[s.id]}</b>}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {dados && !FILTRO_FINANCEIRO && (
             <div className="fn-abas" role="tablist" aria-label="Lançamentos">
               {ABAS.map((a) => (
                 <button key={a.id} role="tab" aria-selected={aba === a.id} className={'fn-aba' + (aba === a.id ? ' on' : '')} onClick={() => setAba(a.id)}>
@@ -131,8 +148,10 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
           {dados && nFiltros > 0 && <p className="ff-resumo">{resumoFiltros(filtros, dados.contas).join(' · ')}</p>}
           {dados && lendo && dados.itens.length === 0 && <p className="p4-legal">Carregando…</p>}
           {dados && !lendo && dados.itens.length === 0 && (nFiltros > 0
-            ? <div className="p4-vazio"><b>Nenhum lançamento com esses filtros</b><span>Mude o período ou tire algum filtro. As outras abas podem ter resultados.</span></div>
-            : <div className="p4-vazio"><b>Nada aqui</b><span>{VAZIO[aba]}</span></div>)}
+            ? <div className="p4-vazio"><b>Nenhum lançamento com esses filtros</b><span>Mude o período ou tire algum filtro{FILTRO_FINANCEIRO ? ', ou marque mais opções acima' : '. As outras abas podem ter resultados'}.</span></div>
+            : FILTRO_FINANCEIRO
+              ? <div className="p4-vazio"><b>Nada aqui</b><span>{situacoes.length ? 'Nenhum lançamento nas opções marcadas.' : 'Marque A receber, A pagar, Recebidas ou Pagas.'}</span></div>
+              : <div className="p4-vazio"><b>Nada aqui</b><span>{VAZIO[aba]}</span></div>)}
           {dados?.itens.map((l) => {
             const s = STATUS[l.status];
             const data = l.status === 'liquidado' ? `pago ${dataCurta(l.pago_em)}` : l.status === 'vencido' ? `venceu ${dataCurta(l.vencimento)}` : `vence ${dataCurta(l.vencimento)}`;

@@ -9,6 +9,7 @@ import { demo } from './demo';
 import { deveRetentar, esperaMs, MSG_INDISPONIVEL, transitorio } from './rede';
 import type { CorpoVenda, ProdutoVenda } from './venda';
 import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
+import type { Situacao } from './financeiro-filtros';
 
 export const BASE = 'https://oimpresso.com';
 export const DEMO = import.meta.env.VITE_DEMO === '1';
@@ -577,6 +578,8 @@ export interface PainelFinanceiro {
   itens: Lancamento[]; contadores: Record<AbaFinanceiro, number>; pagina: number; tem_mais: boolean;
   /** Formas de pagamento da empresa para o filtro avançado; sem ela, o app usa FORMAS_PADRAO. */
   formas_pagamento?: string[];
+  /** Contagem por caixa de seleção (já com o filtro avançado), quando a rota recebe `situacao=`. */
+  contadores_situacao?: Record<Situacao, number>;
 }
 /** Liga o "Filtro avançado" do Financeiro. Só na demo até o ERP aceitar os filtros na rota §10.1
  *  (parâmetros em financeiro-filtros.ts → paramsFiltros); com o ERP pronto, vira true. */
@@ -928,7 +931,9 @@ export const api = {
   salvarBarra: (modulos: Area[]) => chamar<{ modulos: Area[]; barra: Area[] }>('PUT', '/api/app/perfil-menu', { modulos }),
   orcamentos: (status: FiltroOrcamentos, pagina = 1) =>
     chamar<ListaOrcamentos>('GET', `/api/app/orcamentos?status=${status}&pagina=${pagina}`),
-  financeiro: (aba: AbaFinanceiro, pagina = 1, filtros = '') => chamar<PainelFinanceiro>('GET', `/api/app/financeiro?aba=${aba}&pagina=${pagina}${filtros}`),
+  /** `aba` (contrato atual) ou a lista de situações marcadas (proposta junto com o filtro avançado). */
+  financeiro: (aba: AbaFinanceiro | Situacao[], pagina = 1, filtros = '') => chamar<PainelFinanceiro>('GET',
+    `/api/app/financeiro?${Array.isArray(aba) ? `situacao=${aba.join(',')}` : `aba=${aba}`}&pagina=${pagina}${filtros}`),
   fiscal: (status: FiltroFiscal, pagina = 1) => chamar<ListaFiscal>('GET', `/api/app/fiscal?status=${status}&pagina=${pagina}`),
   relatorios: (periodo: PeriodoRelatorio, aba: AbaRelatorio) => chamar<Relatorios>('GET', `/api/app/relatorios?periodo=${periodo}&aba=${aba}`),
   dashboard: () => chamar<Dashboard>('GET', '/api/app/dashboard'),

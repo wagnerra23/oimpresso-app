@@ -1,6 +1,6 @@
 // Contrato do filtro avançado do Financeiro: parâmetros da rota, ida e volta, e a regra de filtragem da demo.
 import { describe, expect, it } from 'vitest';
-import { contarFiltros, filtrarLancamentos, FILTROS_VAZIOS, lerParams, lerValor, paramsFiltros, periodoDe, type FiltrosFinanceiro } from './financeiro-filtros';
+import { contarFiltros, filtrarLancamentos, lerSituacoes, ordenarLancamentos, situacaoDe, FILTROS_VAZIOS, lerParams, lerValor, paramsFiltros, periodoDe, type FiltrosFinanceiro } from './financeiro-filtros';
 
 const f = (x: Partial<FiltrosFinanceiro>): FiltrosFinanceiro => ({ ...FILTROS_VAZIOS, ...x });
 const L = [
@@ -65,4 +65,27 @@ describe('periodoDe', () => {
     expect(periodoDe('mes_passado', hoje)).toEqual({ de: '2026-09-01', ate: '2026-09-30' });
   });
   it('7 dias termina hoje', () => expect(periodoDe('7d', hoje)).toEqual({ de: '2026-10-09', ate: '2026-10-15' }));
+});
+
+describe('situações (caixas de seleção)', () => {
+  it('cada lançamento cai numa das quatro', () => {
+    expect(situacaoDe({ tipo: 'receber', status: 'vencido' })).toBe('a_receber');
+    expect(situacaoDe({ tipo: 'receber', status: 'liquidado' })).toBe('recebidas');
+    expect(situacaoDe({ tipo: 'pagar', status: 'aberto' })).toBe('a_pagar');
+    expect(situacaoDe({ tipo: 'pagar', status: 'liquidado' })).toBe('pagas');
+  });
+  it('lê a lista da rota e ignora valor desconhecido', () => {
+    expect(lerSituacoes('/api/app/financeiro?situacao=a_pagar,pagas,xyz&pagina=1')).toEqual(['a_pagar', 'pagas']);
+    expect(lerSituacoes('/api/app/financeiro?situacao=&pagina=1')).toEqual([]);
+    expect(lerSituacoes('/api/app/financeiro?aba=receber')).toBeNull();
+  });
+  it('em aberto primeiro por vencimento, depois liquidados do mais recente', () => {
+    const x = [
+      { id: 'pago-antigo', status: 'liquidado', vencimento: '2026-10-01', pago_em: '2026-10-01' },
+      { id: 'vence-depois', status: 'aberto', vencimento: '2026-10-20', pago_em: null },
+      { id: 'pago-recente', status: 'liquidado', vencimento: '2026-10-10', pago_em: '2026-10-12' },
+      { id: 'vencido', status: 'vencido', vencimento: '2026-10-05', pago_em: null },
+    ];
+    expect(ordenarLancamentos(x).map((l) => l.id)).toEqual(['vencido', 'vence-depois', 'pago-recente', 'pago-antigo']);
+  });
 });
