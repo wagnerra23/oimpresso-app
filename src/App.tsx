@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement, type React
 import { Network } from '@capacitor/network';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { App as AppNativo } from '@capacitor/app';
-import { api, carregarToken, DEMO, houveFalhaDeLeitura, quandoExpirar, type Area } from './api';
+import { api, carregarToken, DEMO, houveFalhaDeLeitura, precisaDestravar, quandoExpirar, type Area } from './api';
 import { renovarLembrete } from './push';
 import { limparIcone } from './badge';
 import { useTemaDoCelular } from './tema';
@@ -51,6 +51,8 @@ export function App() {
   const tema = useTemaDoCelular();
   const [pronto, setPronto] = useState(false);
   const [logado, setLogado] = useState(false);
+  // P9: biometria ligada neste aparelho → o login abre pedindo a digital.
+  const [trancado, setTrancado] = useState(false);
   const [aba, setAba] = useState<Aba>('inicio');
   const [subMais, setSubMais] = useState<SubMais | null>(null);
   // Card "Estoque" do Início abre a tela 05 já em "Baixo estoque"; pelo Mais abre em "Todos".
@@ -103,7 +105,9 @@ export function App() {
 
   useEffect(() => {
     quandoExpirar(() => { setLogado(false); setNav(null); setAba('inicio'); setSubMais(null); });
-    carregarToken().then((ok) => { setLogado(ok); setPronto(true); SplashScreen.hide(); });
+    precisaDestravar().catch(() => false)
+      .then(async (b) => { if (b) setTrancado(true); else setLogado(await carregarToken()); })
+      .finally(() => { setPronto(true); SplashScreen.hide(); });
     Network.getStatus().then((s) => setOnline(s.connected));
     const h = Network.addListener('networkStatusChange', (s) => setOnline(s.connected));
     return () => { h.then((x) => x.remove()); };
@@ -196,7 +200,7 @@ export function App() {
   }
 
   if (!pronto) return null;
-  if (!logado) return <Login aoEntrar={() => setLogado(true)} />;
+  if (!logado) return <Login biometria={trancado} aoEntrar={() => { setTrancado(false); setLogado(true); }} />;
   const n = nav ?? NAV_PADRAO;
 
   return (
