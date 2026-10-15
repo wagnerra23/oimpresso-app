@@ -12,6 +12,7 @@ import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
 import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
+import type { CorpoEntrega } from './entrega-regras';
 // P5 · atendimento
 import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAtalho } from './atendimento-regras';
 
@@ -64,11 +65,20 @@ export interface ListaPedidos {
   itens: PedidoResumo[]; contadores: Record<FiltroPedidos, number>; pagina: number; tem_mais: boolean;
 }
 export interface PedidoDetalhe extends PedidoResumo {
-  itens_venda: Array<{ produto: string; quantidade: number; total: number }>;
+  /** `linha_id` = linha de topo da venda, devolvida na conferência da entrega (P3, ERP #9464). */
+  itens_venda: Array<{ produto: string; quantidade: number; total: number; linha_id?: number }>;
   etapas: Array<{ grupo: GrupoEtapa; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
   acoes: Array<{ chave: string; rotulo: string; pode: boolean }>;
   /** P1 · histórico de etapas, mais recente primeiro (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = a tela não mostra. */
   historico?: MudancaEtapa[];
+  /** P3 · `null` = a etapa não tem a ação `entregar`; `{ pode }` = o RBAC da FSM deixa (ERP #9464). Ausente = ERP antigo. */
+  entrega?: { pode: boolean } | null;
+}
+// P3 · entrega — 201 do POST /pedidos/{id}/entrega.
+export interface EntregaRegistrada {
+  protocolo: string; registrado_em: string; recebido_por: string; com_assinatura: boolean;
+  /** O mesmo JSON do GET /pedidos/{id}, já na etapa nova. */
+  pedido: PedidoDetalheApi;
 }
 /** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
@@ -1039,6 +1049,12 @@ export const api = {
    *  422 validacao { campos } / idempotencia_conflito · 429 (30/min). `chave` = Idempotency-Key da tentativa. */
   avancarPedido: (id: number, corpo: ReturnType<typeof corpoAcao>, chave: string) =>
     chamar<PedidoDetalheApi>('POST', `/api/app/pedidos/${id}/acao`, corpo, { 'Idempotency-Key': chave }),
+  // P3 · entrega (tela 22, ERP #9464).
+  /** 201 EntregaRegistrada (a mesma chave + mesmo corpo devolve a resposta gravada) · 403 sem_permissao · 404 nao_encontrado ·
+   *  409 etapa_mudou / em_andamento · 422 validacao { campos } / idempotencia_conflito / bloqueado · 503 sem_configuracao ·
+   *  429 (20/min). `chave` = Idempotency-Key da tentativa. */
+  registrarEntrega: (id: number, corpo: CorpoEntrega, chave: string) =>
+    chamar<EntregaRegistrada>('POST', `/api/app/pedidos/${id}/entrega`, corpo, { 'Idempotency-Key': chave }),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
    *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */
