@@ -569,6 +569,8 @@ export interface Lancamento {
    *  `competencia` é AAAA-MM; as outras datas AAAA-MM-DD. */
   emissao?: string | null; competencia?: string | null; venda_em?: string | null; forma_pagamento?: string | null;
   conta_id?: number | null; nf_numero?: string | null; nosso_numero?: string | null;
+  /** Conta do plano de contas (código "2.1.01") e nome; nº do documento; excluído no ERP (só vem com `registro=`). */
+  plano_codigo?: string | null; plano_nome?: string | null; documento?: string | null; excluido?: boolean;
 }
 export interface PainelFinanceiro {
   /** `vencido` = parte vencida do a receber (já contida em `a_receber`). */
@@ -580,6 +582,8 @@ export interface PainelFinanceiro {
   formas_pagamento?: string[];
   /** Contagem por caixa de seleção (já com o filtro avançado), quando a rota recebe `situacao=`. */
   contadores_situacao?: Record<Situacao, number>;
+  /** Plano de contas da empresa (grupos e contas, na ordem do código) para o filtro avançado; sem ele, o filtro some. */
+  planos_conta?: Array<{ codigo: string; nome: string }>;
 }
 /** Liga o "Filtro avançado" do Financeiro. Só na demo até o ERP aceitar os filtros na rota §10.1
  *  (parâmetros em financeiro-filtros.ts → paramsFiltros); com o ERP pronto, vira true. */

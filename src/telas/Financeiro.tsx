@@ -67,7 +67,7 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
   const nFiltros = contarFiltros(filtros);
   if (filtrando && dados) {
     return <FiltroFinanceiro inicial={filtros} contas={dados.contas} formas={dados.formas_pagamento}
-      aoVoltar={() => setFiltrando(false)} aoAplicar={(f) => { setFiltros(f); setFiltrando(false); }} />;
+      planos={dados.planos_conta} aoVoltar={() => setFiltrando(false)} aoAplicar={(f) => { setFiltros(f); setFiltrando(false); }} />;
   }
   return (
     <>
@@ -145,7 +145,7 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
               {nFiltros > 0 && <button className="p4-link ff-limpar" onClick={() => setFiltros(FILTROS_VAZIOS)}>Limpar</button>}
             </div>
           )}
-          {dados && nFiltros > 0 && <p className="ff-resumo">{resumoFiltros(filtros, dados.contas).join(' · ')}</p>}
+          {dados && nFiltros > 0 && <p className="ff-resumo">{resumoFiltros(filtros, dados.contas, dados.planos_conta).join(' · ')}</p>}
           {dados && lendo && dados.itens.length === 0 && <p className="p4-legal">Carregando…</p>}
           {dados && !lendo && dados.itens.length === 0 && (nFiltros > 0
             ? <div className="p4-vazio"><b>Nenhum lançamento com esses filtros</b><span>Mude o período ou tire algum filtro{FILTRO_FINANCEIRO ? ', ou marque mais opções acima' : '. As outras abas podem ter resultados'}.</span></div>
@@ -153,14 +153,14 @@ export function Financeiro({ voltar }: { voltar?: ReactNode }) {
               ? <div className="p4-vazio"><b>Nada aqui</b><span>{situacoes.length ? 'Nenhum lançamento nas opções marcadas.' : 'Marque A receber, A pagar, Recebidas ou Pagas.'}</span></div>
               : <div className="p4-vazio"><b>Nada aqui</b><span>{VAZIO[aba]}</span></div>)}
           {dados?.itens.map((l) => {
-            const s = STATUS[l.status];
+            const s = l.excluido ? { label: 'Excluído', cor: 'var(--text-mute)' } : STATUS[l.status];
             const data = l.status === 'liquidado' ? `pago ${dataCurta(l.pago_em)}` : l.status === 'vencido' ? `venceu ${dataCurta(l.vencimento)}` : `vence ${dataCurta(l.vencimento)}`;
             return (
-              <article key={l.id} className="fn-lanc" aria-label={l.descricao}>
+              <article key={l.id} className={'fn-lanc' + (l.excluido ? ' excluido' : '')} aria-label={l.descricao}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{l.descricao}</b>
                   <small>{l.parte ? `${l.parte} · ` : ''}{data}</small>
-                  {(l.forma_pagamento || l.nf_numero) && <small>{[l.forma_pagamento, l.nf_numero && `NF ${l.nf_numero}`].filter(Boolean).join(' · ')}</small>}
+                  {(l.forma_pagamento || l.nf_numero || l.documento) && <small>{[l.documento && `Doc. ${l.documento}`, l.forma_pagamento, l.nf_numero && `NF ${l.nf_numero}`].filter(Boolean).join(' · ')}</small>}
                 </div>
                 <div className="fn-lanc-v">
                   <span className={l.tipo === 'receber' ? 'pos' : 'neg'}>{l.tipo === 'receber' ? '+ ' : '− '}{reais(l.valor)}</span>

@@ -255,30 +255,42 @@ const ORCAMENTOS = [
 // viram data dentro do handler. Competência = mês da emissão. Contas: 1 movimento, 2 caixa, 3 recebíveis.
 const LANCAMENTOS = [
   { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, emi: -20, venda: -22, valor: 7840, pago: false,
-    forma: 'Boleto', conta: 1, nf: '1290', nosso: '00012345' },
+    forma: 'Boleto', conta: 1, nf: '1290', nosso: '00012345', plano: '1.1.01', doc: 'PED-0043/1', exc: false },
   { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, emi: -37, venda: -40, valor: 1260, pago: false,
-    forma: 'Boleto', conta: 1, nf: '1284', nosso: '00012311' },
+    forma: 'Boleto', conta: 1, nf: '1284', nosso: '00012311', plano: '1.1.01', doc: 'PED-0044/1', exc: false },
   { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, emi: -4, venda: -5, valor: 2315, pago: false,
-    forma: 'Pix', conta: 1, nf: null, nosso: null },
+    forma: 'Pix', conta: 1, nf: null, nosso: null, plano: '1.1.02', doc: 'PED-0046/1', exc: false },
   { id: 908, tipo: 'receber', descricao: 'Pedido #0047 · banner lona', parte: 'Bistrô do Forno', dias: 12, emi: -2, venda: -2, valor: 980, pago: false,
-    forma: 'Cartão de crédito', conta: 3, nf: '1293', nosso: null },
+    forma: 'Cartão de crédito', conta: 3, nf: '1293', nosso: null, plano: '1.1.01', doc: 'PED-0047/1', exc: false },
   { id: 909, tipo: 'receber', descricao: 'Pedido #0045 · cardápio A3', parte: 'Bistrô do Forno', dias: 25, emi: -6, venda: -9, valor: 210, pago: false,
-    forma: 'Boleto', conta: 1, nf: '1291', nosso: '00012352' },
+    forma: 'Boleto', conta: 1, nf: '1291', nosso: '00012352', plano: '1.1.02', doc: 'PED-0045/1', exc: false },
   { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, emi: -31, venda: null, valor: 4380, pago: false,
-    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001' },
+    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001', plano: '2.1.01', doc: '88213-1', exc: false },
   { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, emi: -8, venda: null, valor: 1920, pago: false,
-    forma: 'Boleto', conta: 1, nf: null, nosso: '84670000' },
+    forma: 'Boleto', conta: 1, nf: null, nosso: '84670000', plano: '2.2.01', doc: 'FAT-2026-10', exc: false },
   { id: 910, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', dias: 15, emi: -15, venda: null, valor: 3500, pago: false,
-    forma: 'Transferência', conta: 1, nf: null, nosso: null },
+    forma: 'Transferência', conta: 1, nf: null, nosso: null, plano: '2.2.02', doc: 'ALG-10/2026', exc: false },
   { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, emi: -35, venda: -36, valor: 3420, pago: true,
-    forma: 'Pix', conta: 1, nf: '1287', nosso: null },
+    forma: 'Pix', conta: 1, nf: '1287', nosso: null, plano: '1.1.02', doc: 'PED-0038/1', exc: false },
   { id: 911, tipo: 'receber', descricao: 'Venda balcão #V-0009', parte: 'Consumidor final', dias: -2, emi: -2, venda: -2, valor: 186, pago: true,
-    forma: 'Dinheiro', conta: 2, nf: null, nosso: null },
+    forma: 'Dinheiro', conta: 2, nf: null, nosso: null, plano: '1.1.02', doc: 'V-0009', exc: false },
   { id: 912, tipo: 'receber', descricao: 'Pedido #0040 · placa PVC', parte: 'Clínica Vita', dias: -9, emi: -40, venda: -41, valor: 640, pago: true,
-    forma: 'Cartão de débito', conta: 3, nf: '1282', nosso: null },
+    forma: 'Cartão de débito', conta: 3, nf: '1282', nosso: null, plano: '1.1.01', doc: 'PED-0040/1', exc: false },
   { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, emi: -36, venda: null, valor: 2760, pago: true,
-    forma: 'Boleto', conta: 1, nf: '45120', nosso: '34191220' },
+    forma: 'Boleto', conta: 1, nf: '45120', nosso: '34191220', plano: '2.1.02', doc: '45120-1', exc: false },
+  // Excluídos no ERP: só aparecem com Status "Excluídos" ou "Todos" no filtro avançado e não entram no resumo.
+  { id: 913, tipo: 'receber', descricao: 'Pedido #0042 · cartão de visita', parte: 'Marília Costa', dias: 4, emi: -3, venda: -3, valor: 248, pago: false,
+    forma: 'Boleto', conta: 1, nf: null, nosso: '00012360', plano: '1.1.02', doc: 'PED-0042/1', exc: true },
+  { id: 914, tipo: 'pagar', descricao: 'Lona 440 g · lançada em duplicidade', parte: 'Gráfica Lona Sul', dias: -1, emi: -31, venda: null, valor: 4380, pago: false,
+    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001', plano: '2.1.01', doc: '88213-1', exc: true },
 ] as const;
+// Plano de contas da demo: grupos e contas, na ordem do código.
+const PLANO_CONTAS = [
+  { codigo: '1', nome: 'Receitas' }, { codigo: '1.1', nome: 'Vendas' }, { codigo: '1.1.01', nome: 'Comunicação visual' },
+  { codigo: '1.1.02', nome: 'Impressos e etiquetas' }, { codigo: '2', nome: 'Despesas' }, { codigo: '2.1', nome: 'Insumos' },
+  { codigo: '2.1.01', nome: 'Lona e substratos' }, { codigo: '2.1.02', nome: 'Tintas' }, { codigo: '2.2', nome: 'Despesas fixas' },
+  { codigo: '2.2.01', nome: 'Energia' }, { codigo: '2.2.02', nome: 'Aluguel' },
+];
 
 // Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
 const FISCAIS = [
@@ -703,13 +715,16 @@ export const demo = {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
       // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
       const hoje = diaRel(0);
-      const todos = LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, ...l }) => {
+      const todos = LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, plano, doc, exc, ...l }) => {
         const data = diaRel(dias);
         return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto',
           emissao: diaRel(emi), competencia: diaRel(emi).slice(0, 7), venda_em: venda === null ? null : diaRel(venda),
-          forma_pagamento: forma, conta_id: conta, nf_numero: nf, nosso_numero: nosso };
+          forma_pagamento: forma, conta_id: conta, nf_numero: nf, nosso_numero: nosso,
+          plano_codigo: plano, plano_nome: PLANO_CONTAS.find((p) => p.codigo === plano)?.nome ?? null, documento: doc, excluido: exc };
       });
+      // A lista passa pelo filtro (que esconde os excluídos por padrão); o resumo do mês é só dos ativos.
       const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
+      const abertosAtivos = (t: string) => abertos(t).filter((l) => !l.excluido);
       const extrato = todos.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
       // Filtro avançado: a mesma regra que o ERP vai aplicar. Resumo e contas não mudam; lista e contadores, sim.
       const f = lerParams(caminho);
@@ -722,12 +737,12 @@ export const demo = {
       const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
       const recebido = 148230, pago = 96410;
       return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
-          a_receber: soma(abertos('receber')), vencido: soma(abertos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertos('pagar')) },
+          a_receber: soma(abertosAtivos('receber')), vencido: soma(abertosAtivos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertosAtivos('pagar')) },
         contas: [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
           { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
         itens, contadores: { receber: filtrarLancamentos(abertos('receber'), f).length, pagar: filtrarLancamentos(abertos('pagar'), f).length,
           extrato: filtrarLancamentos(extrato, f).length }, pagina: 1, tem_mais: false,
-        contadores_situacao, formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
+        contadores_situacao, planos_conta: PLANO_CONTAS, formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';

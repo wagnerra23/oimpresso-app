@@ -13,15 +13,24 @@ export const CAMPOS_DATA: Array<{ id: CampoData; label: string }> = [
 /** Usada quando o ERP não manda a lista de formas da empresa. */
 export const FORMAS_PADRAO = ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'];
 
-/** Datas em AAAA-MM-DD; texto vazio = sem filtro. Valores em reais, como o usuário digitou ("1.500,50"). */
+/** Ativos (padrão), só os excluídos ou os dois. Excluído = lançamento apagado no ERP, que segue no histórico. */
+export type Registro = 'ativos' | 'excluidos' | 'todos';
+export const REGISTROS: Array<{ id: Registro; label: string }> = [
+  { id: 'ativos', label: 'Ativos' }, { id: 'excluidos', label: 'Excluídos' }, { id: 'todos', label: 'Todos' },
+];
+
+/** Datas em AAAA-MM-DD; texto vazio = sem filtro. Valores em reais, como o usuário digitou ("1.500,50").
+ *  `plano` é o código do plano de contas: um grupo ("2.1") pega as contas de baixo ("2.1.01", "2.1.02"). */
 export interface FiltrosFinanceiro {
   campo_data: CampoData; de: string; ate: string;
   texto: string; forma: string; conta_id: number | null; nf: string; nosso_numero: string;
   valor_min: string; valor_max: string;
+  plano: string; documento: string; registro: Registro;
 }
 
 export const FILTROS_VAZIOS: FiltrosFinanceiro = {
   campo_data: 'vencimento', de: '', ate: '', texto: '', forma: '', conta_id: null, nf: '', nosso_numero: '', valor_min: '', valor_max: '',
+  plano: '', documento: '', registro: 'ativos',
 };
 
 /** "1.500,50" → 1500.5; "1.000" → 1000; vazio ou inválido → null. */
@@ -37,7 +46,7 @@ export function lerValor(v: string): number | null {
 /** Quantos filtros estão ligados (o período conta como um). */
 export function contarFiltros(f: FiltrosFinanceiro): number {
   return [f.de || f.ate, f.texto.trim(), f.forma, f.conta_id !== null, f.nf.trim(), f.nosso_numero.trim(),
-    lerValor(f.valor_min) !== null || lerValor(f.valor_max) !== null].filter(Boolean).length;
+    lerValor(f.valor_min) !== null || lerValor(f.valor_max) !== null, f.plano, f.documento.trim(), f.registro !== 'ativos'].filter(Boolean).length;
 }
 
 /** Parâmetros da rota, só os ligados. Ex.: "&data_campo=emissao&de=2026-10-01&ate=2026-10-15&forma_pagamento=Pix". */
@@ -52,6 +61,9 @@ export function paramsFiltros(f: FiltrosFinanceiro): string {
   const min = lerValor(f.valor_min), max = lerValor(f.valor_max);
   if (min !== null) p.set('valor_min', String(min));
   if (max !== null) p.set('valor_max', String(max));
+  if (f.plano) p.set('plano_conta', f.plano);
+  if (f.documento.trim()) p.set('documento', f.documento.trim());
+  if (f.registro !== 'ativos') p.set('registro', f.registro);
   const s = p.toString();
   return s ? '&' + s : '';
 }
@@ -61,11 +73,14 @@ export function lerParams(query: string): FiltrosFinanceiro {
   const p = new URLSearchParams(query.includes('?') ? query.slice(query.indexOf('?') + 1) : query);
   const campo = p.get('data_campo') as CampoData | null;
   const conta = p.get('conta_id');
+  const registro = p.get('registro') as Registro | null;
   return {
     campo_data: campo && CAMPOS_DATA.some((c) => c.id === campo) ? campo : 'vencimento',
     de: p.get('de') ?? '', ate: p.get('ate') ?? '', texto: p.get('busca') ?? '', forma: p.get('forma_pagamento') ?? '',
     conta_id: conta && /^\d+$/.test(conta) ? Number(conta) : null, nf: p.get('nf') ?? '', nosso_numero: p.get('nosso_numero') ?? '',
     valor_min: p.get('valor_min') ?? '', valor_max: p.get('valor_max') ?? '',
+    plano: p.get('plano_conta') ?? '', documento: p.get('documento') ?? '',
+    registro: registro && REGISTROS.some((r) => r.id === registro) ? registro : 'ativos',
   };
 }
 
@@ -74,10 +89,12 @@ export interface LancamentoFiltravel {
   descricao: string; parte: string | null; vencimento: string | null; pago_em: string | null; valor: number;
   emissao?: string | null; competencia?: string | null; venda_em?: string | null; forma_pagamento?: string | null;
   conta_id?: number | null; nf_numero?: string | null; nosso_numero?: string | null;
+  plano_codigo?: string | null; documento?: string | null; excluido?: boolean;
 }
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const soDigitos = (s: string) => s.replace(/\D/g, '');
+const compacto = (s: string) => semAcento(s).replace(/[^a-z0-9]/g, '');
 
 /** Data do lançamento para o campo escolhido. Competência é mês (AAAA-MM): compara pelo mês. */
 function dataDo(l: LancamentoFiltravel, campo: CampoData): string | null {
@@ -95,6 +112,7 @@ export function filtrarLancamentos<T extends LancamentoFiltravel>(itens: T[], f:
   const nf = soDigitos(f.nf);
   const nosso = soDigitos(f.nosso_numero);
   const min = lerValor(f.valor_min), max = lerValor(f.valor_max);
+  const doc = compacto(f.documento);
   const mes = f.campo_data === 'competencia';
   const de = mes ? f.de.slice(0, 7) : f.de;
   const ate = mes ? f.ate.slice(0, 7) : f.ate;
@@ -110,6 +128,10 @@ export function filtrarLancamentos<T extends LancamentoFiltravel>(itens: T[], f:
     if (nosso && !soDigitos(l.nosso_numero ?? '').includes(nosso)) return false;
     if (min !== null && l.valor < min) return false;
     if (max !== null && l.valor > max) return false;
+    if (f.registro === 'ativos' && l.excluido) return false;
+    if (f.registro === 'excluidos' && !l.excluido) return false;
+    if (f.plano && !(l.plano_codigo === f.plano || (l.plano_codigo ?? '').startsWith(f.plano + '.'))) return false;
+    if (doc && !compacto(l.documento ?? '').includes(doc)) return false;
     return true;
   });
 }
@@ -162,7 +184,7 @@ export function periodoDe(a: Atalho, hoje = new Date()): { de: string; ate: stri
 }
 
 /** Resumo curto dos filtros ligados, para a linha acima da lista. */
-export function resumoFiltros(f: FiltrosFinanceiro, contas: Array<{ id: number; nome: string }>): string[] {
+export function resumoFiltros(f: FiltrosFinanceiro, contas: Array<{ id: number; nome: string }>, planos: Array<{ codigo: string; nome: string }> = []): string[] {
   const br = (s: string) => s.split('-').reverse().join('/');
   const r: string[] = [];
   if (f.de || f.ate) {
@@ -176,6 +198,9 @@ export function resumoFiltros(f: FiltrosFinanceiro, contas: Array<{ id: number; 
   if (f.nosso_numero.trim()) r.push(`Nosso nº ${f.nosso_numero.trim()}`);
   const min = lerValor(f.valor_min), max = lerValor(f.valor_max);
   const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  if (f.plano) r.push(`${f.plano} ${planos.find((p) => p.codigo === f.plano)?.nome ?? ''}`.trim());
+  if (f.documento.trim()) r.push(`Doc. ${f.documento.trim()}`);
+  if (f.registro !== 'ativos') r.push(f.registro === 'excluidos' ? 'Só excluídos' : 'Ativos e excluídos');
   if (min !== null || max !== null) r.push(min !== null && max !== null ? `${reais(min)} a ${reais(max)}` : min !== null ? `a partir de ${reais(min)}` : `até ${reais(max!)}`);
   return r;
 }

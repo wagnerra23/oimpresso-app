@@ -89,3 +89,30 @@ describe('situações (caixas de seleção)', () => {
     expect(ordenarLancamentos(x).map((l) => l.id)).toEqual(['vencido', 'vence-depois', 'pago-recente', 'pago-antigo']);
   });
 });
+
+describe('plano de contas, documento e status', () => {
+  const X = [
+    { id: 1, descricao: 'Lona', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, plano_codigo: '2.1.01', documento: '88213-1', excluido: false },
+    { id: 2, descricao: 'Tinta', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, plano_codigo: '2.1.02', documento: '45120-1', excluido: false },
+    { id: 3, descricao: 'Lona duplicada', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, plano_codigo: '2.1.01', documento: '88213-1', excluido: true },
+    { id: 4, descricao: 'Aluguel', parte: null, vencimento: '2026-10-01', pago_em: null, valor: 10, plano_codigo: '2.2.02', documento: 'ALG-10/2026', excluido: false },
+  ];
+  const so = (x: Partial<FiltrosFinanceiro>) => filtrarLancamentos(X, f(x)).map((l) => l.id);
+  it('excluídos ficam de fora por padrão', () => expect(so({})).toEqual([1, 2, 4]));
+  it('só excluídos ou todos', () => {
+    expect(so({ registro: 'excluidos' })).toEqual([3]);
+    expect(so({ registro: 'todos' })).toEqual([1, 2, 3, 4]);
+  });
+  it('grupo do plano pega as contas de baixo, e não confunde 2.1 com 2.10', () => {
+    expect(so({ plano: '2.1' })).toEqual([1, 2]);
+    expect(so({ plano: '2.1.02' })).toEqual([2]);
+    expect(so({ plano: '2' })).toEqual([1, 2, 4]);
+  });
+  it('documento ignora barra, hífen e maiúsculas', () => expect(so({ documento: 'alg 10 2026' })).toEqual([4]));
+  it('vai e volta pela rota e conta como filtro', () => {
+    const x = f({ plano: '2.1', documento: '88213', registro: 'todos' });
+    expect(paramsFiltros(x)).toBe('&plano_conta=2.1&documento=88213&registro=todos');
+    expect(lerParams('?aba=pagar' + paramsFiltros(x))).toEqual(x);
+    expect(contarFiltros(x)).toBe(3);
+  });
+});

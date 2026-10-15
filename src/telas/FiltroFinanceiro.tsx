@@ -1,12 +1,16 @@
 // Filtro avançado do Financeiro (tela 06): abre por cima da lista, como as telas de cadastro. Edita uma cópia
 // e só devolve em "Aplicar"; "Limpar" zera tudo. Regras e parâmetros da rota em ../financeiro-filtros.
 import { useState } from 'react';
-import { ATALHOS, CAMPOS_DATA, FILTROS_VAZIOS, FORMAS_PADRAO, contarFiltros, lerValor, periodoDe, type FiltrosFinanceiro } from '../financeiro-filtros';
+import { ATALHOS, CAMPOS_DATA, FILTROS_VAZIOS, FORMAS_PADRAO, REGISTROS, contarFiltros, lerValor, periodoDe, type FiltrosFinanceiro } from '../financeiro-filtros';
 
-export function FiltroFinanceiro({ inicial, contas, formas, aoAplicar, aoVoltar }: {
+/** Recuo do plano de contas pelo nível do código ("2.1.01" = 3º nível). */
+const recuo = (codigo: string) => '\u00a0\u00a0\u00a0'.repeat(codigo.split('.').length - 1);
+
+export function FiltroFinanceiro({ inicial, contas, formas, planos, aoAplicar, aoVoltar }: {
   inicial: FiltrosFinanceiro;
   contas: Array<{ id: number; nome: string; detalhe: string | null }>;
   formas?: string[];
+  planos?: Array<{ codigo: string; nome: string }>;
   aoAplicar: (f: FiltrosFinanceiro) => void;
   aoVoltar: () => void;
 }) {
@@ -63,8 +67,21 @@ export function FiltroFinanceiro({ inicial, contas, formas, aoAplicar, aoVoltar 
 
           <div className="p4-rotulo">Lançamento</div>
           <div className="p4-campo">
+            <label id="ff-l-registro">Status</label>
+            <div className="np-seg tres" role="radiogroup" aria-labelledby="ff-l-registro">
+              {REGISTROS.map((r) => (
+                <button key={r.id} role="radio" aria-checked={f.registro === r.id} className={f.registro === r.id ? 'on' : ''} onClick={() => mudar('registro', r.id)}>{r.label}</button>
+              ))}
+            </div>
+            <span className="np-ajuda">Excluídos são lançamentos apagados no ERP, que continuam no histórico.</span>
+          </div>
+          <div className="p4-campo">
             <label htmlFor="ff-texto">Razão social ou descrição</label>
             <input id="ff-texto" type="search" value={f.texto} onChange={(e) => mudar('texto', e.target.value)} placeholder="Ex.: Clínica Vita, aluguel, #0044" enterKeyHint="search" />
+          </div>
+          <div className="p4-campo">
+            <label htmlFor="ff-doc">Nº do documento</label>
+            <input id="ff-doc" value={f.documento} onChange={(e) => mudar('documento', e.target.value)} placeholder="Ex.: PED-0043/1" />
           </div>
           <div className="ff-duas">
             <div className="p4-campo">
@@ -87,6 +104,16 @@ export function FiltroFinanceiro({ inicial, contas, formas, aoAplicar, aoVoltar 
             </div>
           </div>
           {valorInvalido && <span className="np-erro">Confira a faixa de valor: use números, e o valor inicial não pode passar do final.</span>}
+          {planos && planos.length > 0 && (
+            <div className="p4-campo">
+              <label htmlFor="ff-plano">Plano de contas</label>
+              <select id="ff-plano" className="np-select" value={f.plano} onChange={(e) => mudar('plano', e.target.value)}>
+                <option value="">Todo o plano de contas</option>
+                {planos.map((p) => <option key={p.codigo} value={p.codigo}>{recuo(p.codigo)}{p.codigo} · {p.nome}</option>)}
+              </select>
+              <span className="np-ajuda">Escolher um grupo inclui as contas dentro dele.</span>
+            </div>
+          )}
 
           <div className="p4-rotulo">Pagamento</div>
           <div className="p4-campo">

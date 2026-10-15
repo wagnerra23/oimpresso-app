@@ -538,6 +538,8 @@ a.p4-link { text-decoration: none; }
 .fn-lanc-v { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
 .fn-lanc-v span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fn-lanc-v small { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; }
+.fn-lanc.excluido { border-style: dashed; opacity: .75; }
+.fn-lanc.excluido b, .fn-lanc.excluido .fn-lanc-v span { text-decoration: line-through; }
 /* Filtro avançado do Financeiro */
 .ff-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ff-botao { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }
