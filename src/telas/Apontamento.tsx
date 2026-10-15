@@ -1,52 +1,80 @@
-// Apontamento por QR — P8, tela 02 (Mobile Propostas.dc.html#p8). Abre pela Produção ("Apontar").
-// Lê o QR da etiqueta (câmera nativa) ou o número digitado; mostra o pedido e a etapa que o ERP devolveu;
-// Iniciar / Finalizar / Cancelar. Sem pausa: a API só inicia, finaliza ou cancela (US-COMVIS-004).
-// O cronômetro é só exibição e parte do `iniciado_em` do servidor. Sem internet a escrita trava, sem fila
-// (regra 8): o envio inteiro passa por src/apontamento-envio.ts.
-// `app_apontamento_exige_qr` (ajuste da empresa, padrão false): com true, some "Digitar número" e o iniciar
-// manda o código lido; o ERP confere de novo.
-import { useEffect, useRef, useState } from 'react';
-import { apontamentoApi, drift, type ApontamentoAberto, type EtiquetaProducao } from '../api';
+// Apontamento por QR — P8, tela 02 (Mobile Propostas.dc.html#p8; Mobile Producao.dc.html A2/A3/A8). Abre pela
+// Produção ("Apontar"). Lê o QR da etiqueta (câmera nativa) ou o número digitado; mostra a OS e a etapa (posto e
+// responsável) que o ERP devolveu; Iniciar, Concluir e Corrigir horário. Grava no PCP (ADR 0431, contrato #9447).
+// - Sem internet o toque NÃO trava: vai para a fila do celular com a hora do toque e é enviado quando a rede volta,
+//   sem duplicar (decisão [W] 2026-10-15, só o apontamento). Ler uma etiqueta nova ainda precisa de internet.
+// - O cronômetro é só exibição: parte do `iniciado_em` do ERP (ou da hora do toque, enquanto está no celular).
+// - Pausa fica fora: o contrato pede `motivo_id` do posto e não há rota com a lista de motivos.
+// - `app_apontamento_exige_qr`: some "Digitar número" e o iniciar manda o código lido; o ERP confere de novo.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apontamentoApi, drift, type ApontamentoAberto, type Encerramento, type EtiquetaProducao } from '../api';
 import { useAjustes } from '../ajustes';
 import { useVoltar } from '../voltar';
 import {
-  codigoDoQr, duracao, erroMotivo, m2Digitado, mensagemDoErro, motivoBloqueio, numeroDigitado, relogio, segundosDecorridos,
+  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, numeroDigitado, relogio, segundosDecorridos,
 } from '../apontamento-regras';
-import { apontamentoDoConflito, cancelarApontamento, finalizarApontamento, iniciarApontamento } from '../apontamento-envio';
+import { momentoIso, relogioErrado, rodando, type ItemFila, type Rodando } from '../apontamento-fila-regras';
+import { apontar, descartarItem, enviarFila, useFila, type NovoItem, type ResultadoEnvio } from '../apontamento-fila';
 import '../styles/apontamento.css';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 type Lido = { etiqueta: EtiquetaProducao; codigoQr: string | null };
-const codigoDe = (e: unknown) => (e as { codigo?: string } | null)?.codigo ?? '';
 const voltarSvg = <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>;
 const TECLAS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'] as const;
+const ACAO: Record<ItemFila['acao'], string> = { iniciar: 'Início', concluir: 'Conclusão', corrigir: 'Correção de horário' };
+
+/** Dados de um cartão "rodando": do ERP ou do toque ainda no celular. */
+function dadosDe(r: Rodando<ApontamentoAberto>) {
+  const s = r.servidor, i = r.item;
+  return {
+    programacao: s?.etapa?.programacao_id ?? i?.programacao_id ?? 0,
+    numero: s?.pedido?.numero ?? i?.pedido.numero ?? '',
+    resumo: s?.pedido?.resumo ?? i?.pedido.resumo ?? null,
+    cliente: s?.pedido?.cliente ?? i?.pedido.cliente ?? null,
+    etapa: s?.etapa?.posto?.nome ?? i?.etapa ?? '',
+    maquina: (s?.tipo ?? s?.etapa?.posto?.tipo) === 'maquina',
+    // Do ERP: hora gravada (corrige o desvio do relógio). Do celular: a hora do toque, no relógio do próprio aparelho.
+    iniciadoEm: s?.iniciado_em ?? i?.momento ?? '',
+    noCelular: !s,
+  };
+}
 
 export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void; avisar: Aviso; online: boolean }) {
   const ajustes = useAjustes();
   const soQr = ajustes.app_apontamento_exige_qr;
+  const { itens, dono, fila } = useFila();
+  const [servidor, setServidor] = useState<ApontamentoAberto[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [aberto, setAberto] = useState<ApontamentoAberto | null>(null);
   const [lido, setLido] = useState<Lido | null>(null);
+  const [aberto, setAberto] = useState<number | null>(null);
   const [modo, setModo] = useState<'qr' | 'numero'>('qr');
   const [digitado, setDigitado] = useState('');
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
-  const [folha, setFolha] = useState<'finalizar' | 'cancelar' | null>(null);
+  const [corrigindo, setCorrigindo] = useState<Rodando<ApontamentoAberto> | null>(null);
   const travado = useRef(false);
 
-  useVoltar(folha !== null, () => { if (!ocupado) setFolha(null); });
-  useVoltar(folha === null && lido !== null && aberto === null, () => setLido(null));
+  const lista = rodando(servidor, fila, dono);
+  const atual = aberto === null ? null : lista.find((r) => dadosDe(r).programacao === aberto) ?? null;
 
-  // O apontamento aberto do operador (de outro aparelho, ou de antes de fechar o app) vem primeiro.
-  useEffect(() => {
-    apontamentoApi.emAndamento()
-      .then((r) => setAberto(r.item))
-      .catch((e) => setErro(mensagemDoErro(e)))
-      .finally(() => setCarregando(false));
+  useVoltar(corrigindo !== null, () => { if (!ocupado) setCorrigindo(null); });
+  useVoltar(corrigindo === null && (lido !== null || aberto !== null), () => { setLido(null); setAberto(null); });
+
+  const recarregar = useCallback(async () => {
+    try {
+      const r = await apontamentoApi.emAndamento();
+      setServidor([...(r.pessoa ? [r.pessoa] : []), ...r.maquinas]);
+    } catch { /* sem rede: fica o que já se sabia + a fila */ }
+    setCarregando(false);
   }, []);
 
+  // Ao abrir e quando a rede volta: manda o que estava guardado e busca o que está rodando no ERP.
+  useEffect(() => {
+    if (!online) { setCarregando(false); return; }
+    void enviarFila().then(recarregar);
+  }, [online, recarregar]);
+
   const modoAtual = soQr ? 'qr' : modo;
-  const bloqueio = motivoBloqueio(online);
 
   /** Uma ação por vez: dois toques no mesmo quadro não passam pelo `ocupado` (só muda no próximo render). */
   const uma = async (fazer: () => Promise<void>) => {
@@ -60,8 +88,10 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
     try {
       const etiqueta = await apontamentoApi.etiqueta(codigo);
       setLido({ etiqueta, codigoQr }); setDigitado('');
+      const ja = lista.find((r) => dadosDe(r).programacao === etiqueta.etapa.programacao_id);
+      if (ja) { setAberto(etiqueta.etapa.programacao_id); setLido(null); }
     } catch (e) {
-      setErro(codigoDe(e) === 'validacao' && soQr ? 'Esta empresa aponta só pelo QR da etiqueta.' : mensagemDoErro(e));
+      setErro(mensagemDoErro(e));
     }
   });
 
@@ -89,51 +119,45 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
     setDigitado((d) => (d.length < 10 ? d + t : d));
   };
 
-  const iniciar = () => uma(async () => {
+  /** Guarda o toque e tenta enviar. Diz ao operador onde ele ficou. */
+  const tocar = (novo: NovoItem, ok: (r: ResultadoEnvio) => string) => uma(async () => {
+    const relogioMal = relogioErrado(drift());
+    if (relogioMal) { avisar(relogioMal, 'erro'); return; }
+    let r: ResultadoEnvio;
+    try { r = await apontar(novo, online); } catch { avisar('Não foi possível guardar o apontamento no celular.', 'erro'); return; }
+    if (r.parou?.tipo === 'recusado') avisar(r.parou.mensagem, 'erro');
+    else if (!online || r.parou) avisar('Sem internet: ficou guardado no celular e vai para o ERP quando a conexão voltar.', 'warn');
+    else avisar(ok(r), 'ok');
+    if (online) await recarregar();
+  });
+
+  const iniciar = () => {
     if (!lido) return;
     const { etiqueta, codigoQr } = lido;
-    try {
-      const r = await iniciarApontamento(online, etiqueta.pedido.id, etiqueta.etapa.chave, soQr ? codigoQr : null);
-      setAberto({ id: r.id, pedido: etiqueta.pedido, etapa: etiqueta.etapa, iniciado_em: r.iniciado_em });
-      setLido(null);
-    } catch (e) {
-      const anterior = apontamentoDoConflito(e);
-      if (anterior) {
-        // Já há um aberto: a tela passa a mostrá-lo, para o operador finalizar o anterior antes.
-        setAberto(anterior); setLido(null);
-        avisar(`Você já está apontando ${anterior.pedido.numero}. Finalize ou cancele antes de iniciar outro.`, 'warn');
-      } else if (codigoDe(e) === 'etapa_mudou') {
-        avisar(mensagemDoErro(e), 'warn');
-        try { setLido({ etiqueta: await apontamentoApi.etiqueta(codigoQr ?? String(etiqueta.pedido.id)), codigoQr }); } catch { setLido(null); }
-      } else avisar(mensagemDoErro(e), 'erro');
-    }
-  });
+    const programacao = etiqueta.etapa.programacao_id;
+    void tocar({
+      acao: 'iniciar', momento: momentoIso(new Date()), programacao_id: programacao, ...(soQr && codigoQr ? { codigo: codigoQr } : {}),
+      pedido: etiqueta.pedido, etapa: etiqueta.etapa.posto?.nome ?? 'Etapa',
+    }, () => `Iniciado · ${etiqueta.pedido.numero ?? ''}`).then(() => { setLido(null); setAberto(programacao); });
+  };
 
-  const encerrado = (texto: string, tom: 'ok' | 'warn') => { setAberto(null); setFolha(null); avisar(texto, tom); };
+  const concluir = (r: Rodando<ApontamentoAberto>) => {
+    const d = dadosDe(r);
+    void tocar({ acao: 'concluir', alvo: r.alvo, momento: momentoIso(new Date()), pedido: { id: 0, numero: d.numero, resumo: d.resumo, cliente: d.cliente }, etapa: d.etapa },
+      (res) => {
+        const fim = res.enviados.find((x) => x.item.acao === 'concluir')?.resposta as Encerramento | undefined;
+        return `Etapa concluída${fim?.minutos != null ? ` · ${duracao(fim.minutos)}` : ''} em ${d.numero}`;
+      }).then(() => setAberto(null));
+  };
 
-  const finalizar = (m2: string | null) => uma(async () => {
-    if (!aberto) return;
-    try {
-      const r = await finalizarApontamento(online, aberto.id, m2);
-      encerrado(`Apontamento finalizado · ${duracao(r.minutos)} em ${aberto.pedido.numero}`, 'ok');
-    } catch (e) {
-      if (codigoDe(e) === 'nao_encontrado' || codigoDe(e) === 'bloqueado') encerrado('Este apontamento já tinha sido encerrado.', 'warn');
-      else avisar(mensagemDoErro(e), 'erro');
-    }
-  });
+  const corrigir = (r: Rodando<ApontamentoAberto>, horaCerta: Date, justificativa: string) => {
+    const d = dadosDe(r);
+    void tocar({ acao: 'corrigir', alvo: r.alvo, momento: momentoIso(new Date()), hora_certa: momentoIso(horaCerta), justificativa: justificativa.trim(),
+      pedido: { id: 0, numero: d.numero, resumo: d.resumo, cliente: d.cliente }, etapa: d.etapa },
+    () => 'Pedido de correção enviado ao gestor.').then(() => setCorrigindo(null));
+  };
 
-  const cancelar = (motivo: string) => uma(async () => {
-    if (!aberto) return;
-    try {
-      await cancelarApontamento(online, aberto.id, motivo);
-      encerrado('Apontamento cancelado — não conta tempo.', 'warn');
-    } catch (e) {
-      if (codigoDe(e) === 'nao_encontrado' || codigoDe(e) === 'bloqueado') encerrado('Este apontamento já tinha sido encerrado.', 'warn');
-      else avisar(mensagemDoErro(e), 'erro');
-    }
-  });
-
-  const job = aberto ? { pedido: aberto.pedido, etapa: aberto.etapa } : lido ? lido.etiqueta : null;
+  const etapaLida = lido?.etiqueta.etapa;
 
   return (
     <>
@@ -148,8 +172,22 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
         <div className="pd-corpo ap-corpo">
           {carregando && <p className="p4-legal">Carregando…</p>}
 
-          {!carregando && !job && (
+          {!carregando && !atual && !lido && (
             <>
+              {lista.length > 0 && (
+                <div className="ap-rodando">
+                  <div className="p4-rotulo">Rodando agora</div>
+                  {lista.map((r) => {
+                    const d = dadosDe(r);
+                    return (
+                      <button key={r.chave} className="ap-rodando-item" onClick={() => setAberto(d.programacao)}>
+                        <span className="ap-job-l1"><span>{d.numero}</span><b>{d.etapa}{d.maquina ? ' · máquina' : ''}</b></span>
+                        <Cronometro iniciadoEm={d.iniciadoEm} corrigeRelogio={!d.noCelular} pequeno />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {!soQr && (
                 <div className="np-seg" role="tablist" aria-label="Como identificar o pedido">
                   <button role="tab" aria-selected={modoAtual === 'qr'} className={modoAtual === 'qr' ? 'on' : ''} onClick={() => { setModo('qr'); setErro(''); }}>Ler QR</button>
@@ -180,114 +218,141 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
                   </div>
                 </>
               )}
+              {!online && <p className="pd-rodape-nota">Sem conexão: ler uma etiqueta nova precisa de internet. O que você já iniciou dá para concluir.</p>}
             </>
           )}
 
-          {!carregando && job && (
+          {!carregando && !atual && lido && etapaLida && (
             <>
               <div className="ap-job">
-                <div className="ap-job-l1"><span>{job.pedido.numero}</span><b>{job.etapa.rotulo}</b></div>
-                <div className="ap-job-d">{job.pedido.resumo ?? 'OS sem itens de orçamento'}</div>
-                {job.pedido.cliente && <div className="ap-job-c">{job.pedido.cliente}</div>}
+                <div className="ap-job-l1"><span>{lido.etiqueta.pedido.numero}</span><b>{etapaLida.posto?.nome ?? 'Etapa'}</b></div>
+                <div className="ap-job-d">{lido.etiqueta.pedido.resumo ?? 'OS sem itens de orçamento'}</div>
+                {lido.etiqueta.pedido.cliente && <div className="ap-job-c">{lido.etiqueta.pedido.cliente}</div>}
+                {etapaLida.responsavel && <div className="ap-job-c">Responsável: {etapaLida.responsavel.nome}</div>}
               </div>
-              {aberto ? <Cronometro iniciadoEm={aberto.iniciado_em} /> : (
-                <div className="ap-crono" role="timer" aria-label="Tempo apontado">
-                  <span>{lido?.etiqueta.pode_apontar ? 'pronto para iniciar' : 'não dá para apontar'}</span>
-                  <b>{relogio(0)}</b>
-                </div>
-              )}
-              {lido && !lido.etiqueta.pode_apontar && (
-                <p className="np-erro" role="alert">Este pedido já foi encerrado ou seu usuário não pode apontar nele.</p>
+              <div className="ap-crono" role="timer" aria-label="Tempo apontado">
+                <span>{lido.etiqueta.pode_apontar ? 'pronto para iniciar' : 'não dá para apontar'}</span>
+                <b>{relogio(0)}</b>
+              </div>
+              {!lido.etiqueta.pode_apontar && (
+                <p className="np-erro" role="alert">
+                  {etapaLida.status === 'concluida' ? 'Esta etapa já foi concluída.'
+                    : `Esta etapa está em ${etapaLida.posto?.nome ?? 'outro posto'}${etapaLida.responsavel ? `, com ${etapaLida.responsavel.nome}` : ''}. Nada é apontado.`}
+                </p>
               )}
               <div className="ap-acoes">
-                {aberto ? (
-                  <>
-                    <button className="ap-btn" onClick={() => setFolha('finalizar')} disabled={ocupado || !!bloqueio}>Finalizar</button>
-                    <button className="ap-btn" onClick={() => setFolha('cancelar')} disabled={ocupado || !!bloqueio}>Cancelar</button>
-                  </>
-                ) : (
-                  <>
-                    <button className="ap-btn primario" onClick={iniciar} disabled={ocupado || !!bloqueio || !lido?.etiqueta.pode_apontar} aria-busy={ocupado}>
-                      {ocupado ? 'Iniciando…' : 'Iniciar'}
-                    </button>
-                    <button className="ap-btn" onClick={() => setLido(null)} disabled={ocupado}>Outro pedido</button>
-                  </>
-                )}
+                <button className="ap-btn primario" onClick={iniciar} disabled={ocupado || !lido.etiqueta.pode_apontar} aria-busy={ocupado}>
+                  {ocupado ? 'Iniciando…' : 'Iniciar'}
+                </button>
+                <button className="ap-btn" onClick={() => setLido(null)} disabled={ocupado}>Outro pedido</button>
               </div>
-              {bloqueio && <span className="pd-rodape-nota">{bloqueio}</span>}
-              <p className="p4-legal">O tempo que vale é o do ERP: o relógio parte da hora em que o servidor registrou o início.</p>
             </>
           )}
+
+          {!carregando && atual && (() => {
+            const d = dadosDe(atual);
+            return (
+              <>
+                <div className="ap-job">
+                  <div className="ap-job-l1"><span>{d.numero}</span><b>{d.etapa}{d.maquina ? ' · máquina' : ''}</b></div>
+                  <div className="ap-job-d">{d.resumo ?? 'OS sem itens de orçamento'}</div>
+                  {d.cliente && <div className="ap-job-c">{d.cliente}</div>}
+                </div>
+                <Cronometro iniciadoEm={d.iniciadoEm} corrigeRelogio={!d.noCelular} />
+                {d.noCelular && <p className="np-ajuda" style={{ textAlign: 'center' }}>Início guardado no celular. Vai para o ERP quando a internet voltar.</p>}
+                <div className="ap-acoes">
+                  <button className="ap-btn primario" onClick={() => concluir(atual)} disabled={ocupado} aria-busy={ocupado}>{ocupado ? 'Concluindo…' : 'Concluir etapa'}</button>
+                  <button className="ap-btn" onClick={() => setCorrigindo(atual)} disabled={ocupado}>Corrigir horário</button>
+                </div>
+                <button className="ap-link" onClick={() => setAberto(null)} disabled={ocupado}>
+                  {d.maquina ? 'Deixar a máquina rodando e apontar outro' : 'Apontar outro pedido'}
+                </button>
+                <p className="p4-legal">O tempo que vale é o do ERP. Errou o horário? Peça a correção: o gestor confere e o registro original fica.</p>
+              </>
+            );
+          })()}
+
+          {itens.length > 0 && <Pendentes itens={itens} online={online} />}
         </div>
       </div>
 
-      {folha === 'finalizar' && aberto && <FolhaFinalizar ocupado={ocupado} online={online} aoFechar={() => setFolha(null)} aoConfirmar={finalizar} />}
-      {folha === 'cancelar' && aberto && <FolhaCancelar ocupado={ocupado} online={online} aoFechar={() => setFolha(null)} aoConfirmar={cancelar} />}
+      {corrigindo && <FolhaCorrigir alvo={corrigindo} ocupado={ocupado} aoFechar={() => setCorrigindo(null)} aoConfirmar={(h, j) => corrigir(corrigindo, h, j)} />}
     </>
   );
 }
 
-function Cronometro({ iniciadoEm }: { iniciadoEm: string }) {
+/** O que está guardado no celular, na ordem de envio. Recusado pelo ERP: mostra o motivo e deixa descartar. */
+function Pendentes({ itens, online }: { itens: ItemFila[]; online: boolean }) {
+  const [confirmar, setConfirmar] = useState<string | null>(null);
+  return (
+    <div className="ap-fila" aria-live="polite">
+      <div className="p4-rotulo">Guardado no celular · {itens.length}</div>
+      {itens.map((i) => (
+        <div key={i.local} className={'ap-fila-item' + (i.estado === 'recusado' ? ' recusado' : '')}>
+          <div className="ap-fila-l1"><b>{ACAO[i.acao]} · {i.pedido.numero}</b><span>{horaDe(i.momento)}</span></div>
+          <div className="ap-fila-l2">{i.etapa}</div>
+          {i.estado === 'recusado' ? (
+            <>
+              <span className="np-erro">O ERP recusou: {i.erro}</span>
+              <button className="ap-link" onClick={() => (confirmar === i.local ? void descartarItem(i.local) : setConfirmar(i.local))}>
+                {confirmar === i.local ? 'Toque de novo para descartar' : 'Descartar'}
+              </button>
+            </>
+          ) : <span className="np-ajuda" style={{ marginTop: 0 }}>{online ? 'Enviando…' : 'Aguardando internet'}</span>}
+        </div>
+      ))}
+      {itens.some((i) => i.estado === 'recusado') && <p className="p4-legal">Enquanto houver um recusado, os de trás esperam. Descartar não apaga nada no ERP.</p>}
+    </div>
+  );
+}
+
+function Cronometro({ iniciadoEm, corrigeRelogio, pequeno = false }: { iniciadoEm: string; corrigeRelogio: boolean; pequeno?: boolean }) {
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setAgora(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
+  const txt = relogio(segundosDecorridos(iniciadoEm, agora, corrigeRelogio ? drift() : null));
+  if (pequeno) return <span className="ap-rodando-t" role="timer">{txt}</span>;
   return (
     <div className="ap-crono" role="timer" aria-label="Tempo apontado">
-      <span>em andamento</span>
-      <b>{relogio(segundosDecorridos(iniciadoEm, agora, drift()))}</b>
+      <span>em andamento · desde {horaDe(iniciadoEm)}</span>
+      <b>{txt}</b>
     </div>
   );
 }
 
-function Folha({ titulo, aoFechar, travada, children }: { titulo: string; aoFechar: () => void; travada: boolean; children: React.ReactNode }) {
+function FolhaCorrigir({ alvo, ocupado, aoFechar, aoConfirmar }: {
+  alvo: Rodando<ApontamentoAberto>; ocupado: boolean; aoFechar: () => void; aoConfirmar: (horaCerta: Date, justificativa: string) => void;
+}) {
+  const d = dadosDe(alvo);
+  const [hora, setHora] = useState(horaDe(d.iniciadoEm));
+  const [justificativa, setJustificativa] = useState('');
+  const [tocou, setTocou] = useState(false);
+  const data = horaNoDia(hora, d.iniciadoEm);
+  const erroJ = erroJustificativa(justificativa);
+  const erroH = !data ? 'Informe a hora (HH:MM).' : data.getTime() > Date.now() + 5 * 60000 ? 'A hora certa não pode estar no futuro.' : null;
   return (
-    <div className="vr-folha" role="dialog" aria-modal="true" aria-label={titulo}>
-      <div className="vr-veu" onClick={() => { if (!travada) aoFechar(); }} />
+    <div className="vr-folha" role="dialog" aria-modal="true" aria-label="Corrigir horário">
+      <div className="vr-veu" onClick={() => { if (!ocupado) aoFechar(); }} />
       <div className="vr-painel">
         <span className="vr-alca" aria-hidden="true" />
-        <div className="vr-folha-cab"><span>{titulo}</span><button onClick={aoFechar} disabled={travada}>Fechar</button></div>
-        {children}
+        <div className="vr-folha-cab"><span>Corrigir horário</span><button onClick={aoFechar} disabled={ocupado}>Fechar</button></div>
+        <p className="np-ajuda" style={{ marginTop: 0 }}>{d.numero} · {d.etapa}. O gestor confere e aplica; o registro original fica.</p>
+        <div className="p4-campo">
+          <label htmlFor="ap-hora">Hora certa do início</label>
+          <input id="ap-hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} disabled={ocupado} />
+        </div>
+        <div className="p4-campo">
+          <label htmlFor="ap-justificativa">Por que está errado</label>
+          <textarea id="ap-justificativa" className="ap-motivo" rows={3} maxLength={500} value={justificativa} disabled={ocupado}
+            onChange={(e) => setJustificativa(e.target.value)} onBlur={() => setTocou(true)} placeholder="ex.: Comecei às 8h e esqueci de apontar" />
+        </div>
+        {tocou && (erroH || erroJ) && <span className="np-erro" role="alert">{erroH ?? erroJ}</span>}
+        <button className="p4-cta" onClick={() => { setTocou(true); if (!erroH && !erroJ && data) aoConfirmar(data, justificativa); }} disabled={ocupado} aria-busy={ocupado}>
+          {ocupado ? 'Enviando…' : 'Pedir correção'}
+        </button>
       </div>
     </div>
-  );
-}
-
-function FolhaFinalizar({ ocupado, online, aoFechar, aoConfirmar }: { ocupado: boolean; online: boolean; aoFechar: () => void; aoConfirmar: (m2: string | null) => void }) {
-  const [m2, setM2] = useState('');
-  const valor = m2Digitado(m2);
-  return (
-    <Folha titulo="Finalizar apontamento" aoFechar={aoFechar} travada={ocupado}>
-      <div className="p4-campo">
-        <label htmlFor="ap-m2">m² produzido (opcional)</label>
-        <input id="ap-m2" inputMode="decimal" value={m2} onChange={(e) => setM2(e.target.value)} placeholder="ex.: 4,5" disabled={ocupado} />
-      </div>
-      {valor === 'invalido' ? <span className="np-erro" role="alert">Use números, com até 3 casas depois da vírgula.</span>
-        : <span className="np-ajuda">Com o m² orçado, o ERP calcula a diferença do produzido.</span>}
-      <button className="p4-cta" onClick={() => aoConfirmar(valor === 'invalido' ? null : valor)} disabled={ocupado || !online || valor === 'invalido'} aria-busy={ocupado}>
-        {ocupado ? 'Finalizando…' : 'Finalizar'}
-      </button>
-    </Folha>
-  );
-}
-
-function FolhaCancelar({ ocupado, online, aoFechar, aoConfirmar }: { ocupado: boolean; online: boolean; aoFechar: () => void; aoConfirmar: (motivo: string) => void }) {
-  const [motivo, setMotivo] = useState('');
-  const [tocou, setTocou] = useState(false);
-  const erro = erroMotivo(motivo);
-  return (
-    <Folha titulo="Cancelar apontamento" aoFechar={aoFechar} travada={ocupado}>
-      <p className="np-ajuda" style={{ marginTop: 0 }}>Cancelado não conta tempo e fica registrado com o motivo. Nada é apagado.</p>
-      <div className="p4-campo">
-        <label htmlFor="ap-motivo">Motivo</label>
-        <textarea id="ap-motivo" className="ap-motivo" rows={3} maxLength={500} value={motivo} disabled={ocupado}
-          onChange={(e) => setMotivo(e.target.value)} onBlur={() => setTocou(true)} placeholder="ex.: Iniciei no pedido errado" />
-      </div>
-      {tocou && erro && <span className="np-erro" role="alert">{erro}</span>}
-      <button className="p4-cta" onClick={() => { setTocou(true); if (!erro) aoConfirmar(motivo); }} disabled={ocupado || !online} aria-busy={ocupado}>
-        {ocupado ? 'Cancelando…' : 'Cancelar apontamento'}
-      </button>
-    </Folha>
   );
 }

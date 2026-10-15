@@ -1,7 +1,7 @@
 // Regras puras do apontamento por QR (P8, tela 02).
 import { describe, expect, it } from 'vitest';
 import {
-  codigoDoQr, duracao, erroMotivo, m2Digitado, mensagemDoErro, motivoBloqueio, numeroDigitado, relogio, segundosDecorridos,
+  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, numeroDigitado, relogio, segundosDecorridos,
 } from './apontamento-regras';
 
 describe('apontamento — leitura da etiqueta', () => {
@@ -48,35 +48,29 @@ describe('apontamento — cronômetro (tempo do servidor)', () => {
   });
 });
 
-describe('apontamento — campos e trava', () => {
-  it('motivo do cancelamento: 5 a 500 letras', () => {
-    expect(erroMotivo('erro')).toMatch(/pelo menos 5/);
-    expect(erroMotivo('   abcd   ')).toMatch(/pelo menos 5/);
-    expect(erroMotivo('Pedido errado')).toBeNull();
-    expect(erroMotivo('x'.repeat(501))).toMatch(/até 500/);
+describe('apontamento — campos e erros', () => {
+  it('justificativa da correção: 5 a 500 letras', () => {
+    expect(erroJustificativa('erro')).toMatch(/pelo menos 5/);
+    expect(erroJustificativa('   abcd   ')).toMatch(/pelo menos 5/);
+    expect(erroJustificativa('Comecei às 8h')).toBeNull();
+    expect(erroJustificativa('x'.repeat(501))).toMatch(/até 500/);
   });
-  it('m² produzido vira texto com ponto e 3 casas; vazio é opcional', () => {
-    expect(m2Digitado('4,5')).toBe('4.500');
-    expect(m2Digitado('4.5')).toBe('4.500');
-    expect(m2Digitado('12')).toBe('12.000');
-    expect(m2Digitado('0,125')).toBe('0.125');
-    expect(m2Digitado('  ')).toBeNull();
-    expect(m2Digitado('4,5678')).toBe('invalido');
-    expect(m2Digitado('-1')).toBe('invalido');
-    expect(m2Digitado('1.000,5')).toBe('invalido');
-  });
-  it('sem internet a escrita trava, sem fila (regra 8)', () => {
-    expect(motivoBloqueio(true)).toBeNull();
-    expect(motivoBloqueio(false)).toMatch(/Sem conexão/);
+  it('hora certa "HH:MM" no dia do início', () => {
+    const d = horaNoDia('08:15', '2026-10-15T14:03:00-03:00')!;
+    expect(horaDe(d.toISOString())).toBe('08:15');
+    expect(horaNoDia('25:00', '2026-10-15T14:03:00-03:00')).toBeNull();
+    expect(horaNoDia('8h', '2026-10-15T14:03:00-03:00')).toBeNull();
   });
   it('traduz os erros do contrato', () => {
-    const erro = (status: number, codigo: string, msg = '') => Object.assign(new Error(msg), { status, codigo });
+    const erro = (status: number, codigo: string, msg = '', extra = {}) => Object.assign(new Error(msg), { status, codigo, ...extra });
     expect(mensagemDoErro(erro(404, 'nao_encontrado'))).toMatch(/não encontrada/);
     expect(mensagemDoErro(erro(403, 'sem_permissao'))).toMatch(/não pode apontar/);
-    expect(mensagemDoErro(erro(409, 'etapa_mudou'))).toMatch(/etapa/);
-    expect(mensagemDoErro(erro(422, 'bloqueado', 'Esta OS já foi encerrada.'))).toBe('Esta OS já foi encerrada.');
+    expect(mensagemDoErro(erro(409, 'etapa_alheia', 'Esta etapa está em Laminação, com Felipe.'))).toBe('Esta etapa está em Laminação, com Felipe.');
+    expect(mensagemDoErro(erro(409, 'em_andamento'))).toMatch(/Conclua a anterior/);
+    expect(mensagemDoErro(erro(422, 'bloqueado', 'Esta etapa já foi concluída.'))).toBe('Esta etapa já foi concluída.');
+    expect(mensagemDoErro(erro(422, 'validacao', 'Confira', { campos: { momento: 'Envio vencido; peça a correção ao gestor' } }))).toBe('Envio vencido; peça a correção ao gestor');
     expect(mensagemDoErro(erro(429, 'erro'))).toMatch(/Espere/);
-    expect(mensagemDoErro(erro(0, 'rede'))).toMatch(/duas vezes/);
-    expect(mensagemDoErro(erro(503, 'indisponivel'))).toMatch(/duas vezes/);
+    expect(mensagemDoErro(erro(0, 'rede'))).toMatch(/Sem conexão/);
+    expect(mensagemDoErro(erro(503, 'indisponivel'))).toMatch(/ERP/);
   });
 });

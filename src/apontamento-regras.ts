@@ -1,9 +1,10 @@
 // Apontamento por QR (P8, tela 02): regras puras da tela, sem Capacitor, para o teste rodar em Node.
-// Contrato: memory/requisitos/AppMobile/api/tela-02-apontamento.md no ERP (#9447).
+// Contrato: memory/requisitos/AppMobile/api/tela-02-apontamento.md no ERP (#9447) — grava no PCP (Modules/Producao,
+// ADR 0431). A fila sem internet tem as regras dela em apontamento-fila-regras.ts.
 //
-// O cronômetro é só exibição: o tempo que vale é o do servidor. A conta parte do `iniciado_em` que o ERP
-// gravou e desconta o desvio do relógio do aparelho (header Date, `drift()` do api.ts), para um celular
-// adiantado não mostrar minutos a mais.
+// O cronômetro é só exibição: o tempo que vale é o que o ERP gravou. A conta parte do `iniciado_em` devolvido e
+// desconta o desvio do relógio do aparelho (header Date, `drift()` do api.ts), para um celular adiantado não mostrar
+// minutos a mais.
 
 /** QR da etiqueta: `oimpresso:p:<business_hash 12 hex>:<id da OS>` (EtiquetaProducao::codigo no ERP). */
 const QR = /^oimpresso:p:[0-9a-f]{12}:[1-9]\d{0,9}$/;
@@ -44,27 +45,29 @@ export function duracao(minutos: number): string {
   return h ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`;
 }
 
-/** Motivo do cancelamento: 5 a 500 letras, como a web (ApontamentoController). null = válido. */
-export function erroMotivo(motivo: string): string | null {
-  const n = motivo.trim().length;
-  if (n < 5) return 'Escreva o motivo (pelo menos 5 letras).';
-  if (n > 500) return 'Motivo longo demais (até 500 letras).';
+/** Justificativa do pedido de correção: 5 a 500 letras (ProducaoController::corrigir). null = válida. */
+export function erroJustificativa(texto: string): string | null {
+  const n = texto.trim().length;
+  if (n < 5) return 'Diga por que o horário está errado (pelo menos 5 letras).';
+  if (n > 500) return 'Justificativa longa demais (até 500 letras).';
   return null;
 }
 
-/** m² produzido digitado ("4,5", "4.5", "12") → texto do contrato com ponto e 3 casas ("4.500").
- *  Vazio = não informado (null). Inválido = 'invalido'. */
-export function m2Digitado(texto: string): string | null | 'invalido' {
-  const t = texto.trim().replace(',', '.');
-  if (!t) return null;
-  if (!/^\d{1,7}(\.\d{1,3})?$/.test(t)) return 'invalido';
-  const [int, dec = ''] = t.split('.');
-  return `${Number(int)}.${dec.padEnd(3, '0')}`;
+/** "HH:MM" digitado + o dia de referência (ISO) → Date local daquele dia, ou null se a hora é inválida. */
+export function horaNoDia(hhmm: string, diaIso: string): Date | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm.trim());
+  const base = new Date(diaIso);
+  if (!m || Number.isNaN(base.getTime())) return null;
+  base.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return base;
 }
 
-/** Trava da escrita (regra 8 do playbook): sem internet nada sai do aparelho, sem fila. null = pode enviar. */
-export const motivoBloqueio = (online: boolean): string | null =>
-  online ? null : 'Sem conexão. Apontar precisa de internet.';
+/** Hora local "HH:MM" de um ISO. */
+export function horaDe(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 const statusDe = (e: unknown) => (e as { status?: number } | null)?.status ?? 0;
 const codigoDe = (e: unknown) => (e as { codigo?: string } | null)?.codigo ?? '';
@@ -73,13 +76,16 @@ const codigoDe = (e: unknown) => (e as { codigo?: string } | null)?.codigo ?? ''
 export function mensagemDoErro(e: unknown): string {
   const st = statusDe(e), cod = codigoDe(e);
   const msg = e instanceof Error && e.message ? e.message : '';
-  if (cod === 'sem_conexao') return msg;
+  const campos = (e as { campos?: Record<string, string> } | null)?.campos;
+  if (cod === 'rede' && st === 0) return 'Sem conexão. Ler uma etiqueta nova precisa de internet.';
   if (st === 404 || cod === 'nao_encontrado') return 'Etiqueta não encontrada nesta empresa. Confira o código.';
   if (st === 403 || cod === 'sem_permissao') return 'Seu usuário não pode apontar produção.';
-  if (cod === 'etapa_mudou') return 'A etapa deste pedido mudou. Leia a etiqueta de novo.';
-  if (cod === 'bloqueado') return msg || 'Este pedido ou apontamento já foi encerrado.';
-  if (cod === 'idempotencia_conflito') return 'O envio anterior ainda está valendo. Toque de novo.';
+  if (cod === 'etapa_alheia') return msg || 'Esta etapa está com outra pessoa. Nada foi apontado.';
+  if (cod === 'em_andamento') return 'Você já tem uma etapa aberta. Conclua a anterior antes de iniciar outra.';
+  if (cod === 'bloqueado') return msg || 'Esta etapa ou apontamento já foi encerrado.';
+  if (cod === 'idempotencia_conflito') return 'Este envio já foi usado com outros dados. Descarte e aponte de novo.';
+  if (campos && Object.keys(campos).length) return Object.values(campos)[0];
   if (st === 429) return 'Muitas tentativas seguidas. Espere um minuto.';
-  if (st === 0 || st >= 500) return 'Não foi possível falar com o ERP. Toque de novo: nada é gravado duas vezes.';
+  if (st === 0 || st >= 500) return 'Não foi possível falar com o ERP agora.';
   return msg || 'Não foi possível apontar agora.';
 }
