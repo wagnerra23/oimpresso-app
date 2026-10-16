@@ -111,7 +111,9 @@ export function LancamentoDetalhe({ id, contas, formas, planos, aoVoltar, aoAbri
       // Rede e 5xx mantêm a chave: o reenvio não baixa nem estorna duas vezes.
       if (st >= 400 && st < 500) chave.current = null;
       const c = camposDoErro(e);
-      if (acao === 'baixar' && Object.keys(c).length) setErrosBaixa(c);
+      // Na baixa, erros de campo vão para debaixo do campo; os que a tela não mostra (conta_id, forma_pagamento…) vão no aviso.
+      const fora = Object.entries(c).filter(([k]) => !['valor', 'pago_em', 'vencimento_restante'].includes(k)).map(([, v]) => v);
+      if (acao === 'baixar' && Object.keys(c).length) { setErrosBaixa(c); if (fora.length) setErroAcao(fora[0]); }
       else setErroAcao(Object.values(c)[0] ?? (e instanceof Error ? e.message : 'Não foi possível concluir.'));
       if (st === 409) carregar();
     } finally { setEnviando(false); }
