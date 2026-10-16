@@ -1155,6 +1155,12 @@ export const apontamentoApi = {
    *  422 bloqueado / campos.codigo / campos.momento. */
   iniciar: (corpo: { programacao_id: number; momento: string; codigo?: string }, chave: string) =>
     chamar<{ id: number; programacao_id: number; iniciado_em: string }>('POST', '/api/app/producao/apontamentos/iniciar', corpo, { 'Idempotency-Key': chave }),
+  /** Motivos de pausa ativos do posto (cadastro da thread 03). Resposta crua: `motivosDoPosto` normaliza. */
+  motivosPausa: (postoId: number) => chamar<unknown>('GET', `/api/app/producao/motivos-pausa?posto_id=${postoId}`),
+  /** Pausa ENCERRA o apontamento (`encerrado_por: "pausa"`); retomar = iniciar de novo na mesma etapa.
+   *  422 campos.motivo_id (motivo de outro posto ou inativo) / campos.momento / bloqueado. */
+  pausar: (id: number, corpo: { motivo_id: number; momento: string }, chave: string) =>
+    chamar<Encerramento>('POST', `/api/app/producao/apontamentos/${id}/pausar`, corpo, { 'Idempotency-Key': chave }),
   /** 201/200 Encerramento (200 com origem "turno"/"ponto" quando o fechamento automático veio antes). */
   concluir: (id: number, corpo: { momento: string }, chave: string) =>
     chamar<Encerramento>('POST', `/api/app/producao/apontamentos/${id}/concluir`, corpo, { 'Idempotency-Key': chave }),

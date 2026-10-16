@@ -2,8 +2,8 @@
 // só com confirmação do servidor ou do operador, dono do item e o que o operador vê rodando.
 import { describe, expect, it } from 'vitest';
 import {
-  aposFalha, aposSucesso, descartar, enfileirar, FILA_VAZIA, momentoIso, pendentesDe, proximoEnvio, relogioErrado, rodando,
-  tipoDaFalha, type Fila, type ItemFila,
+  aposFalha, aposSucesso, descartar, enfileirar, esquecerPausa, FILA_VAZIA, momentoIso, pausadasDe, pausar, pendentesDe, proximoEnvio,
+  relogioErrado, rodando, tipoDaFalha, type Fila, type ItemFila,
 } from './apontamento-fila-regras';
 
 const pedido = { id: 4812, numero: 'OS-2026-04812', resumo: 'Fachada', cliente: 'Ótica' };
@@ -114,5 +114,88 @@ describe('fila do apontamento — dono, relógio e o que aparece rodando', () =>
     // Início já confirmado (id 3 no ERP) com o concluir ainda na fila pelo local: não aparece rodando.
     const f = aposSucesso(encher(ini, fimLocal), ini.local, 3);
     expect(rodando([{ id: 1 }, { id: 3 }], f, 'marcos').map((r) => r.chave)).toEqual(['id:1']);
+  });
+});
+
+describe('fila do apontamento — pausa com motivo', () => {
+  const pausa = (alvo: ItemFila['alvo']) => item({ acao: 'pausar', alvo, motivo_id: 2, motivo: 'Troca de bobina' });
+  const dados = { programacao_id: 77, pedido, etapa: 'Impressão' };
+
+  it('sem internet: iniciar → pausar → retomar → concluir saem na ordem, cada um no id certo do ERP', () => {
+    const ini = item({});
+    const pa = pausa({ ref: ini.local });
+    let f = pausar(encher(ini), pa, dados);
+    expect(pausadasDe(f, 'marcos')).toMatchObject([{ programacao_id: 77, motivo: 'Troca de bobina', momento: pa.momento, por: pa.local }]);
+    // Retomar = novo iniciar na mesma etapa: sai da lista de pausadas na hora, sem esperar o ERP.
+    const ret = item({});
+    f = enfileirar(f, ret);
+    expect(pausadasDe(f, 'marcos')).toEqual([]);
+    const fim = item({ acao: 'concluir', alvo: { ref: ret.local } });
+    f = enfileirar(f, fim);
+
+    const enviados: Array<[string, number | null]> = [];
+    const ids: Record<string, number> = { [ini.local]: 701, [ret.local]: 702 };
+    for (let p = proximoEnvio(f, 'marcos'); p; p = proximoEnvio(f, 'marcos')) {
+      enviados.push([p.item.acao, p.apontamentoId]);
+      f = aposSucesso(f, p.item.local, ids[p.item.local]);
+    }
+    expect(enviados).toEqual([['iniciar', null], ['pausar', 701], ['iniciar', null], ['concluir', 702]]);
+    expect(f.itens).toEqual([]);
+    expect(f.ids).toEqual({});
+  });
+
+  it('reenvio da pausa leva a mesma chave, o mesmo momento e o mesmo motivo (sem duplicar no ERP)', () => {
+    const pa = pausa({ id: 9 });
+    let f = pausar(FILA_VAZIA, pa, dados);
+    for (const st of [0, 503, 429]) f = aposFalha(f, pa.local, tipoDaFalha(st), 'fora');
+    const p = proximoEnvio(f, 'marcos')!;
+    expect(p).toMatchObject({ apontamentoId: 9, item: { chave: pa.chave, momento: pa.momento, motivo_id: 2, tentativas: 3, estado: 'pendente' } });
+    // Confirmado: o item sai, a etapa continua pausada à espera do Retomar.
+    f = aposSucesso(f, pa.local);
+    expect(f.itens).toEqual([]);
+    expect(pausadasDe(f, 'marcos')).toHaveLength(1);
+  });
+
+  it('pausar tira o cartão de "rodando" (encerra o apontamento), pelo id do ERP ou pelo início na fila', () => {
+    const ini = item({});
+    let f = pausar(encher(ini), pausa({ ref: ini.local }), dados);
+    expect(rodando([{ id: 1 }], f, 'marcos').map((r) => r.chave)).toEqual(['id:1']);
+    f = pausar(FILA_VAZIA, pausa({ id: 1 }), dados);
+    expect(rodando([{ id: 1 }, { id: 2 }], f, 'marcos').map((r) => r.chave)).toEqual(['id:2']);
+  });
+
+  it('pausa recusada (422 momento vencido) para a fila; descartar tira a etapa das pausadas', () => {
+    const pa = pausa({ id: 9 });
+    let f = aposFalha(pausar(FILA_VAZIA, pa, dados), pa.local, tipoDaFalha(422), 'Envio vencido; peça a correção ao gestor');
+    expect(proximoEnvio(f, 'marcos')).toBeNull();
+    expect(f.itens[0]).toMatchObject({ estado: 'recusado', erro: 'Envio vencido; peça a correção ao gestor' });
+    f = descartar(f, pa.local);
+    expect(f.itens).toEqual([]);
+    expect(pausadasDe(f, 'marcos')).toEqual([]);
+  });
+
+  it('início recusado leva junto a pausa que dependia dele', () => {
+    const ini = item({});
+    let f = pausar(encher(ini), pausa({ ref: ini.local }), dados);
+    f = descartar(aposFalha(f, ini.local, 'recusado', 'etapa alheia'), ini.local);
+    expect(f.itens).toEqual([]);
+    expect(pausadasDe(f, 'marcos')).toEqual([]);
+  });
+
+  it('pausada é do dono; some se o ERP mostra a etapa rodando; o operador pode tirar da lista', () => {
+    let f = pausar(FILA_VAZIA, pausa({ id: 9 }), dados);
+    expect(pausadasDe(f, 'ana')).toEqual([]);
+    expect(pausadasDe(f, 'marcos', [77])).toEqual([]);
+    // Pausar de novo a mesma etapa não duplica.
+    f = pausar(f, pausa({ id: 10 }), dados);
+    expect(pausadasDe(f, 'marcos')).toHaveLength(1);
+    f = esquecerPausa(f, 'marcos', 77);
+    expect(pausadasDe(f, 'marcos')).toEqual([]);
+  });
+
+  it('fila gravada antes da pausa existir (sem `pausadas`) continua valendo', () => {
+    const antiga: Fila = { itens: [item({})], ids: {} };
+    expect(pausadasDe(antiga, 'marcos')).toEqual([]);
+    expect(enfileirar(antiga, item({})).pausadas).toBeUndefined();
   });
 });

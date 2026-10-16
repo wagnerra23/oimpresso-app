@@ -91,3 +91,24 @@ export function mensagemDoErro(e: unknown): string {
   if (st === 0 || st >= 500) return 'Não foi possível falar com o ERP agora.';
   return msg || 'Não foi possível apontar agora.';
 }
+
+/** Motivo de pausa do cadastro do posto (ERP, thread 03). */
+export interface MotivoPausa { id: number; nome: string }
+
+/** Resposta de GET /api/app/producao/motivos-pausa → motivos do posto, na ordem do ERP, sem repetidos nem inválidos.
+ *  Aceita a lista solta ou dentro de `itens`/`motivos`; se vier `posto_id` em cada motivo, fica só o do posto. */
+export function motivosDoPosto(resposta: unknown, postoId: number | null): MotivoPausa[] {
+  const r = resposta as { itens?: unknown; motivos?: unknown } | null;
+  const lista = Array.isArray(resposta) ? resposta : Array.isArray(r?.itens) ? r.itens : Array.isArray(r?.motivos) ? r.motivos : [];
+  const vistos = new Set<number>();
+  const fora: MotivoPausa[] = [];
+  for (const m of lista as Array<Record<string, unknown> | null>) {
+    const id = Number(m?.id), nome = typeof m?.nome === 'string' ? m.nome.trim() : '';
+    if (!Number.isInteger(id) || id <= 0 || !nome || vistos.has(id)) continue;
+    if (m?.ativo === false) continue;
+    if (postoId !== null && m?.posto_id != null && Number(m.posto_id) !== postoId) continue;
+    vistos.add(id);
+    fora.push({ id, nome });
+  }
+  return fora;
+}

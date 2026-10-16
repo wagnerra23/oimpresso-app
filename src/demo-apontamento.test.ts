@@ -80,4 +80,21 @@ describe('apontamento na demo', () => {
     await expect(iniciar({ programacao_id: 80, codigo: QR_DEMO }, 'q2')).rejects.toMatchObject({ status: 404 });
     await expect(iniciar({ programacao_id: 77, codigo: QR_DEMO }, 'q3')).resolves.toMatchObject({ programacao_id: 77 });
   });
+
+  it('pausa com motivo do posto encerra o apontamento; retomar = iniciar de novo na mesma etapa', async () => {
+    expect(await demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=5')).toContainEqual({ id: 31, nome: 'Troca de bobina' });
+    expect(await demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=999')).toEqual([]);
+    const a = await iniciar({ programacao_id: 80 }, 'pa1');
+    // Motivo de outro posto (Impressão) → 422 campos.motivo_id.
+    await expect(post(`${a.id}/pausar`, { motivo_id: 11, momento: agora() }, 'pa2')).rejects.toMatchObject({ status: 422, campos: { motivo_id: expect.any(String) } });
+    const corpo = { motivo_id: 31, momento: agora() };
+    const p = await post<{ encerrado_por: string }>(`${a.id}/pausar`, corpo, 'pa3');
+    expect(p).toMatchObject({ id: a.id, encerrado_por: 'pausa' });
+    expect(await post(`${a.id}/pausar`, corpo, 'pa3')).toEqual(p);
+    expect((await emAndamento()).maquinas).toEqual([]);
+    await expect(post(`${a.id}/concluir`, { momento: agora() }, 'pa4')).rejects.toMatchObject({ codigo: 'bloqueado' });
+    const b = await iniciar({ programacao_id: 80 }, 'pa5');
+    expect(b.id).not.toBe(a.id);
+    expect((await emAndamento()).maquinas.map((x) => x.id)).toEqual([b.id]);
+  });
 });

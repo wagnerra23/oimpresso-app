@@ -449,6 +449,13 @@ const OS_APONTAMENTO = [
     etapa: { programacao_id: 79, status: 'concluida', posto: { id: 3, nome: 'Impressão', tipo: 'pessoa' }, responsavel: EU_DEMO } },
 ];
 type OsApontamentoDemo = (typeof OS_APONTAMENTO)[number];
+/** Motivos de pausa por posto (cadastro da thread 03 no ERP): cada posto mostra só os dele (UC-PCV-33). */
+const MOTIVOS_PAUSA_DEMO: Record<number, Array<{ id: number; nome: string }>> = {
+  3: [{ id: 11, nome: 'Ajuste / setup' }, { id: 12, nome: 'Falta de material' }, { id: 13, nome: 'Dúvida na arte' }, { id: 14, nome: 'Intervalo' }],
+  4: [{ id: 21, nome: 'Troca de rolo' }, { id: 14, nome: 'Intervalo' }],
+  5: [{ id: 31, nome: 'Troca de bobina' }, { id: 32, nome: 'Ajuste / setup' }, { id: 33, nome: 'Falta de material' }, { id: 34, nome: 'Manutenção' },
+    { id: 35, nome: 'Dúvida na arte' }, { id: 14, nome: 'Intervalo' }],
+};
 interface AbertoDemo { id: number; os: OsApontamentoDemo; iniciado_em: string }
 let apontamentosAbertos: AbertoDemo[] = [];
 let idApontamento = 700;
@@ -655,6 +662,9 @@ export const demo = {
           maquinas: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'maquina').map(abertoDemo),
           ponto: { entrada: '07:02', saida: null, presenca_minutos: null } });
       }
+      if (metodo === 'GET' && caminho.startsWith('/api/app/producao/motivos-pausa')) {
+        return r(MOTIVOS_PAUSA_DEMO[Number((caminho.match(/posto_id=(\d+)/) || [])[1])] ?? []);
+      }
       if (metodo === 'GET' && caminho.startsWith('/api/app/producao/etiqueta/')) {
         const o = osDoCodigo(decodeURIComponent(caminho.slice('/api/app/producao/etiqueta/'.length)));
         if (o === 'numero') throw erroDemo(422, 'validacao', NUMERO_RECUSADO, { campos: { codigo: NUMERO_RECUSADO } });
@@ -668,7 +678,7 @@ export const demo = {
         const ja = APONTAMENTOS_POR_CHAVE[chave];
         if (ja && ja.pedido !== pedido) throw erroDemo(422, 'idempotencia_conflito', 'Chave já usada em outro apontamento.');
         if (ja) return r(ja.resposta);
-        const c = (corpo ?? {}) as { programacao_id?: number; codigo?: string; momento?: string; justificativa?: string };
+        const c = (corpo ?? {}) as { programacao_id?: number; codigo?: string; momento?: string; justificativa?: string; motivo_id?: number };
         let resposta: unknown;
         if (caminho === '/api/app/producao/apontamentos/iniciar') {
           const o = OS_APONTAMENTO.find((x) => x.etapa.programacao_id === c.programacao_id);
@@ -704,6 +714,9 @@ export const demo = {
             if (!aberto) {
               if (id > 700 && id <= idApontamento) throw erroDemo(422, 'bloqueado', 'Este apontamento já foi encerrado.');
               throw erroDemo(404, 'nao_encontrado', 'Apontamento não encontrado.');
+            }
+            if (m[2] === 'pausar' && !(MOTIVOS_PAUSA_DEMO[aberto.os.etapa.posto.id] ?? []).some((x) => x.id === c.motivo_id)) {
+              throw erroDemo(422, 'validacao', 'Escolha um motivo de pausa deste posto.', { campos: { motivo_id: 'Escolha um motivo de pausa deste posto.' } });
             }
             const momento = momentoDemo(c.momento);
             resposta = { id, encerrado_por: m[2] === 'pausar' ? 'pausa' : 'fim', origem: 'app', encerrado_em: momento,
