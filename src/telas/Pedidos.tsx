@@ -12,7 +12,7 @@ import { botaoEntrega } from '../entrega-regras';
 import { haQuanto } from '../tempo';
 import { novaChave } from '../venda';
 import { useVoltar } from '../voltar';
-import { CampoBusca, casaBusca } from '../busca';
+import { CampoBusca } from '../busca';
 import { EntregaPedido } from './EntregaPedido';
 import { VendaRapida } from './VendaRapida';
 
@@ -42,26 +42,35 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
   const [erro, setErro] = useState<string | null>(null);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [busca, setBusca] = useState('');
+  const [q, setQ] = useState('');
+  // A busca vai ao servidor (`q`) só depois de uma pausa na digitação, como em Pessoas.
+  useEffect(() => { const t = setTimeout(() => setQ(busca.trim()), 350); return () => clearTimeout(t); }, [busca]);
 
-  const carregar = useCallback(async (f: FiltroPedidos) => {
+  // Busca e filtro mudam rápido: só a resposta do pedido mais recente entra na tela.
+  const pedido = useRef(0);
+  const carregar = useCallback(async (f: FiltroPedidos, texto: string) => {
+    const n = ++pedido.current;
     setDados(null); setErro(null);
-    try { setDados(await api.pedidos(f)); }
-    catch (e) { setErro(e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não tem acesso a pedidos.' : e instanceof Error ? e.message : 'Não foi possível carregar.'); }
+    try { const r = await api.pedidos(f, 1, texto); if (n === pedido.current) setDados(r); }
+    catch (e) {
+      if (n !== pedido.current) return;
+      setErro(e instanceof ErroApi && e.codigo === 'sem_permissao' ? 'Seu usuário não tem acesso a pedidos.' : e instanceof Error ? e.message : 'Não foi possível carregar.');
+    }
   }, []);
-  useEffect(() => { carregar(filtro); }, [filtro, carregar]);
+  useEffect(() => { carregar(filtro, q); }, [filtro, q, carregar]);
 
   const mais = async () => {
     if (!dados) return;
+    const n = pedido.current;
     setCarregandoMais(true);
     try {
-      const prox = await api.pedidos(filtro, dados.pagina + 1);
-      setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
-    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
+      const prox = await api.pedidos(filtro, dados.pagina + 1, q);
+      if (n === pedido.current) setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
+    } catch (e) { if (n === pedido.current) setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
     finally { setCarregandoMais(false); }
   };
 
   const c = dados?.contadores;
-  const itens = dados?.itens.filter((p) => casaBusca(busca, [p.numero, p.cliente, p.resumo])) ?? [];
   return (
     <>
       <div className="pd-head">
@@ -76,7 +85,7 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
       </div>
       <div className="oi-scroll">
         <div className="pd-corpo">
-          <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente, número ou produto" rotulo="Buscar pedido" />
+          <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente ou número do pedido" rotulo="Buscar pedido" />
           <div className="pd-chips" role="tablist" aria-label="Filtro de pedidos">
             {FILTROS.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
@@ -86,9 +95,10 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
           </div>
           {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
           {!dados && !erro && <p className="p4-legal">Carregando…</p>}
-          {dados && dados.itens.length === 0 && <div className="p4-vazio"><b>Nenhum pedido aqui</b><span>Troque o filtro para ver outros pedidos.</span></div>}
-          {dados && dados.itens.length > 0 && itens.length === 0 && <div className="p4-vazio"><b>Nada encontrado</b><span>Tente outro cliente, número ou produto{dados.tem_mais ? ', ou toque em Carregar mais' : ''}.</span></div>}
-          {itens.map((p) => (
+          {dados && dados.itens.length === 0 && (q
+            ? <div className="p4-vazio"><b>Nada encontrado</b><span>Nenhum pedido com “{q}” aqui. Tente outro cliente ou número, ou troque o filtro.</span></div>
+            : <div className="p4-vazio"><b>Nenhum pedido aqui</b><span>Troque o filtro para ver outros pedidos.</span></div>)}
+          {dados?.itens.map((p) => (
             <button key={p.id} className={'pd-card' + (p.atrasado ? ' atrasado' : '')} style={{ borderLeftColor: p.atrasado ? 'var(--danger)' : TINTA[p.etapa.grupo] }} onClick={() => aoAbrir(p.id)}>
               <span className="pd-card-l1">
                 <span className="pd-num">#{p.numero}</span>

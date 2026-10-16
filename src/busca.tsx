@@ -1,19 +1,26 @@
-// Busca nas listas (Pedidos, Ordens de serviço, Orçamentos): filtra no aparelho o que já foi carregado,
-// como a Produção. As rotas não recebem texto; "Carregar mais" traz mais itens para dentro da busca.
+// Busca nas listas. Ordens de serviço e Orçamentos filtram no aparelho o que já foi carregado, como a Produção
+// (as rotas não recebem texto; "Carregar mais" traz mais itens para dentro da busca). Pedidos manda `q` ao ERP.
 import type { ReactElement } from 'react';
 
 /** Minúsculas e sem acento: "Clínica" casa com "clinica". */
 export const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-/** Só letras e números: "RLV-2E48" casa com "rlv2e48" e "OS-01044" com "1044". */
-const compacto = (s: string) => semAcento(s).replace(/[^a-z0-9]/g, '');
+/** Só letras e números (já sem acento): "RLV-2E48" vira "rlv2e48" e "OS-01044" vira "os01044". */
+const compacto = (s: string) => s.replace(/[^a-z0-9]/g, '');
 
-/** True se o texto buscado aparece em algum dos campos. Texto vazio casa com tudo. */
+/** True se cada palavra buscada aparece em algum dos campos: "clinica 1044" acha a OS-01044 da Clínica Vita.
+ *  Palavra com número também casa sem hífen nem barra ("rlv2e48" acha RLV-2E48, "1044" acha OS-01044); palavra só de
+ *  letras não, para "cav" não achar "Clínica Vita" juntando as palavras. Texto vazio casa com tudo. */
 export function casaBusca(texto: string, campos: Array<string | null | undefined>): boolean {
-  const termo = semAcento(texto.trim());
-  if (!termo) return true;
-  const termoCompacto = compacto(termo);
-  return campos.some((c) => !!c && (semAcento(c).includes(termo) || (!!termoCompacto && compacto(c).includes(termoCompacto))));
+  const palavras = semAcento(texto).split(/\s+/).filter(Boolean);
+  if (!palavras.length) return true;
+  const normais = campos.filter((c): c is string => !!c).map(semAcento);
+  const compactos = normais.map(compacto);
+  return palavras.every((p) => {
+    if (normais.some((c) => c.includes(p))) return true;
+    const pc = compacto(p);
+    return /\d/.test(pc) && compactos.some((c) => c.includes(pc));
+  });
 }
 
 /** Campo de busca no padrão das listas v4 (mesmo visual de Pessoas, Produtos e Produção). */

@@ -1,4 +1,4 @@
-// Contrato da busca nas listas: nome sem acento, número parcial e placa com ou sem hífen.
+// Contrato da busca nas listas: nome sem acento, número parcial, placa com ou sem hífen e várias palavras.
 import { describe, expect, it } from 'vitest';
 import { casaBusca } from './busca';
 
@@ -15,8 +15,18 @@ describe('casaBusca', () => {
   it('placa com ou sem hífen', () => {
     expect(casaBusca('rlv-2e48', ['RLV2E48'])).toBe(true);
     expect(casaBusca('RLV2', ['RLV-2E48'])).toBe(true);
+    expect(casaBusca('rlv 2e48', ['RLV-2E48'])).toBe(true);
   });
   it('ignora campos nulos e não casa o que não existe', () => {
     expect(casaBusca('padaria', [null, undefined, 'Clínica Vita'])).toBe(false);
+  });
+  it('cada palavra pode casar num campo diferente', () => {
+    expect(casaBusca('clinica 1044', ['OS-01044', 'Clínica Vita'])).toBe(true);
+    expect(casaBusca('vita clinica', ['Clínica Vita'])).toBe(true);
+    expect(casaBusca('clinica 2077', ['OS-01044', 'Clínica Vita'])).toBe(false);
+  });
+  it('palavra só de letras não junta palavras do campo', () => {
+    expect(casaBusca('cav', ['Clínica Vita'])).toBe(false);
+    expect(casaBusca('ssilva', ['Lucas Silva'])).toBe(false);
   });
 });
