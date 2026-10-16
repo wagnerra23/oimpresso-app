@@ -6,6 +6,8 @@
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
 import type { AnexoOs, ParteFormulario } from './api';
 import { assinaturaValida } from './entrega-regras';
+import { dividirParcelas, proximaRecorrencia, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
+import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
 import { casaBusca } from './busca';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
@@ -350,16 +352,125 @@ function calcularOrcamentoDemo(it: Record<string, unknown>, campo: (k: string, m
   return { area_m2: areaMil / 1000, preco_m2: mat.preco_m2, total: totalCent / 100, totalCent };
 }
 
-// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias` vira data dentro do handler.
+// Lançamentos de demonstração (tela 06), como o protótipo. Partes fictícias; `dias`, `emi` (emissão) e `venda`
+// viram data dentro do handler. Competência = mês da emissão. Contas: 1 movimento, 2 caixa, 3 recebíveis.
 const LANCAMENTOS = [
-  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, valor: 7840, pago: false },
-  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, valor: 1260, pago: false },
-  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, valor: 2315, pago: false },
-  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, valor: 4380, pago: false },
-  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, valor: 1920, pago: false },
-  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, valor: 3420, pago: true },
-  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, valor: 2760, pago: true },
+  { id: 901, tipo: 'receber', descricao: 'Pedido #0043 · fachada ACM', parte: 'Papelaria Sol', dias: 0, emi: -20, venda: -22, valor: 7840, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1290', nosso: '00012345', plano: '1.1.01', doc: 'PED-0043/1', exc: false },
+  { id: 902, tipo: 'receber', descricao: 'Pedido #0044 · placas', parte: 'Clínica Vita', dias: -7, emi: -37, venda: -40, valor: 1260, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1284', nosso: '00012311', plano: '1.1.01', doc: 'PED-0044/1', exc: false },
+  { id: 903, tipo: 'receber', descricao: 'Pedido #0046 · etiquetas', parte: 'Restaurante 88', dias: 3, emi: -4, venda: -5, valor: 2315, pago: false,
+    forma: 'Pix', conta: 1, nf: null, nosso: null, plano: '1.1.02', doc: 'PED-0046/1', exc: false },
+  { id: 908, tipo: 'receber', descricao: 'Pedido #0047 · banner lona', parte: 'Bistrô do Forno', dias: 12, emi: -2, venda: -2, valor: 980, pago: false,
+    forma: 'Cartão de crédito', conta: 3, nf: '1293', nosso: null, plano: '1.1.01', doc: 'PED-0047/1', exc: false },
+  { id: 909, tipo: 'receber', descricao: 'Pedido #0045 · cardápio A3', parte: 'Bistrô do Forno', dias: 25, emi: -6, venda: -9, valor: 210, pago: false,
+    forma: 'Boleto', conta: 1, nf: '1291', nosso: '00012352', plano: '1.1.02', doc: 'PED-0045/1', exc: false },
+  { id: 904, tipo: 'pagar', descricao: 'Lona 440 g · 3 rolos', parte: 'Gráfica Lona Sul', dias: -1, emi: -31, venda: null, valor: 4380, pago: false,
+    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001', plano: '2.1.01', doc: '88213-1', exc: false },
+  { id: 905, tipo: 'pagar', descricao: 'Energia elétrica', parte: 'Companhia de energia', dias: 6, emi: -8, venda: null, valor: 1920, pago: false,
+    forma: 'Boleto', conta: 1, nf: null, nosso: '84670000', plano: '2.2.01', doc: 'FAT-2026-10', exc: false },
+  { id: 910, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', dias: 15, emi: -15, venda: null, valor: 3500, pago: false,
+    forma: 'Transferência', conta: 1, nf: null, nosso: null, plano: '2.2.02', doc: 'ALG-10/2026', exc: false },
+  { id: 906, tipo: 'receber', descricao: 'Pedido #0038 · adesivos', parte: 'Papelaria Sol', dias: -5, emi: -35, venda: -36, valor: 3420, pago: true,
+    forma: 'Pix', conta: 1, nf: '1287', nosso: null, plano: '1.1.02', doc: 'PED-0038/1', exc: false },
+  { id: 911, tipo: 'receber', descricao: 'Venda balcão #V-0009', parte: 'Consumidor final', dias: -2, emi: -2, venda: -2, valor: 186, pago: true,
+    forma: 'Dinheiro', conta: 2, nf: null, nosso: null, plano: '1.1.02', doc: 'V-0009', exc: false },
+  { id: 912, tipo: 'receber', descricao: 'Pedido #0040 · placa PVC', parte: 'Clínica Vita', dias: -9, emi: -40, venda: -41, valor: 640, pago: true,
+    forma: 'Cartão de débito', conta: 3, nf: '1282', nosso: null, plano: '1.1.01', doc: 'PED-0040/1', exc: false },
+  { id: 907, tipo: 'pagar', descricao: 'Tinta eco-solvente CMYK', parte: 'Fornecedor de tintas', dias: -6, emi: -36, venda: null, valor: 2760, pago: true,
+    forma: 'Boleto', conta: 1, nf: '45120', nosso: '34191220', plano: '2.1.02', doc: '45120-1', exc: false },
+  // Excluídos no ERP: só aparecem com Status "Excluídos" ou "Todos" no filtro avançado e não entram no resumo.
+  { id: 913, tipo: 'receber', descricao: 'Pedido #0042 · cartão de visita', parte: 'Marília Costa', dias: 4, emi: -3, venda: -3, valor: 248, pago: false,
+    forma: 'Boleto', conta: 1, nf: null, nosso: '00012360', plano: '1.1.02', doc: 'PED-0042/1', exc: true },
+  { id: 914, tipo: 'pagar', descricao: 'Lona 440 g · lançada em duplicidade', parte: 'Gráfica Lona Sul', dias: -1, emi: -31, venda: null, valor: 4380, pago: false,
+    forma: 'Boleto', conta: 1, nf: '88213', nosso: '23790001', plano: '2.1.01', doc: '88213-1', exc: true },
 ] as const;
+// Plano de contas da demo: grupos e contas, na ordem do código.
+const PLANO_CONTAS = [
+  { codigo: '1', nome: 'Receitas', tipo: 'receita' }, { codigo: '1.1', nome: 'Vendas', tipo: 'receita' },
+  { codigo: '1.1.01', nome: 'Comunicação visual', tipo: 'receita' }, { codigo: '1.1.02', nome: 'Impressos e etiquetas', tipo: 'receita' },
+  { codigo: '2', nome: 'Despesas', tipo: 'despesa' }, { codigo: '2.1', nome: 'Insumos', tipo: 'despesa' },
+  { codigo: '2.1.01', nome: 'Lona e substratos', tipo: 'despesa' }, { codigo: '2.1.02', nome: 'Tintas', tipo: 'despesa' },
+  { codigo: '2.2', nome: 'Despesas fixas', tipo: 'despesa' }, { codigo: '2.2.01', nome: 'Energia', tipo: 'despesa' },
+  { codigo: '2.2.02', nome: 'Aluguel', tipo: 'despesa' },
+] as const;
+// Lançamentos criados pelo "+ Novo" nesta sessão (datas já absolutas). `chaves`: Idempotency-Key → id.
+const LANC_CRIADOS: Array<{ id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; valor: number; vencimento: string;
+  emissao: string; competencia: string; venda_em: null; forma_pagamento: string | null; conta_id: number | null; nf_numero: string | null;
+  nosso_numero: null; plano_codigo: string; plano_nome: string | null; documento: string | null; excluido: false;
+  parte_id: number | null; observacao: string | null; contrato: string | null; recorrencia_id: number | null; parcela: string | null }> = [];
+const chavesLanc = new Map<string, { id: number; ids: number[]; recorrencia_id: number | null }>();
+// Recorrências da demo. `ini` = dias do 1º vencimento a partir de hoje; `fim` = término; `parou` = interrompida há N dias.
+// Datas viram absolutas na 1ª leitura (nunca no topo do módulo: o build de produção precisa descartar o demo).
+const RECORRENCIAS_SEMENTE = [
+  { id: 801, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', plano: 'Aluguel', valor: 3500, frequencia: 'mensal', dia: 1, ini: -350, fim: null, gerados: 12, parou: null , contrato: 'CT-2025/014' },
+  { id: 802, tipo: 'receber', descricao: 'Contrato · manutenção de fachada', parte: 'Clínica Vita', plano: 'Comunicação visual', valor: 450, frequencia: 'mensal', dia: 20, ini: -115, fim: 250, gerados: 4, parou: null , contrato: 'CT-2026/031' },
+  { id: 803, tipo: 'pagar', descricao: 'Licença do software de corte', parte: 'Software Corte Ltda', plano: 'Insumos', valor: 1890, frequencia: 'anual', dia: 5, ini: -200, fim: null, gerados: 1, parou: null , contrato: 'LIC-8841' },
+  { id: 804, tipo: 'receber', descricao: 'Contrato · painel de LED', parte: 'Bistrô do Forno', plano: 'Comunicação visual', valor: 300, frequencia: 'mensal', dia: 10, ini: -190, fim: null, gerados: 6, parou: -20 , contrato: 'CT-2026/009' },
+] as const;
+type RecDemo = { id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
+  frequencia: Frequencia; dia_geracao: number; inicio: string; termino: string | null; gerados: number; interrompida_em: string | null;
+  contrato: string | null };
+let recorrenciasDemo: RecDemo[] | null = null;
+const recorrencias = (): RecDemo[] => (recorrenciasDemo ??= RECORRENCIAS_SEMENTE.map((s) => ({ id: s.id, tipo: s.tipo, descricao: s.descricao,
+  parte: s.parte, plano_nome: s.plano, valor: s.valor, frequencia: s.frequencia, dia_geracao: s.dia, inicio: diaRel(s.ini),
+  termino: s.fim === null ? null : diaRel(s.fim), gerados: s.gerados, interrompida_em: s.parou === null ? null : diaRel(s.parou),
+  contrato: s.contrato })));
+/** Formato da rota: próxima criação calculada na hora, pela mesma regra do app. */
+const verRecorrencia = (r: RecDemo) => {
+  const prox = r.interrompida_em ? null : proximaRecorrencia(r.inicio, r.frequencia, r.dia_geracao, r.termino, diaRel(0));
+  return { id: r.id, tipo: r.tipo, descricao: r.descricao, parte: r.parte, plano_nome: r.plano_nome, valor: r.valor, frequencia: r.frequencia,
+    dia_geracao: r.dia_geracao, dia_vencimento: Number(r.inicio.slice(8, 10)), inicio: r.inicio, termino: r.termino,
+    proxima_geracao: prox?.geracao ?? null, proximo_vencimento: prox?.vencimento ?? null, gerados: r.gerados,
+    status: r.interrompida_em ? 'interrompida' : 'ativa', interrompida_em: r.interrompida_em, contrato: r.contrato };
+};
+const CONTAS_DEMO = [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
+  { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }];
+// Contrato e recorrência dos lançamentos da semente que vêm de uma recorrência.
+const CONTRATO_BASE: Record<number, { contrato: string; recorrencia_id: number }> = { 910: { contrato: 'CT-2025/014', recorrencia_id: 801 } };
+// Mudanças feitas pelo detalhe do lançamento (baixa, estorno, alteração, exclusão), por cima da semente e dos criados.
+type AjusteLanc = { pago_em?: string | null; excluido?: boolean; motivo?: string | null; campos?: Partial<LancDemo>;
+  historico: Array<{ quando: string; texto: string }>;
+  /** Pagamento parcial: valor antes da baixa e o lançamento criado com o restante. `origem`: no restante, de onde veio. */
+  valor_original?: number; restante_id?: number | null; origem_id?: number };
+const EMPRESA_DEMO = { nome: 'Gráfica Demonstração', documento: '00.000.000/0001-91', cidade: 'Tubarão/SC' };
+const ajustesLanc = new Map<number, AjusteLanc>();
+const chavesAcaoLanc = new Set<string>();
+const brDemo = (iso: string) => iso.split('-').reverse().join('/');
+/** Todos os lançamentos da demo, com as mudanças aplicadas e a situação recalculada. Datas só aqui dentro. */
+function lancamentosDemo(): LancDemo[] {
+  const hoje = diaRel(0);
+  const base: LancDemo[] = [...LANCAMENTOS.map(({ dias, pago, emi, venda, forma, conta, nf, nosso, plano, doc, exc, ...l }): LancDemo => {
+    const data = diaRel(dias);
+    return { ...l, vencimento: data, pago_em: pago ? data : null, status: '',
+      emissao: diaRel(emi), competencia: diaRel(emi).slice(0, 7), venda_em: venda === null ? null : diaRel(venda),
+      forma_pagamento: forma, conta_id: conta, nf_numero: nf, nosso_numero: nosso,
+      plano_codigo: plano, plano_nome: PLANO_CONTAS.find((p) => p.codigo === plano)?.nome ?? null, documento: doc, excluido: exc as boolean,
+      parte_id: PESSOAS.find((p) => p.nome === l.parte)?.id ?? null, observacao: null,
+      contrato: CONTRATO_BASE[l.id]?.contrato ?? null, recorrencia_id: CONTRATO_BASE[l.id]?.recorrencia_id ?? null, parcela: null };
+  }), ...LANC_CRIADOS.map((l) => ({ ...l, pago_em: null, status: '' }))];
+  return base.map((l) => {
+    const a = ajustesLanc.get(l.id);
+    const m: LancDemo = a ? { ...l, ...a.campos, ...(a.pago_em !== undefined ? { pago_em: a.pago_em } : {}),
+      ...(a.excluido !== undefined ? { excluido: a.excluido } : {}) } : l;
+    return { ...m, status: m.pago_em ? 'liquidado' : m.vencimento < hoje ? 'vencido' : 'aberto' };
+  });
+}
+function detalheDemo(l: LancDemo) {
+  const a = ajustesLanc.get(l.id);
+  const semente = LANCAMENTOS.find((x) => x.id === l.id);
+  const recebe = l.tipo === 'receber';
+  const historico = [{ quando: l.emissao, texto: semente ? 'Lançamento criado no ERP' : 'Lançamento criado pelo app' }];
+  if (semente?.pago) historico.push({ quando: diaRel(semente.dias), texto: recebe ? 'Recebido' : 'Pago' });
+  if (semente?.exc) historico.push({ quando: diaRel(semente.emi + 1), texto: 'Excluído: lançado em duplicidade' });
+  const resto = a?.restante_id ? lancamentosDemo().find((x) => x.id === a.restante_id) : undefined;
+  return { ...l, conta_nome: CONTAS_DEMO.find((c) => c.id === l.conta_id)?.nome ?? null,
+    restante: resto ? { id: resto.id, valor: resto.valor, vencimento: resto.vencimento } : null, origem_id: a?.origem_id ?? null,
+    motivo_exclusao: l.excluido ? (a?.motivo !== undefined ? a.motivo : semente?.exc ? 'Lançado em duplicidade' : null) : null,
+    historico: [...historico, ...(a?.historico ?? [])] };
+}
+type LancDemo = Omit<(typeof LANC_CRIADOS)[number], 'nosso_numero' | 'venda_em' | 'excluido'> & {
+  pago_em: string | null; status: string; nosso_numero: string | null; venda_em: string | null; excluido: boolean };
 
 // Documentos fiscais de demonstração (tela 14), como o protótipo. Chave fictícia; `dias` vira data dentro do handler.
 const FISCAIS = [
@@ -1103,24 +1214,200 @@ export const demo = {
       return r({ id: p.id, descricao: p.descricao, valor: p.valor, vencimento: diaRel(p.dias), metodo: p.metodo, status: p.status,
         pago_em: p.pago === null ? null : diaRel(p.pago), link: p.status === 'cancelado' ? null : `https://pagamento.exemplo/c/${p.id}` });
     }
+    if (metodo === 'POST' && caminho === '/api/app/financeiro/lancamentos') {
+      // Mesma validação do app, repetida aqui como o ERP faria (o servidor nunca confia no corpo).
+      const n = (corpo ?? {}) as Partial<NovoLancamentoDemo>;
+      const chave = cabecalhos['Idempotency-Key'];
+      if (chave && chavesLanc.has(chave)) return r(chavesLanc.get(chave));
+      const campos: Record<string, string> = {};
+      if (n.tipo !== 'receber' && n.tipo !== 'pagar') campos.tipo = 'Escolha a receber ou a pagar.';
+      if (!String(n.descricao ?? '').trim()) campos.descricao = 'Escreva uma descrição.';
+      if (typeof n.valor !== 'number' || !(n.valor > 0)) campos.valor = 'O valor precisa ser maior que zero.';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(n.vencimento))) campos.vencimento = 'Escolha a data de vencimento.';
+      const plano = PLANO_CONTAS.find((p) => p.codigo === n.plano_codigo);
+      if (!plano) campos.plano = 'Escolha a conta do plano de contas.';
+      else if (PLANO_CONTAS.some((p) => p.codigo.startsWith(plano.codigo + '.'))) campos.plano = 'Escolha uma conta, não um grupo.';
+      else if (plano.tipo !== (n.tipo === 'receber' ? 'receita' : 'despesa')) campos.plano = 'Essa conta não é do mesmo tipo do lançamento.';
+      if (n.parcelas != null && n.recorrencia != null) campos.parcelas = 'Escolha parcelado ou recorrente, não os dois.';
+      if (n.parcelas != null && (!Number.isInteger(n.parcelas) || n.parcelas < 2 || n.parcelas > 60)) campos.parcelas = 'Use de 2 a 60 parcelas.';
+      if (n.recorrencia && !(n.recorrencia.dia_geracao >= 1 && n.recorrencia.dia_geracao <= 28)) campos.dia_geracao = 'Use um dia de 1 a 28.';
+      if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+      await espera(500);
+      const parte = n.contato_id ? PESSOAS.find((p) => p.id === n.contato_id)?.nome ?? null : null;
+      const desc = String(n.descricao).trim();
+      // Parcelado: o valor é o total, dividido pela mesma regra do app; uma parcela por mês a partir do vencimento.
+      const qtd = n.parcelas ?? 1;
+      const valores = n.parcelas ? dividirParcelas(n.valor!, qtd) : [n.valor!];
+      const ids: number[] = [];
+      const recorrencia_id: number | null = n.recorrencia ? 805 + recorrencias().length : null;
+      valores.forEach((valor, i) => {
+        const id = 950 + LANC_CRIADOS.length;
+        ids.push(id);
+        LANC_CRIADOS.push({ id, tipo: n.tipo!, descricao: n.parcelas ? `${desc} (${i + 1}/${qtd})` : desc, parte, valor,
+          vencimento: somarMeses(n.vencimento!, i), emissao: n.emissao ?? diaRel(0), competencia: n.competencia ?? diaRel(0).slice(0, 7), venda_em: null,
+          forma_pagamento: n.forma_pagamento ?? null, conta_id: n.conta_id ?? null, nf_numero: n.nf_numero ?? null, nosso_numero: null,
+          plano_codigo: plano!.codigo, plano_nome: plano!.nome, documento: n.documento ? (n.parcelas ? `${n.documento}/${i + 1}` : n.documento) : null, excluido: false,
+          parte_id: n.contato_id ?? null, observacao: n.observacao ?? null, contrato: n.recorrencia?.contrato ?? null, recorrencia_id,
+          parcela: n.parcelas ? `${i + 1}/${qtd}` : null });
+      });
+      if (n.recorrencia && recorrencia_id !== null) {
+        recorrencias().unshift({ id: recorrencia_id, tipo: n.tipo!, descricao: desc, parte, plano_nome: plano!.nome, valor: n.valor!,
+          frequencia: n.recorrencia.frequencia, dia_geracao: n.recorrencia.dia_geracao, inicio: n.vencimento!, termino: n.recorrencia.termino,
+          gerados: 1, interrompida_em: null, contrato: n.recorrencia.contrato ?? null });
+      }
+      const resposta = { id: ids[0], ids, recorrencia_id };
+      if (chave) chavesLanc.set(chave, resposta);
+      return r(resposta);
+    }
+    const detLanc = caminho.match(/^\/api\/app\/financeiro\/lancamentos\/(\d+)(?:\/(baixar|estornar|excluir|reativar|recibo))?$/);
+    if (detLanc) {
+      const id = Number(detLanc[1]);
+      const acao = detLanc[2];
+      const achar = () => lancamentosDemo().find((x) => x.id === id);
+      const l = achar();
+      if (!l) throw Object.assign(new Error('Lançamento não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
+      if (metodo === 'GET' && !acao) return r(detalheDemo(l));
+      if (metodo === 'GET' && acao === 'recibo') {
+        if (l.status !== 'liquidado' || l.excluido) throw Object.assign(new Error('Recibo só de lançamento recebido ou pago.'), { status: 409, codigo: 'estado' });
+        const p = l.parte_id ? PESSOAS.find((x) => x.id === l.parte_id) : PESSOAS.find((x) => x.nome === l.parte);
+        return r({ numero: `REC-${l.pago_em!.slice(0, 4)}-${String(l.id).padStart(5, '0')}`, tipo: l.tipo, valor: l.valor, data: l.pago_em!,
+          referente: l.descricao, forma: l.forma_pagamento, documento: l.documento, empresa: EMPRESA_DEMO,
+          parte: l.parte ? { nome: l.parte, documento: p?.documento ?? null } : null });
+      }
+      const falha = (msg: string): never => { throw Object.assign(new Error(msg), { status: 409, codigo: 'estado' }); };
+      const chave = cabecalhos['Idempotency-Key'];
+      if (chave && chavesAcaoLanc.has(chave)) return r(detalheDemo(l));
+      const aj = ajustesLanc.get(id) ?? { historico: [] };
+      const hoje = diaRel(0);
+      const recebe = l.tipo === 'receber';
+      const n = (corpo ?? {}) as Record<string, unknown>;
+      if (metodo === 'PATCH' && !acao) {
+        if (l.excluido) falha('Lançamento excluído: reative antes de alterar.');
+        if (l.status === 'liquidado') falha(recebe ? 'Já recebido: retorne a receber antes de alterar.' : 'Já pago: retorne a pagar antes de alterar.');
+        const campos: Record<string, string> = {};
+        if (!String(n.descricao ?? '').trim()) campos.descricao = 'Escreva uma descrição.';
+        if (typeof n.valor !== 'number' || !(n.valor > 0)) campos.valor = 'O valor precisa ser maior que zero.';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(n.vencimento))) campos.vencimento = 'Escolha a data de vencimento.';
+        const plano = PLANO_CONTAS.find((p) => p.codigo === n.plano_codigo);
+        if (!plano) campos.plano = 'Escolha a conta do plano de contas.';
+        else if (plano.tipo !== (recebe ? 'receita' : 'despesa')) campos.plano = 'Essa conta não é do mesmo tipo do lançamento.';
+        if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
+        const parteId = typeof n.contato_id === 'number' ? n.contato_id : null;
+        const novo: Partial<LancDemo> = { descricao: String(n.descricao).trim(), valor: n.valor as number, vencimento: String(n.vencimento),
+          emissao: String(n.emissao ?? l.emissao), competencia: String(n.competencia ?? l.competencia), forma_pagamento: (n.forma_pagamento as string | null) ?? null,
+          conta_id: (n.conta_id as number | null) ?? null, plano_codigo: plano!.codigo, plano_nome: plano!.nome, documento: (n.documento as string | null) ?? null,
+          nf_numero: (n.nf_numero as string | null) ?? null, observacao: (n.observacao as string | null) ?? null, contrato: (n.contrato as string | null) ?? null,
+          parte_id: parteId, parte: parteId ? PESSOAS.find((p) => p.id === parteId)?.nome ?? null : null };
+        const mudou = (Object.keys(novo) as Array<keyof LancDemo>).filter((k) => novo[k] !== l[k] && !['plano_nome', 'parte_id'].includes(k));
+        const NOMES: Partial<Record<keyof LancDemo, string>> = { descricao: 'descrição', valor: 'valor', vencimento: 'vencimento', emissao: 'emissão',
+          competencia: 'competência', forma_pagamento: 'forma', conta_id: 'conta', plano_codigo: 'plano de contas', documento: 'documento',
+          nf_numero: 'nota fiscal', observacao: 'observação', contrato: 'contrato', parte: recebe ? 'cliente' : 'fornecedor' };
+        aj.campos = { ...aj.campos, ...novo };
+        if (mudou.length) aj.historico.push({ quando: hoje, texto: `Alterado: ${mudou.map((k) => NOMES[k] ?? k).join(', ')}` });
+      } else if (metodo === 'POST' && acao === 'baixar') {
+        if (l.excluido) falha('Lançamento excluído: reative antes de dar baixa.');
+        if (l.status === 'liquidado') falha(recebe ? 'Este lançamento já foi recebido.' : 'Este lançamento já foi pago.');
+        const quando = String(n.pago_em ?? '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(quando) || quando > hoje)
+          throw Object.assign(new Error('Data do pagamento inválida.'), { status: 422, codigo: 'validacao', campos: { pago_em: 'Data do pagamento inválida.' } });
+        const pagoC = Math.round(Number(n.valor_pago ?? l.valor) * 100), totalC = Math.round(l.valor * 100);
+        if (!(pagoC > 0) || pagoC > totalC)
+          throw Object.assign(new Error('Valor pago inválido.'), { status: 422, codigo: 'validacao', campos: { valor: 'O valor pago precisa ser maior que zero e até o valor do lançamento.' } });
+        const venceResto = String(n.vencimento_restante ?? '');
+        if (pagoC < totalC && (!/^\d{4}-\d{2}-\d{2}$/.test(venceResto) || venceResto < quando))
+          throw Object.assign(new Error('Escolha o vencimento do restante.'), { status: 422, codigo: 'validacao', campos: { vencimento_restante: 'Escolha o vencimento do restante.' } });
+        aj.pago_em = quando;
+        aj.campos = { ...aj.campos, conta_id: (n.conta_id as number | null) ?? l.conta_id, forma_pagamento: (n.forma_pagamento as string | null) ?? l.forma_pagamento };
+        const rs = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (pagoC < totalC) {
+          // Parcial: este fica liquidado com o valor pago; o restante vira um lançamento novo em aberto.
+          const novoId = 950 + LANC_CRIADOS.length;
+          LANC_CRIADOS.push({ id: novoId, tipo: l.tipo, descricao: `${l.descricao.replace(/ \(restante\)$/, '')} (restante)`, parte: l.parte, valor: (totalC - pagoC) / 100,
+            vencimento: venceResto, emissao: l.emissao, competencia: l.competencia, venda_em: null, forma_pagamento: l.forma_pagamento, conta_id: l.conta_id,
+            nf_numero: l.nf_numero, nosso_numero: null, plano_codigo: l.plano_codigo, plano_nome: l.plano_nome, documento: l.documento, excluido: false,
+            parte_id: l.parte_id, observacao: null, contrato: l.contrato, recorrencia_id: l.recorrencia_id, parcela: l.parcela });
+          ajustesLanc.set(novoId, { origem_id: id, historico: [{ quando: hoje, texto: `Criado com o restante do lançamento #${id} (pagamento parcial de ${rs(pagoC)})` }] });
+          aj.valor_original = l.valor; aj.restante_id = novoId;
+          aj.campos = { ...aj.campos, valor: pagoC / 100 };
+          aj.historico.push({ quando: hoje, texto: `${recebe ? 'Recebido' : 'Pago'} parcialmente: ${rs(pagoC)} em ${brDemo(quando)}. Restante de ${rs(totalC - pagoC)} no lançamento #${novoId}, vencendo ${brDemo(venceResto)}` });
+        } else {
+          aj.historico.push({ quando: hoje, texto: `${recebe ? 'Recebido' : 'Pago'} em ${brDemo(quando)}` });
+        }
+      } else if (metodo === 'POST' && acao === 'estornar') {
+        if (l.status !== 'liquidado') falha(recebe ? 'Este lançamento ainda não foi recebido.' : 'Este lançamento ainda não foi pago.');
+        let junta = '';
+        if (aj.restante_id) {
+          // Parcial: o restante volta para este lançamento (se ainda estiver em aberto).
+          const resto = lancamentosDemo().find((x) => x.id === aj.restante_id);
+          if (resto && resto.status === 'liquidado' && !resto.excluido)
+            falha(`O restante (lançamento #${resto.id}) já foi ${recebe ? 'recebido' : 'pago'}: retorne ele antes.`);
+          if (resto && !resto.excluido) {
+            const ar = ajustesLanc.get(resto.id) ?? { historico: [] };
+            ar.excluido = true; ar.motivo = `Juntado de volta ao lançamento #${id}`;
+            ar.historico.push({ quando: hoje, texto: `Juntado de volta ao lançamento #${id} (retorno do pagamento parcial)` });
+            ajustesLanc.set(resto.id, ar);
+          }
+          aj.campos = { ...aj.campos, valor: aj.valor_original ?? l.valor };
+          junta = `; o restante #${aj.restante_id} voltou para este lançamento`;
+          aj.restante_id = null; aj.valor_original = undefined;
+        }
+        aj.historico.push({ quando: hoje, texto: `${recebe ? 'Retornado a receber' : 'Retornado a pagar'} (baixa de ${brDemo(l.pago_em!)} desfeita${junta})` });
+        aj.pago_em = null;
+      } else if (metodo === 'POST' && acao === 'excluir') {
+        if (l.status === 'liquidado') falha(recebe ? 'Já recebido: retorne a receber antes de excluir.' : 'Já pago: retorne a pagar antes de excluir.');
+        if (!l.excluido) {
+          const motivo = String(n.motivo ?? '').trim() || null;
+          aj.excluido = true; aj.motivo = motivo;
+          aj.historico.push({ quando: hoje, texto: motivo ? `Excluído: ${motivo}` : 'Excluído' });
+        }
+      } else if (metodo === 'POST' && acao === 'reativar') {
+        if (!l.excluido) falha('Este lançamento não está excluído.');
+        aj.excluido = false; aj.motivo = null;
+        aj.historico.push({ quando: hoje, texto: 'Reativado' });
+      } else {
+        throw Object.assign(new Error('Ação não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      }
+      ajustesLanc.set(id, aj);
+      if (chave) chavesAcaoLanc.add(chave);
+      await espera(400);
+      return r(detalheDemo(achar()!));
+    }
+    if (metodo === 'GET' && caminho === '/api/app/financeiro/recorrencias') {
+      return r({ itens: recorrencias().map(verRecorrencia) });
+    }
+    const parar = caminho.match(/^\/api\/app\/financeiro\/recorrencias\/(\d+)\/interromper$/);
+    if (metodo === 'POST' && parar) {
+      const rec = recorrencias().find((x) => x.id === Number(parar[1]));
+      if (!rec) throw Object.assign(new Error('Recorrência não encontrada.'), { status: 404, codigo: 'nao_encontrado' });
+      await espera(400);
+      rec.interrompida_em ??= diaRel(0);
+      return r(verRecorrencia(rec));
+    }
     if (metodo === 'GET' && caminho.startsWith('/api/app/financeiro')) {
       const aba = (caminho.match(/aba=(\w+)/) || [])[1] || 'receber';
       // Datas calculadas aqui, nunca no topo do módulo (o build de produção precisa descartar o demo).
       const hoje = diaRel(0);
-      const todos = LANCAMENTOS.map(({ dias, pago, ...l }) => {
-        const data = diaRel(dias);
-        return { ...l, vencimento: data, pago_em: pago ? data : null, status: pago ? 'liquidado' : data < hoje ? 'vencido' : 'aberto' };
-      });
+      const todos = lancamentosDemo();
+      // A lista passa pelo filtro (que esconde os excluídos por padrão); o resumo do mês é só dos ativos.
       const abertos = (t: string) => todos.filter((l) => l.tipo === t && l.status !== 'liquidado');
+      const abertosAtivos = (t: string) => abertos(t).filter((l) => !l.excluido);
       const extrato = todos.filter((l) => l.status === 'liquidado').sort((a, b) => (b.pago_em ?? '').localeCompare(a.pago_em ?? ''));
-      const itens = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      // Filtro avançado: a mesma regra que o ERP vai aplicar. Resumo e contas não mudam; lista e contadores, sim.
+      const f = lerParams(caminho);
+      const ordenados = aba === 'extrato' ? extrato : abertos(aba === 'pagar' ? 'pagar' : 'receber').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+      // Caixas de seleção (situacao=a_receber,pagas): no lugar da aba, junta em aberto e liquidados dos dois lados.
+      const situacoes = lerSituacoes(caminho);
+      const itens = situacoes ? filtrarLancamentos(ordenarLancamentos(todos.filter((l) => situacoes.includes(situacaoDe(l)))), f) : filtrarLancamentos(ordenados, f);
+      const filtrados = filtrarLancamentos(todos, f);
+      const contadores_situacao = Object.fromEntries(SITUACOES.map((s) => [s.id, filtrados.filter((l) => situacaoDe(l) === s.id).length]));
       const soma = (l: Array<{ valor: number }>) => l.reduce((x, y) => x + y.valor, 0);
       const recebido = 148230, pago = 96410;
       return r({ resumo: { mes: hoje.slice(0, 7), recebido, pago, saldo: recebido - pago,
-          a_receber: soma(abertos('receber')), vencido: soma(abertos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertos('pagar')) },
-        contas: [{ id: 1, nome: 'Conta movimento', detalhe: 'Banco · ag. 0001', saldo: 42318.4 },
-          { id: 2, nome: 'Caixa balcão', detalhe: 'Dinheiro', saldo: 1940 }, { id: 3, nome: 'Recebíveis', detalhe: 'Cartões', saldo: null }],
-        itens, contadores: { receber: abertos('receber').length, pagar: abertos('pagar').length, extrato: extrato.length }, pagina: 1, tem_mais: false });
+          a_receber: soma(abertosAtivos('receber')), vencido: soma(abertosAtivos('receber').filter((l) => l.status === 'vencido')), a_pagar: soma(abertosAtivos('pagar')) },
+        contas: CONTAS_DEMO,
+        itens, contadores: { receber: filtrarLancamentos(abertos('receber'), f).length, pagar: filtrarLancamentos(abertos('pagar'), f).length,
+          extrato: filtrarLancamentos(extrato, f).length }, pagina: 1, tem_mais: false,
+        contadores_situacao, planos_conta: PLANO_CONTAS, formas_pagamento: ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Transferência'] });
     }
     if (metodo === 'GET' && caminho.startsWith('/api/app/fiscal')) {
       const st = (caminho.match(/status=(\w+)/) || [])[1] || 'todos';
