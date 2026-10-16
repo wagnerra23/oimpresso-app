@@ -3,13 +3,16 @@
 // (ERP #9445). Quem recusa de verdade é a rota (lista segura + `app_acoes_fsm_liberadas` + RBAC da FSM);
 // o app só esconde o botão e reage ao código de erro.
 
-export interface AcaoPedido { chave: string; rotulo: string; pode: boolean }
+/** `pede_motivo` (contrato novo, ex. pausar/retomar produção): a confirmação mostra um motivo opcional. */
+export interface AcaoPedido { chave: string; rotulo: string; pode: boolean; pede_motivo?: boolean }
 
 /** Destino das ações da lista segura do ERP (`AcoesDoPedido::SEGURAS`), para a folha "Mover para …?".
- *  Ação que não está aqui usa o próprio rótulo. */
+ *  Ação que não está aqui usa o próprio rótulo. O app não filtra ações por chave: aparece o que o ERP manda em acoes[]
+ *  e a empresa liberou (`app_acoes_fsm_liberadas`), então ação nova (ex. retomar_producao) não precisa de mudança aqui. */
 const DESTINO: Record<string, string> = {
   iniciar_producao: 'Em produção',
   pausar_producao: 'Em espera',
+  retomar_producao: 'Em produção',
   concluir: 'Concluída',
 };
 
@@ -26,6 +29,9 @@ export const soConsulta = (acoes: readonly AcaoPedido[], liberadas: readonly str
 
 /** Título da folha de confirmação. */
 export const tituloConfirmacao = (a: AcaoPedido): string => (DESTINO[a.chave] ? `Mover para ${DESTINO[a.chave]}?` : `${a.rotulo}?`);
+
+/** Limite do motivo no POST (422 validacao acima disso). */
+export const MOTIVO_ACAO_MAX = 500;
 
 /** Corpo do POST: `etapa_esperada` = a etapa que a tela mostrava (diferente da atual → 409 etapa_mudou). */
 export const corpoAcao = (acao: string, etapaEsperada: string, motivo: string | null = null) =>

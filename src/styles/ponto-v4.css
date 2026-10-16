@@ -153,6 +153,13 @@
 .pd-prazo-l { font-size: 12.5px; color: var(--text-dim); display: flex; gap: 6px; align-items: baseline; }
 .pd-prazo-l b { font-family: var(--font-mono); color: var(--text); }
 .pd-atrasado { color: var(--danger); font-weight: 600; }
+/* Contrato novo: selo do pagamento e aviso de cancelado no cartão do detalhe. */
+.pd-pg { margin-left: auto; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+.pd-pg.ok { border-color: var(--ok); color: var(--ok); }
+.pd-pg.warn { border-color: var(--warn); color: var(--warn); }
+.pd-cancelado { font-size: 12.5px; color: var(--danger); font-weight: 600; }
+.pd-passo-l { font-size: 12.5px; color: var(--text-dim); }
+.pd-passo-l b { color: var(--text); }
 .pd-item { min-height: 56px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-2); }
 .pd-item-d { font-size: 13.5px; font-weight: 500; }
 .pd-item-m { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mute); }

@@ -107,11 +107,33 @@ const PEDIDOS: PedidoDemo[] = [
 
 // P1 · avançar etapa (tela 22, ERP #9445). Só a lista segura do ERP (AcoesDoPedido::SEGURAS), cada uma saindo de uma
 // etapa só, como no processo venda_com_producao. As outras ações ficam na web e não vêm em acoes[].
-const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: ChaveEtapaDemo; progresso: number }> = {
+// `retomar_producao` (Em espera → Em produção) e o motivo opcional de pausar/retomar vêm só no contrato novo.
+const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: ChaveEtapaDemo; progresso: number; pedeMotivo?: boolean; novo?: boolean }> = {
   quote_approved: { chave: 'iniciar_producao', rotulo: 'Iniciar produção', para: 'in_production', progresso: 0.5 },
-  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: 'on_hold', progresso: 0.5 },
+  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: 'on_hold', progresso: 0.5, pedeMotivo: true },
+  on_hold: { chave: 'retomar_producao', rotulo: 'Retomar produção', para: 'in_production', progresso: 0.5, pedeMotivo: true, novo: true },
   delivered: { chave: 'concluir', rotulo: 'Concluir venda', para: 'completed', progresso: 1 },
 };
+/** Contrato do ERP que a demo imita: 'novo' manda passos[], passo_atual, etapa.terminal/cancelada, pagamento,
+ *  pede_motivo, retomar_producao e o filtro "cancelados"; 'antigo' é o ERP de antes (só para teste). */
+let contratoPedidoDemo: 'novo' | 'antigo' = 'novo';
+/** Passos do processo no contrato novo (sem Em espera, que é desvio de Em produção, e sem Paga: pagamento é selo). */
+const PASSOS_DEMO: Array<{ chave: ChaveEtapaDemo; rotulo: string }> = [
+  { chave: 'quote_draft', rotulo: 'Orçamento' }, { chave: 'quote_approved', rotulo: 'Aprovado' }, { chave: 'in_production', rotulo: 'Produção' },
+  { chave: 'ready_for_invoice', rotulo: 'Pronto' }, { chave: 'invoiced', rotulo: 'Faturada' }, { chave: 'delivered', rotulo: 'Entregue' },
+  { chave: 'completed', rotulo: 'Concluída' },
+];
+/** Etapa → passo da barra (quote_sent conta como Orçamento; on_hold como Produção; paid como Faturada). */
+const PASSO_DA_ETAPA: Partial<Record<string, ChaveEtapaDemo>> = { quote_sent: 'quote_draft', on_hold: 'in_production', paid: 'invoiced' };
+const passoAtualDemo = (chave: string) => (chave === 'cancelled' ? null : PASSO_DA_ETAPA[chave] ?? chave);
+const etapaNovaDemo = (e: EtapaPedidoDemo) => ({ ...e, terminal: terminalDemo(e.grupo), cancelada: e.grupo === 'cancelado' });
+/** Situação de cobrança por etapa (o #0047 está pago em parte). */
+function pagamentoDemo(p: PedidoDemo) {
+  const k = p.etapa.chave;
+  if (['paid', 'delivered', 'completed'].includes(k)) return { situacao: 'pago', valor_aberto: 0 };
+  if (k === 'invoiced') return p.id === 110 ? { situacao: 'parcial', valor_aberto: 980 } : { situacao: 'pendente', valor_aberto: p.valor };
+  return { situacao: 'sem_titulo', valor_aberto: 0 };
+}
 /** `false` simula o usuário sem o RBAC da FSM (a ação vem com pode: false). Só para teste. */
 let podeAcoesPedidoDemo = true;
 /** Histórico de etapas por pedido (mais recente primeiro), criado na 1ª leitura. */
@@ -135,21 +157,28 @@ function historicoPedidoDemo(p: PedidoDemo) {
   }
   return HISTORICO_PEDIDO[p.id];
 }
-const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
+const acaoSeguraDemo = (etapa: string) => {
   const a = ACOES_SEGURAS_DEMO[etapa];
-  return a && (liberadas.length === 0 || liberadas.includes(a.chave)) ? [{ chave: a.chave, rotulo: a.rotulo, pode: podeAcoesPedidoDemo }] : [];
+  return a && (!a.novo || contratoPedidoDemo === 'novo') ? a : undefined;
+};
+const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
+  const a = acaoSeguraDemo(etapa);
+  if (!a || (liberadas.length > 0 && !liberadas.includes(a.chave))) return [];
+  return [{ chave: a.chave, rotulo: a.rotulo, pode: podeAcoesPedidoDemo, ...(a.pedeMotivo && contratoPedidoDemo === 'novo' ? { pede_motivo: true } : {}) }];
 };
 
 // P3 · entrega (tela 22, ERP #9464). A ação `entregar` da FSM sai de uma etapa só e NÃO vem em acoes[]: o detalhe manda
-// `entrega: { pode }`. Na demo, como no seed, sai de "Paga" e vai para "Entregue" (de onde o P1 oferece "Concluir venda").
-const ENTREGA_DEMO = { de: 'paid', para: 'delivered' as const, progresso: 0.9 };
+// `entrega: { pode }`. Na demo sai de "Paga" e, no contrato novo (pagamento fora das etapas), também de "Faturada"; vai
+// para "Entregue" (de onde o P1 oferece "Concluir venda").
+const ENTREGA_DEMO = { de: ['paid', 'invoiced'], para: 'delivered' as const, progresso: 0.9 };
+const entregaSaiDe = (etapa: string) => (contratoPedidoDemo === 'novo' ? ENTREGA_DEMO.de.includes(etapa) : etapa === 'paid');
 /** Linha de topo da venda (`itens_venda[].linha_id`), estável por pedido. */
 const linhaIdDemo = (pedidoId: number, i: number) => pedidoId * 100 + i + 1;
 /** Próximo número do protocolo (ENT-NNNN por business). */
 let protocoloEntregaDemo = 418;
 /** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem registrar de novo). */
 const ENTREGAS_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
-const entregaDemo = (etapa: string) => (etapa === ENTREGA_DEMO.de ? { pode: podeAcoesPedidoDemo } : null);
+const entregaDemo = (etapa: string) => (entregaSaiDe(etapa) ? { pode: podeAcoesPedidoDemo } : null);
 /** Os erros por campo do contrato (422 validacao), na ordem em que o ERP confere. */
 function camposEntregaDemo(p: PedidoDemo, n: Record<string, unknown>, chave: string | undefined) {
   const campos: Record<string, string> = {};
@@ -726,6 +755,8 @@ export const demo = {
   definirBloqueioPrecoZero(v: boolean) { bloqueiaPrecoZeroDemo = v; },
   /** P1 · só para teste: `false` = o usuário não passa no RBAC da FSM (acoes[] com pode: false; POST → 403). */
   definirPodeAcoesPedido(v: boolean) { podeAcoesPedidoDemo = v; },
+  /** Só para teste: imita o ERP antigo (sem passos, pagamento, pede_motivo, retomar_producao nem filtro "cancelados"). */
+  definirContratoPedido(c: 'novo' | 'antigo') { contratoPedidoDemo = c; },
   /** P5 · atendimento — só para teste: canal do WhatsApp ligado/desligado (desligado = área some de `areas`). Recomeça as conversas. */
   definirCanalAtendimento(ligado: boolean) { canalAtendimentoDemo = ligado; conversasDemo = null; },
   /** Troca ajustes da empresa na demo (o resto fica como está). Vazio = volta ao padrão. */
@@ -791,21 +822,28 @@ export const demo = {
         const ordem: readonly GrupoEtapa[] = ['orcamento', 'aprovacao', 'producao', 'entrega', 'concluido'];
         const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
         const pos = ordem.indexOf(p.etapa.grupo);
+        const novo = contratoPedidoDemo === 'novo'
+          ? { etapa: etapaNovaDemo(p.etapa), passos: PASSOS_DEMO, passo_atual: passoAtualDemo(p.etapa.chave), pagamento: pagamentoDemo(p) } : {};
         return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
           itens_venda: p.itens.map((it, i) => ({ ...it, linha_id: linhaIdDemo(p.id, i) })), entrega: entregaDemo(p.etapa.chave), etapas: ordem.map((g, i) => ({ grupo: g, rotulo: rot[i], estado: i < pos ? 'feito' : i === pos ? 'atual' : 'futuro' })),
-          acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p) });
+          acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p), ...novo });
       }
+      const novo = contratoPedidoDemo === 'novo';
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
       const ativos = PEDIDOS.filter((p) => !terminalDemo(p.etapa.grupo));
-      const concluidos = PEDIDOS.filter((p) => terminalDemo(p.etapa.grupo));
+      // Contrato novo: cancelados têm filtro próprio e saem de "concluídos". Antigo: filtro desconhecido volta os ativos.
+      const cancelados = PEDIDOS.filter((p) => p.etapa.grupo === 'cancelado');
+      const concluidos = PEDIDOS.filter((p) => (novo ? p.etapa.grupo === 'concluido' : terminalDemo(p.etapa.grupo)));
       const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? concluidos
+        : filtro === 'cancelados' && novo ? cancelados
         : filtro === 'atrasados' ? PEDIDOS.filter((p) => p.atrasado) : ativos;
       // `q` (busca da lista): a demo usa a mesma regra do aparelho; o ERP busca do jeito dele.
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '');
       const achados = lista.filter((p) => casaBusca(q, [p.numero, p.cliente, p.itens[0]?.produto]));
-      return r({ itens: achados.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
+      return r({ itens: achados.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null,
+        ...(novo ? { etapa: etapaNovaDemo(p.etapa), passo_atual: passoAtualDemo(p.etapa.chave) } : {}) })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
-          concluidos: concluidos.length, todos: PEDIDOS.length } });
+          concluidos: concluidos.length, ...(novo ? { cancelados: cancelados.length } : {}), todos: PEDIDOS.length } });
     }
     // ── Apontamento por QR (P8 · PR 08) ──
     if (caminho.startsWith('/api/app/producao/')) {
@@ -901,11 +939,11 @@ export const demo = {
       const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
       if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
       const liberadas = ajustesDemo.app_acoes_fsm_liberadas;
-      const segura = Object.values(ACOES_SEGURAS_DEMO).some((a) => a.chave === n.acao);
+      const segura = Object.keys(ACOES_SEGURAS_DEMO).some((e) => acaoSeguraDemo(e)?.chave === n.acao);
       if (!segura || (liberadas.length && !liberadas.includes(n.acao!)) || !podeAcoesPedidoDemo) {
         throw Object.assign(new Error('Seu usuário não pode executar esta ação no app.'), { status: 403, codigo: 'sem_permissao' });
       }
-      const a = ACOES_SEGURAS_DEMO[p.etapa.chave];
+      const a = acaoSeguraDemo(p.etapa.chave);
       if (n.etapa_esperada !== p.etapa.chave || !a || a.chave !== n.acao) {
         throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
       }
@@ -928,7 +966,7 @@ export const demo = {
       const p = PEDIDOS.find((x) => x.id === Number(caminho.split('/')[4]));
       if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404, codigo: 'nao_encontrado' });
       if (!podeAcoesPedidoDemo) throw Object.assign(new Error('Seu usuário não pode registrar esta entrega.'), { status: 403, codigo: 'sem_permissao' });
-      if (n.etapa_esperada && (n.etapa_esperada !== p.etapa.chave || p.etapa.chave !== ENTREGA_DEMO.de)) {
+      if (n.etapa_esperada && (n.etapa_esperada !== p.etapa.chave || !entregaSaiDe(p.etapa.chave))) {
         throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
       }
       const campos = camposEntregaDemo(p, n, chave);
