@@ -4,10 +4,13 @@
 // liberou (`app_acoes_fsm_liberadas`). Confirma em folha; offline trava; 409 etapa_mudou recarrega o pedido.
 // P3 · tela 22 (ERP #9464): com `entrega.pode`, o rodapé abre "Registrar entrega" (EntregaPedido), fora de acoes[].
 // "+ Venda" abre a Venda rápida (tela 11, D16 Onda A). Fora do v4 de propósito: "Link de aprovação" (não está no contrato).
+// Contrato novo tolerando o antigo (16/10/2026): barra pelos `passos[]` do ERP quando vierem (senão por grupo), filtro
+// "Cancelados" só quando a API conta cancelados, motivo opcional nas ações com `pede_motivo` e selo de `pagamento`.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, ErroApi, type FiltroPedidos, type GrupoEtapa, type ListaPedidos, type PedidoDetalheApi } from '../api';
+import { api, ErroApi, type FiltroPedidos, type ListaPedidos, type PedidoDetalheApi } from '../api';
 import { useAjustes } from '../ajustes';
-import { acoesDoRodape, corpoAcao, reacaoAoErro, soConsulta, textoMudanca, tituloConfirmacao, type AcaoPedido } from '../pedido-acao-regras';
+import { acoesDoRodape, corpoAcao, MOTIVO_ACAO_MAX, reacaoAoErro, soConsulta, textoMudanca, tituloConfirmacao, type AcaoPedido } from '../pedido-acao-regras';
+import { barraDePassos, ehCancelado, seloPagamento, tintaEtapa } from '../pedido-passos';
 import { botaoEntrega } from '../entrega-regras';
 import { haQuanto } from '../tempo';
 import { novaChave } from '../venda';
@@ -18,12 +21,8 @@ import { VendaRapida } from './VendaRapida';
 
 const FILTROS: Array<{ id: FiltroPedidos; label: string }> = [
   { id: 'ativos', label: 'Ativos' }, { id: 'atrasados', label: 'Atrasados' },
-  { id: 'concluidos', label: 'Concluídos' }, { id: 'todos', label: 'Todos' },
+  { id: 'concluidos', label: 'Concluídos' }, { id: 'cancelados', label: 'Cancelados' }, { id: 'todos', label: 'Todos' },
 ];
-const TINTA: Record<GrupoEtapa, string> = {
-  orcamento: 'var(--text-dim)', aprovacao: 'var(--warn)', producao: 'var(--accent-text)', entrega: 'var(--info)', concluido: 'var(--text-mute)',
-  cancelado: 'var(--danger)',
-};
 export const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
 
@@ -72,6 +71,10 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
   };
 
   const c = dados?.contadores;
+  // "Cancelados" só aparece depois que a API contou cancelados (ERP novo); o antigo não conhece o filtro.
+  const [comCancelados, setComCancelados] = useState(false);
+  useEffect(() => { if (typeof c?.cancelados === 'number') setComCancelados(true); }, [c]);
+  const filtros = FILTROS.filter((f) => f.id !== 'cancelados' || comCancelados || filtro === 'cancelados');
   return (
     <>
       <div className="pd-head">
@@ -88,9 +91,9 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
         <div className="pd-corpo">
           <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente ou número do pedido" rotulo="Buscar pedido" />
           <div className="pd-chips" role="tablist" aria-label="Filtro de pedidos">
-            {FILTROS.map((f) => (
+            {filtros.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
-                {f.label}{c && <span>{c[f.id]}</span>}
+                {f.label}{typeof c?.[f.id] === 'number' && <span>{c[f.id]}</span>}
               </button>
             ))}
           </div>
@@ -100,11 +103,11 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
             ? <div className="p4-vazio"><b>Nada encontrado</b><span>Nenhum pedido com “{q}” aqui. Tente outro cliente ou número, ou troque o filtro.</span></div>
             : <div className="p4-vazio"><b>Nenhum pedido aqui</b><span>Troque o filtro para ver outros pedidos.</span></div>)}
           {dados?.itens.map((p) => (
-            <button key={p.id} className={'pd-card' + (p.atrasado ? ' atrasado' : '')} style={{ borderLeftColor: p.atrasado ? 'var(--danger)' : TINTA[p.etapa.grupo] }} onClick={() => aoAbrir(p.id)}>
+            <button key={p.id} className={'pd-card' + (p.atrasado ? ' atrasado' : '')} style={{ borderLeftColor: p.atrasado ? 'var(--danger)' : tintaEtapa(p.etapa) }} onClick={() => aoAbrir(p.id)}>
               <span className="pd-card-l1">
                 <span className="pd-num">#{p.numero}</span>
                 <span className={'pd-prazo' + (p.atrasado ? ' atrasado' : '')}>{p.atrasado ? `atrasado · ${dataCurta(p.prazo)}` : `prazo ${dataCurta(p.prazo)}`}</span>
-                <span className="pd-status" style={{ color: TINTA[p.etapa.grupo] }}><i style={{ background: TINTA[p.etapa.grupo] }} />{p.etapa.rotulo}</span>
+                <span className="pd-status" style={{ color: tintaEtapa(p.etapa) }}><i style={{ background: tintaEtapa(p.etapa) }} />{p.etapa.rotulo}</span>
               </span>
               <span className="pd-card-l2"><b>{p.resumo ?? p.cliente}</b></span>
               <span className="pd-card-l3"><span>{p.cliente}</span><span className="pd-valor">{reais(p.valor)}</span></span>
@@ -124,6 +127,8 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
   const [p, setP] = useState<PedidoDetalheApi | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<AcaoPedido | null>(null);
+  /** Motivo opcional da ação com `pede_motivo` (vai em `motivo` no POST). */
+  const [motivo, setMotivo] = useState('');
   const [enviando, setEnviando] = useState(false);
   /** Ações recusadas com 403 nesta visita: o botão some até recarregar. */
   const [recusadas, setRecusadas] = useState<string[]>([]);
@@ -143,15 +148,23 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
   const botoes = acoesDoRodape(acoes, ajustes.app_acoes_fsm_liberadas);
   const entregar = p ? botaoEntrega(p.entrega, entregaRecusada) : false;
   const consulta = !entregar && (soConsulta(acoes, ajustes.app_acoes_fsm_liberadas) || (!!p?.entrega && botoes.length === 0));
+  const passos = p ? barraDePassos(p) : [];
+  // Mais de 5 passos não cabem com rótulo no celular: a barra fica só com as bolas e o passo atual vai numa linha embaixo.
+  const compacta = passos.length > 5;
+  const atual = passos.findIndex((e) => e.estado === 'atual');
+  const selo = seloPagamento(p?.pagamento);
 
+  const confirmar = (a: AcaoPedido) => { setMotivo(''); setConfirmando(a); };
   const mover = async (a: AcaoPedido) => {
     if (!p || enviando) return;
     if (!online) { setConfirmando(null); avisar('Sem conexão. Mover etapa precisa de internet.', 'warn'); return; }
-    const sig = `${p.id}|${a.chave}|${p.etapa.chave}`;
+    const texto = a.pede_motivo ? motivo : null;
+    // O motivo entra na assinatura: mudar o texto entre tentativas leva chave nova (senão 422 idempotencia_conflito).
+    const sig = `${p.id}|${a.chave}|${p.etapa.chave}|${texto?.trim() ?? ''}`;
     if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
     setEnviando(true);
     try {
-      const novo = await api.avancarPedido(p.id, corpoAcao(a.chave, p.etapa.chave), chave.current.valor);
+      const novo = await api.avancarPedido(p.id, corpoAcao(a.chave, p.etapa.chave, texto), chave.current.valor);
       chave.current = null;
       setP(novo); setConfirmando(null);
       avisar(`Pedido #${novo.numero} em ${novo.etapa.rotulo}`);
@@ -189,8 +202,8 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
           <div className="p4-rotulo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p?.cliente.nome ?? ''}</div>
           <div className="pd-dtitulo">Pedido #{p?.numero ?? '…'}</div>
         </div>
-        {p && <span className="pd-status" style={{ color: p.atrasado ? 'var(--danger)' : TINTA[p.etapa.grupo], paddingRight: 8 }}>
-          <i style={{ background: p.atrasado ? 'var(--danger)' : TINTA[p.etapa.grupo] }} />{p.atrasado ? 'Atrasado' : p.etapa.rotulo}</span>}
+        {p && <span className="pd-status" style={{ color: p.atrasado ? 'var(--danger)' : tintaEtapa(p.etapa), paddingRight: 8 }}>
+          <i style={{ background: p.atrasado ? 'var(--danger)' : tintaEtapa(p.etapa) }} />{p.atrasado ? 'Atrasado' : p.etapa.rotulo}</span>}
       </div>
       <div className="oi-scroll">
         {erro && <div className="p4-vazio"><b>Não foi possível carregar</b><span>{erro}</span></div>}
@@ -198,15 +211,20 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
         {p && (
           <div className="pd-corpo">
             <div className="pd-cartao">
-              <ol className="pd-etapas" aria-label="Andamento do pedido">
-                {p.etapas.map((e, i) => (
-                  <li key={e.grupo} className={'pd-etapa ' + e.estado} aria-current={e.estado === 'atual' ? 'step' : undefined}>
-                    <span className="pd-bola">{e.estado === 'feito' ? '✓' : i + 1}</span>
-                    <span className="pd-etapa-r">{e.rotulo}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="pd-prazo-l">Prazo <b>{p.prazo ? p.prazo.split('-').reverse().join('/') : '—'}</b>{p.atrasado && <span className="pd-atrasado">atrasado</span>}</div>
+              {passos.length > 0 && (
+                <ol className="pd-etapas" aria-label="Andamento do pedido" style={{ gridTemplateColumns: `repeat(${passos.length}, minmax(0, 1fr))` }}>
+                  {passos.map((e, i) => (
+                    <li key={e.chave + i} className={'pd-etapa ' + e.estado} aria-current={e.estado === 'atual' ? 'step' : undefined}>
+                      <span className="pd-bola">{e.estado === 'feito' ? '✓' : i + 1}</span>
+                      <span className={compacta ? 'sr-only' : 'pd-etapa-r'}>{e.rotulo}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {compacta && atual >= 0 && <div className="pd-passo-l">Passo {atual + 1} de {passos.length} · <b>{passos[atual].rotulo}</b></div>}
+              {ehCancelado(p.etapa) && <div className="pd-cancelado">Pedido cancelado</div>}
+              <div className="pd-prazo-l">Prazo <b>{p.prazo ? p.prazo.split('-').reverse().join('/') : '—'}</b>{p.atrasado && <span className="pd-atrasado">atrasado</span>}
+                {selo && <span className={'pd-pg ' + selo.tom}>{selo.texto}</span>}</div>
             </div>
 
             <div className="p4-rotulo">Itens</div>
@@ -252,7 +270,7 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
           {consulta && <span className="pd-rodape-nota">Seu usuário só consulta este pedido.</span>}
           {entregar && <button className="p4-cta" disabled={!online || enviando} onClick={() => setEntregando(true)}>Registrar entrega</button>}
           {botoes.map((a, i) => (
-            <button key={a.chave} className={i === 0 && !entregar ? 'p4-cta' : 'oi-btn block pd-rodape-2'} disabled={!online || enviando} onClick={() => setConfirmando(a)}>{a.rotulo}</button>
+            <button key={a.chave} className={i === 0 && !entregar ? 'p4-cta' : 'oi-btn block pd-rodape-2'} disabled={!online || enviando} onClick={() => confirmar(a)}>{a.rotulo}</button>
           ))}
           {(botoes.length > 0 || entregar) && !online && <span className="pd-rodape-nota">{entregar && botoes.length === 0 ? 'Sem conexão. Registrar a entrega precisa de internet.' : 'Sem conexão. Mover etapa precisa de internet.'}</span>}
         </div>
@@ -264,6 +282,13 @@ export function Detalhe({ id, aoVoltar, avisar, online }: { id: number; aoVoltar
             <div className="oi-sheet-h"><b id="pd-conf-t">{tituloConfirmacao(confirmando)}</b></div>
             <div className="osd-folha">
               <p className="osd-conf">O pedido #{p.numero} sai de <b>{p.etapa.rotulo}</b>. Fica no histórico com seu nome e a hora.</p>
+              {confirmando.pede_motivo && (
+                <div className="p4-campo">
+                  <label htmlFor="pd-motivo">Motivo (opcional)</label>
+                  <textarea id="pd-motivo" className="nos-obs" rows={3} maxLength={MOTIVO_ACAO_MAX} value={motivo} disabled={enviando}
+                    onChange={(e) => setMotivo(e.target.value)} placeholder={confirmando.chave === 'pausar_producao' ? 'Ex.: aguardando material' : 'Ex.: material chegou'} />
+                </div>
+              )}
               <div className="osd-conf-bts">
                 <button className="oi-btn" disabled={enviando} onClick={() => setConfirmando(null)}>Cancelar</button>
                 <button className="p4-cta" disabled={enviando || !online} onClick={() => mover(confirmando)}>{enviando ? 'Movendo…' : 'Mover'}</button>

@@ -89,7 +89,7 @@ describe('POST /pedidos/{id}/acao na demo', () => {
     expect(await falha(mover(103, corpoAcao('pausar_producao', 'in_production')))).toMatchObject({ status: 403, codigo: 'sem_permissao' });
     demo.definirAjustes();
     demo.definirPodeAcoesPedido(false);
-    expect((await detalhe(103)).acoes).toEqual([{ chave: 'pausar_producao', rotulo: 'Pausar produção', pode: false }]);
+    expect((await detalhe(103)).acoes).toEqual([{ chave: 'pausar_producao', rotulo: 'Pausar produção', pode: false, pede_motivo: true }]);
     expect(await falha(mover(103, corpoAcao('pausar_producao', 'in_production')))).toMatchObject({ status: 403 });
     expect(await falha(mover(103, corpoAcao('cancelar_venda', 'in_production')))).toMatchObject({ status: 403 });
   });

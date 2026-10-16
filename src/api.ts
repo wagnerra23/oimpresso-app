@@ -12,6 +12,7 @@ import type { NovoLinkPagamento, TipoReferencia } from './pagamento-regras';
 import { completarAjustes, type AjustesEmpresa } from './ajustes-regras';
 import { guardarAjustes, limparAjustes } from './ajustes';
 import type { corpoAcao, MudancaEtapa } from './pedido-acao-regras';
+import { normalizarDetalhe, normalizarLista } from './pedido-passos';
 import type { CorpoEntrega } from './entrega-regras';
 // P5 · atendimento
 import type { DetalheAtendimento, ListaAtendimento, MensagemAtendimento, TipoAtalho } from './atendimento-regras';
@@ -58,22 +59,40 @@ export interface MarcacaoCriada {
 // ── Pedidos (API-CONTRATO-v1 §2, ERP #8492). Pedido = venda do ERP; etapas agrupam a FSM. ──
 /** `cancelado` = etapa terminal `cancelled` (PedidosController::GRUPOS); fica fora da barra de etapas do detalhe. */
 export type GrupoEtapa = 'orcamento' | 'aprovacao' | 'producao' | 'entrega' | 'concluido' | 'cancelado';
-export type FiltroPedidos = 'ativos' | 'atrasados' | 'concluidos' | 'todos';
+/** `cancelados` só existe no ERP novo; o antigo não conhece o filtro e devolve os ativos (o chip só aparece quando
+ *  `contadores.cancelados` vem). */
+export type FiltroPedidos = 'ativos' | 'atrasados' | 'concluidos' | 'cancelados' | 'todos';
+/** Etapa do pedido, já normalizada (pedido-passos.ts): `grupo` null = desconhecido ou venda legada sem estágio.
+ *  `terminal`/`cancelada` vêm só do ERP novo. */
+export interface EtapaPedido { chave: string; rotulo: string; grupo: GrupoEtapa | null; terminal?: boolean; cancelada?: boolean }
+/** Passo do processo, na ordem do ERP (contrato novo). */
+export interface PassoPedido { chave: string; rotulo: string }
 export interface PedidoResumo {
   id: number; numero: string; cliente: string;
   /** Nome do 1º item da venda (título do cartão no v4); null se a venda não tem item. */
   resumo: string | null;
   valor: number; prazo: string | null; atrasado: boolean;
-  etapa: { chave: string; rotulo: string; grupo: GrupoEtapa }; progresso: number;
+  etapa: EtapaPedido; progresso: number;
+  /** Contrato novo: os passos do processo e a chave do passo atual (null fora dos passos, ex. cancelado). Ausente = ERP
+   *  antigo: a barra usa `etapas[]` por grupo. */
+  passos?: PassoPedido[]; passo_atual?: string | null;
 }
 export interface ListaPedidos {
-  itens: PedidoResumo[]; contadores: Record<FiltroPedidos, number>; pagina: number; tem_mais: boolean;
+  itens: PedidoResumo[]; contadores: Record<Exclude<FiltroPedidos, 'cancelados'>, number> & { cancelados?: number };
+  pagina: number; tem_mais: boolean;
 }
+/** Ação da etapa (lista segura do ERP). `pede_motivo` (contrato novo): a confirmação pede um motivo opcional. */
+export interface AcaoPedidoApi { chave: string; rotulo: string; pode: boolean; pede_motivo?: boolean }
+/** Situação de cobrança do pedido (contrato novo); `valor_aberto` = quanto falta receber. */
+export interface PagamentoPedido { situacao: 'sem_titulo' | 'pendente' | 'parcial' | 'pago'; valor_aberto: number }
 export interface PedidoDetalhe extends PedidoResumo {
   /** `linha_id` = linha de topo da venda, devolvida na conferência da entrega (P3, ERP #9464). */
   itens_venda: Array<{ produto: string; quantidade: number; total: number; linha_id?: number }>;
-  etapas: Array<{ grupo: GrupoEtapa; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
-  acoes: Array<{ chave: string; rotulo: string; pode: boolean }>;
+  /** Barra por grupo (contrato antigo). `grupo` pode vir desconhecido; `rotulo` ausente no ERP vira o nome do grupo. */
+  etapas: Array<{ grupo: string; rotulo: string; estado: 'feito' | 'atual' | 'futuro' }>;
+  acoes: AcaoPedidoApi[];
+  /** Contrato novo: selo de pagamento. Ausente/null = sem selo. */
+  pagamento?: PagamentoPedido | null;
   /** P1 · histórico de etapas, mais recente primeiro (FORMATO PROVISÓRIO, pedido ao ERP). Ausente = a tela não mostra. */
   historico?: MudancaEtapa[];
   /** P3 · `null` = a etapa não tem a ação `entregar`; `{ pode }` = o RBAC da FSM deixa (ERP #9464). Ausente = ERP antigo. */
@@ -85,7 +104,8 @@ export interface EntregaRegistrada {
   /** O mesmo JSON do GET /pedidos/{id}, já na etapa nova. */
   pedido: PedidoDetalheApi;
 }
-/** No detalhe o contrato manda `cliente` como objeto; na lista, como texto. */
+/** No detalhe a tela usa `cliente` como objeto; na lista, como texto. O ERP manda texto + `cliente_detalhe` no detalhe:
+ *  `normalizarDetalhe` junta os dois. */
 export type PedidoDetalheApi = Omit<PedidoDetalhe, 'cliente'> & { cliente: { id: number; nome: string; telefone: string | null } };
 
 // ── Pessoas (API-CONTRATO-v1 §4, ERP #8497). Papéis vêm das flags is_customer/is_supplier/is_employee. ──
@@ -977,8 +997,8 @@ export const api = {
   tipos: () => chamar<Array<{ value: string; label: string }>>('GET', '/ponto/api/intercorrencias/tipos'),
   espelho: (mes: string) => chamar<Espelho>('GET', `/ponto/api/espelho?mes=${mes}`),
   pedidos: (filtro: FiltroPedidos, pagina = 1, q = '') =>
-    chamar<ListaPedidos>('GET', `/api/app/pedidos?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
-  pedido: (id: number) => chamar<PedidoDetalheApi>('GET', `/api/app/pedidos/${id}`),
+    chamar<unknown>('GET', `/api/app/pedidos?filtro=${filtro}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`).then(normalizarLista),
+  pedido: (id: number) => chamar<unknown>('GET', `/api/app/pedidos/${id}`).then(normalizarDetalhe),
   pessoas: (papel: FiltroPessoas, pagina = 1, q = '') =>
     chamar<ListaPessoas>('GET', `/api/app/pessoas?papel=${papel}&pagina=${pagina}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
   pessoa: (id: number) => chamar<PessoaDetalhe>('GET', `/api/app/pessoas/${id}`),
@@ -1109,13 +1129,14 @@ export const api = {
    *  403 sem_permissao (fora da lista liberada ou RBAC da FSM) · 404 nao_encontrado · 409 etapa_mudou / em_andamento ·
    *  422 validacao { campos } / idempotencia_conflito · 429 (30/min). `chave` = Idempotency-Key da tentativa. */
   avancarPedido: (id: number, corpo: ReturnType<typeof corpoAcao>, chave: string) =>
-    chamar<PedidoDetalheApi>('POST', `/api/app/pedidos/${id}/acao`, corpo, { 'Idempotency-Key': chave }),
+    chamar<unknown>('POST', `/api/app/pedidos/${id}/acao`, corpo, { 'Idempotency-Key': chave }).then(normalizarDetalhe),
   // P3 · entrega (tela 22, ERP #9464).
   /** 201 EntregaRegistrada (a mesma chave + mesmo corpo devolve a resposta gravada) · 403 sem_permissao · 404 nao_encontrado ·
    *  409 etapa_mudou / em_andamento · 422 validacao { campos } / idempotencia_conflito / bloqueado · 503 sem_configuracao ·
    *  429 (20/min). `chave` = Idempotency-Key da tentativa. */
   registrarEntrega: (id: number, corpo: CorpoEntrega, chave: string) =>
-    chamar<EntregaRegistrada>('POST', `/api/app/pedidos/${id}/entrega`, corpo, { 'Idempotency-Key': chave }),
+    chamar<EntregaRegistrada>('POST', `/api/app/pedidos/${id}/entrega`, corpo, { 'Idempotency-Key': chave })
+      .then((r) => ({ ...r, pedido: normalizarDetalhe(r.pedido) })),
   /** Tela 30. Contrato §12 (ERP #8592). Grava a escolha (≤3, em ordem, só chaves de `areas`); `[]` apaga a escolha e
    *  volta ao padrão do ERP. 422 { mensagem, campos: { modulos: "msg" } } (mais de 3, repetido, fora das áreas).
    *  Devolve a escolha gravada e a barra que passa a valer. */
