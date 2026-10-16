@@ -1,7 +1,7 @@
 // Novo lançamento (tela 06): validação por campo e corpo que vai ao ERP. Mexe em valor (regra mestre): o corpo
 // leva só os campos do contrato, montados um a um, e o valor arredondado em centavos.
 import { describe, expect, it } from 'vitest';
-import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, corpoBaixa, formBaixa, restanteDaBaixa, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
+import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, corpoBaixa, formBaixa, restanteDaBaixa, mudancasAlteracao, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
   validarLancamento, type FormLancamento } from './lancamento-regras';
 
 const PLANOS = [
@@ -175,5 +175,23 @@ describe('pagamento parcial', () => {
   it('corpo: total sem vencimento do restante; parcial com', () => {
     expect(corpoBaixa(b({ vencimento_restante: '2026-11-15' }), 1260)).toEqual({ pago_em: '2026-10-15', conta_id: 1, forma_pagamento: 'Boleto', valor_pago: 1260, vencimento_restante: null });
     expect(corpoBaixa(b({ valor: '500,00', vencimento_restante: '2026-11-15' }), 1260).vencimento_restante).toBe('2026-11-15');
+  });
+});
+
+describe('revisão #98', () => {
+  it('valor com mais de 2 casas não passa, nem escondido na 4ª casa', () => {
+    expect(validarLancamento(ok({ valor: '10,1001' }), PLANOS).valor).toMatch(/2 casas/);
+    expect(validarLancamento(ok({ valor: '10,10' }), PLANOS).valor).toBeUndefined();
+    expect(validarBaixa({ ...formBaixa({ valor: 100 }, '2026-10-15'), valor: '50,0001' }, 100, '2026-10-15').valor).toMatch(/2 casas/);
+  });
+  it('alterar lista só o que mudou, com antes e depois legíveis', () => {
+    const antes = ok({ conta_id: 1 });
+    const depois = { ...antes, valor: '1.300,00', vencimento: '2026-11-05', conta_id: 2 };
+    expect(mudancasAlteracao(antes, depois, [{ id: 1, nome: 'Conta movimento' }, { id: 2, nome: 'Caixa balcão' }])).toEqual([
+      { campo: 'Valor', antes: 'R$\u00a01.250,50', depois: 'R$\u00a01.300,00' },
+      { campo: 'Vencimento', antes: '30/10/2026', depois: '05/11/2026' },
+      { campo: 'Conta bancária', antes: 'Conta movimento', depois: 'Caixa balcão' },
+    ]);
+    expect(mudancasAlteracao(antes, { ...antes, valor: '1250,5' })).toEqual([]);
   });
 });

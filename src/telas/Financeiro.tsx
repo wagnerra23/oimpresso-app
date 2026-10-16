@@ -66,11 +66,14 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
 
   const mais = async () => {
     if (!dados) return;
+    // Mesmo contador do carregar: se o filtro ou as caixas mudarem enquanto a página chega, ela é descartada.
+    const n = pedido.current;
     setCarregandoMais(true);
     try {
       const prox = await api.financeiro(consulta, dados.pagina + 1, paramsFiltros(filtros));
-      setDados({ ...prox, itens: [...dados.itens, ...prox.itens] });
-    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
+      if (n !== pedido.current) return;
+      setDados((d) => (d ? { ...prox, itens: [...d.itens, ...prox.itens] } : d));
+    } catch (e) { if (n === pedido.current) setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'); }
     finally { setCarregandoMais(false); }
   };
 
@@ -196,17 +199,18 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
             const s = l.excluido ? { label: 'Excluído', cor: 'var(--text-mute)' } : STATUS[l.status];
             const data = l.status === 'liquidado' ? `pago ${dataCurta(l.pago_em)}` : l.status === 'vencido' ? `venceu ${dataCurta(l.vencimento)}` : `vence ${dataCurta(l.vencimento)}`;
             return (
-              <Cartao key={l.id} className={'fn-lanc' + (l.excluido ? ' excluido' : '')} aria-label={l.descricao}
+              <Cartao key={l.id} className={'fn-lanc' + (l.excluido ? ' excluido' : '')}
+                aria-label={`${l.descricao} · ${l.tipo === 'receber' ? 'a receber' : 'a pagar'} ${reais(l.valor)} · ${l.excluido ? 'Excluído' : s.label}`}
                 {...(LANCAMENTO_ACOES ? { onClick: () => setAberto(l.id) } : {})}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
                   <b>{l.descricao}</b>
                   <small>{l.parte ? `${l.parte} · ` : ''}{data}</small>
                   {(l.forma_pagamento || l.nf_numero || l.documento) && <small>{[l.documento && `Doc. ${l.documento}`, l.forma_pagamento, l.nf_numero && `NF ${l.nf_numero}`].filter(Boolean).join(' · ')}</small>}
-                </div>
-                <div className="fn-lanc-v">
+                </span>
+                <span className="fn-lanc-v">
                   <span className={l.tipo === 'receber' ? 'pos' : 'neg'}>{l.tipo === 'receber' ? '+ ' : '− '}{reais(l.valor)}</span>
                   <small style={{ color: s.cor }}>{s.label}</small>
-                </div>
+                </span>
               </Cartao>
             );
           })}

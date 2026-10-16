@@ -1150,8 +1150,11 @@ export const api = {
   // Detalhe e ações do lançamento. Todas devolvem o lançamento atualizado; 409 { erro: "estado" } quando a situação
   // não permite (ex.: receber o que já foi recebido, excluir o que está pago).
   lancamento: (id: number) => chamar<LancamentoDetalhe>('GET', `/api/app/financeiro/lancamentos/${id}`),
-  alterarLancamento: (id: number, corpo: AlteracaoLancamento) => chamar<LancamentoDetalhe>('PATCH', `/api/app/financeiro/lancamentos/${id}`, corpo),
-  /** Baixa (receber/pagar) pelo valor do lançamento. `chave` = Idempotency-Key: repetir não baixa duas vezes. */
+  /** Alterar (Tier 0: pode mudar valor). `chave` = Idempotency-Key da tentativa. */
+  alterarLancamento: (id: number, corpo: AlteracaoLancamento, chave: string) =>
+    chamar<LancamentoDetalhe>('PATCH', `/api/app/financeiro/lancamentos/${id}`, corpo, { 'Idempotency-Key': chave }),
+  /** Baixa (receber/pagar) pelo `valor_pago` do corpo: menor que o do lançamento = parcial, e o ERP cria o restante
+   *  vencendo em `vencimento_restante`. `chave` = Idempotency-Key: repetir não baixa duas vezes. */
   baixarLancamento: (id: number, corpo: BaixaLancamento, chave: string) =>
     chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/baixar`, corpo, { 'Idempotency-Key': chave }),
   /** Dados do recibo de um lançamento liquidado (409 estado se não estiver). O PDF é montado no app (recibo.ts). */
@@ -1159,8 +1162,11 @@ export const api = {
   /** Desfaz a baixa (retornar a receber/pagar). Num parcial, junta o restante de volta (409 se o restante já foi pago). */
   estornarLancamento: (id: number, chave: string) =>
     chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/estornar`, undefined, { 'Idempotency-Key': chave }),
-  excluirLancamento: (id: number, motivo: string | null) => chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/excluir`, { motivo }),
-  reativarLancamento: (id: number) => chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/reativar`),
+  /** Excluir e reativar também levam Idempotency-Key: se a resposta se perder, tocar de novo não vira erro 409. */
+  excluirLancamento: (id: number, motivo: string | null, chave: string) =>
+    chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/excluir`, { motivo }, { 'Idempotency-Key': chave }),
+  reativarLancamento: (id: number, chave: string) =>
+    chamar<LancamentoDetalhe>('POST', `/api/app/financeiro/lancamentos/${id}/reativar`, undefined, { 'Idempotency-Key': chave }),
   /** Para de gerar daqui pra frente; idempotente (interromper de novo devolve a mesma). */
   interromperRecorrencia: (id: number) => chamar<Recorrencia>('POST', `/api/app/financeiro/recorrencias/${id}/interromper`),
   pagamentos: (status: FiltroPagamentos, pagina = 1) => chamar<ListaPagamentos>('GET', `/api/app/pagamentos?status=${status}&pagina=${pagina}`),

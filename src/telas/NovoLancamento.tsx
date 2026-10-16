@@ -1,9 +1,10 @@
-// Novo lançamento do Financeiro (tela 06, "+ Novo"). Nasce em aberto; baixar fica na tela 15 (Pagamentos).
+// Novo lançamento do Financeiro (tela 06, "+ Novo"). Nasce em aberto; receber/pagar fica no detalhe do lançamento.
+// Com `editar`, é o "Alterar": mostra o antes→depois e só envia o PATCH depois do "Confirmar" (mexe em valor, Tier 0).
 // Regras, validação e corpo em ../lancamento-regras. Cliente/fornecedor vem da mesma rota da tela Pessoas.
 import { useEffect, useRef, useState } from 'react';
 import { api, camposDoErro, type LancamentoDetalhe, type PessoaResumo } from '../api';
 import { FORMAS_PADRAO, lerValor } from '../financeiro-filtros';
-import { contaAnalitica, corpoAlteracao, corpoLancamento, formVazio, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
+import { contaAnalitica, corpoAlteracao, corpoLancamento, formVazio, mudancasAlteracao, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
   validarLancamento, type FormLancamento, type TipoLancamento } from '../lancamento-regras';
 import { novaChave } from '../venda';
 import { useVoltar } from '../voltar';
@@ -12,7 +13,7 @@ import { Cabecalho } from './NovaOs';
 const hojeLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const br = (iso: string) => iso.split('-').reverse().join('/');
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const recuo = (codigo: string) => '   '.repeat(codigo.split('.').length - 1);
+const recuo = (codigo: string) => '\u00a0\u00a0\u00a0'.repeat(codigo.split('.').length - 1);
 
 /** `editar`: abre como "Alterar lançamento" (sem tipo nem repetição) e salva com PATCH; devolve o lançamento em `aoSalvar`. */
 export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, aoCriar, avisar, editar, aoSalvar }: {
@@ -31,7 +32,10 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
   const [salvando, setSalvando] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const chave = useRef<{ sig: string; valor: string } | null>(null);
+  // Alterar: lista antes→depois aguardando o "Confirmar".
+  const [confirmando, setConfirmando] = useState<Array<{ campo: string; antes: string; depois: string }> | null>(null);
   useVoltar(buscando, () => setBuscando(false));
+  useVoltar(confirmando !== null, () => setConfirmando(null));
 
   const doTipo = planosDoTipo(planos, f.tipo);
   const mudar = <K extends keyof FormLancamento>(k: K, v: FormLancamento[K]) => {
@@ -51,16 +55,9 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
     setErros(e);
     if (Object.keys(e).length) return;
     if (editar) {
-      setSalvando(true);
-      try {
-        const novo = await api.alterarLancamento(editar.id, corpoAlteracao(f));
-        avisar?.('Alterações salvas.', 'ok');
-        aoSalvar?.(novo);
-      } catch (x) {
-        const campos = camposDoErro(x);
-        if (Object.keys(campos).length) setErros(campos);
-        avisar?.(x instanceof Error ? x.message : 'Não foi possível salvar.', 'erro');
-      } finally { setSalvando(false); }
+      const m = mudancasAlteracao(editar.inicial, f, contas, planos);
+      if (!m.length) { avisar?.('Nada mudou.', 'warn'); return; }
+      setConfirmando(m);
       return;
     }
     const corpo = corpoLancamento(f);
@@ -81,6 +78,28 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
       const campos = camposDoErro(x);
       if (Object.keys(campos).length) setErros(campos);
       avisar?.(x instanceof Error ? x.message : 'Não foi possível lançar.', 'erro');
+    } finally { setSalvando(false); }
+  };
+
+  const confirmarAlteracao = async () => {
+    if (!editar) return;
+    const corpo = corpoAlteracao(f);
+    const sig = 'alterar' + JSON.stringify(corpo);
+    if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
+    setSalvando(true);
+    try {
+      const novo = await api.alterarLancamento(editar.id, corpo, chave.current.valor);
+      chave.current = null;
+      setConfirmando(null);
+      avisar?.('Alterações salvas.', 'ok');
+      aoSalvar?.(novo);
+    } catch (x) {
+      const st = (x as { status?: number } | null)?.status ?? 0;
+      // Rede, 5xx e 409 mantêm a chave: o reenvio não altera duas vezes.
+      if (st >= 400 && st < 500 && st !== 409) chave.current = null;
+      const campos = camposDoErro(x);
+      if (Object.keys(campos).length) { setErros(campos); setConfirmando(null); }
+      avisar?.(x instanceof Error ? x.message : 'Não foi possível salvar.', 'erro');
     } finally { setSalvando(false); }
   };
 
@@ -260,13 +279,26 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
           <p className="p4-legal">{editar ? 'A alteração fica registrada no histórico do lançamento.' : 'O lançamento entra em aberto. Para receber ou pagar, abra o lançamento na lista.'}</p>
         </div>
       </div>
-      <div className="np-rodape">
+      {confirmando && (
+        <div className="ld-rodape ld-acao" role="group" aria-label="Confirmar alteração">
+          <b className="ld-acao-t">Confirmar alteração</b>
+          <ul className="nl-mudancas">
+            {confirmando.map((m) => <li key={m.campo}><span>{m.campo}</span><s>{m.antes}</s><b>{m.depois}</b></li>)}
+          </ul>
+          <span className="ld-dica">Fica registrado no histórico do lançamento.</span>
+          <div className="ld-secundarias">
+            <button className="oi-btn" disabled={salvando} onClick={() => setConfirmando(null)}>Voltar</button>
+            <button className="oi-btn primary" disabled={salvando} onClick={confirmarAlteracao}>{salvando ? 'Salvando…' : 'Confirmar'}</button>
+          </div>
+        </div>
+      )}
+      {!confirmando && <div className="np-rodape">
         <button className="oi-btn" style={{ minHeight: 44 }} disabled={salvando} onClick={aoVoltar}>Cancelar</button>
         <button className="oi-btn primary" style={{ minHeight: 44 }} disabled={salvando} onClick={salvar}>
           {salvando ? (editar ? 'Salvando…' : 'Lançando…') : editar ? 'Salvar alterações' : f.repeticao === 'parcelado' && previa ? `Lançar ${previa.length} parcelas`
             : f.repeticao === 'recorrente' ? 'Lançar recorrente' : f.tipo === 'receber' ? 'Lançar a receber' : 'Lançar a pagar'}
         </button>
-      </div>
+      </div>}
     </>
   );
 }
@@ -278,12 +310,14 @@ function BuscaParte({ tipo, aoEscolher, aoVoltar }: { tipo: TipoLancamento; aoEs
   const [erro, setErro] = useState<string | null>(null);
   const quem = tipo === 'receber' ? 'cliente' : 'fornecedor';
   useEffect(() => {
+    // Resposta de uma busca antiga (ex.: "ma" chegando depois de "maria") é descartada.
+    let valendo = true;
     const t = setTimeout(() => {
       setErro(null);
-      api.pessoas(tipo === 'receber' ? 'clientes' : 'fornecedores', 1, texto.trim()).then((r) => setItens(r.itens))
-        .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível buscar.'));
+      api.pessoas(tipo === 'receber' ? 'clientes' : 'fornecedores', 1, texto.trim()).then((r) => { if (valendo) setItens(r.itens); })
+        .catch((e) => { if (valendo) setErro(e instanceof Error ? e.message : 'Não foi possível buscar.'); });
     }, 350);
-    return () => clearTimeout(t);
+    return () => { valendo = false; clearTimeout(t); };
   }, [texto, tipo]);
   return (
     <>

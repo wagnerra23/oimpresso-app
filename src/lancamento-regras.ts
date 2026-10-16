@@ -88,6 +88,8 @@ export function planosDoTipo<P extends { codigo: string; tipo?: 'receita' | 'des
 }
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
+/** Centavos inteiros: "10,10" passa, "10,1001" não (o ERP receberia 10.10 sem o usuário saber). */
+const duasCasas = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
 const MES = /^\d{4}-\d{2}$/;
 const p2 = (n: number) => String(n).padStart(2, '0');
 const ultimoDia = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
@@ -144,7 +146,7 @@ export function validarLancamento(f: FormLancamento, planos: Array<{ codigo: str
   if (f.valor.trim() === '') e.valor = 'Informe o valor.';
   else if (v === null) e.valor = 'Valor inválido. Use números, ex.: 1.250,00.';
   else if (v <= 0) e.valor = 'O valor precisa ser maior que zero.';
-  else if (Math.round(v * 100) !== Math.round(v * 1000) / 10) e.valor = 'Use no máximo 2 casas depois da vírgula.';
+  else if (!duasCasas(v)) e.valor = 'Use no máximo 2 casas depois da vírgula.';
   if (!DATA.test(f.vencimento)) e.vencimento = 'Escolha a data de vencimento.';
   if (!DATA.test(f.emissao)) e.emissao = 'Escolha a data de emissão.';
   else if (DATA.test(f.vencimento) && f.vencimento < f.emissao) e.vencimento = 'O vencimento não pode ser antes da emissão.';
@@ -204,8 +206,9 @@ export function rotuloAcao(a: AcaoLancamento, tipo: TipoLancamento): string {
   }
 }
 
-/** Corpo do POST /api/app/financeiro/lancamentos/{id}/baixar. O valor baixado é o do lançamento (o ERP não aceita
- *  valor aqui: baixa parcial, juros e desconto ficam no computador). */
+/** Corpo do POST /api/app/financeiro/lancamentos/{id}/baixar. `valor_pago` é o valor realmente pago e o ERP deve
+ *  registrar ESTE valor (não o cheio): menor que o do lançamento = baixa parcial, com o restante num lançamento novo
+ *  vencendo em `vencimento_restante`. Maior que o do lançamento é recusado: juros, multa e desconto ficam no computador. */
 export interface BaixaLancamento {
   pago_em: string; conta_id: number | null; forma_pagamento: string | null;
   /** Valor pago agora. Menor que o do lançamento = pagamento parcial: o lançamento fica liquidado com este valor e o
@@ -239,7 +242,7 @@ export function validarBaixa(f: FormBaixa, valorLancamento: number, hoje: string
   if (f.valor.trim() === '') e.valor = 'Informe o valor pago.';
   else if (v === null) e.valor = 'Valor inválido. Use números, ex.: 500,00.';
   else if (v <= 0) e.valor = 'O valor precisa ser maior que zero.';
-  else if (Math.round(v * 100) !== Math.round(v * 1000) / 10) e.valor = 'Use no máximo 2 casas depois da vírgula.';
+  else if (!duasCasas(v)) e.valor = 'Use no máximo 2 casas depois da vírgula.';
   else if (Math.round(v * 100) > Math.round(valorLancamento * 100)) e.valor = 'O valor pago não pode passar do valor do lançamento. Juros e multa ficam no computador.';
   if (!e.valor && restanteDaBaixa(valorLancamento, f.valor) !== null) {
     if (!DATA.test(f.vencimento_restante)) e.vencimento_restante = 'Escolha o vencimento do restante.';
@@ -263,6 +266,32 @@ export type AlteracaoLancamento = Omit<NovoLancamento, 'tipo' | 'parcelas' | 're
 export function corpoAlteracao(f: FormLancamento): AlteracaoLancamento {
   const { tipo: _t, parcelas: _p, recorrencia: _r, ...resto } = corpoLancamento({ ...f, repeticao: 'unico' });
   return { ...resto, contrato: f.contrato.trim() ? f.contrato.trim() : null };
+}
+
+/** O que muda no Alterar, para o "antes → depois" da confirmação. Valor e datas comparados pelo que vai ao ERP. */
+export function mudancasAlteracao(antes: FormLancamento, depois: FormLancamento,
+  contas: Array<{ id: number; nome: string }> = [], planos: Array<{ codigo: string; nome: string }> = []): Array<{ campo: string; antes: string; depois: string }> {
+  const br = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '—');
+  const reais = (t: string) => { const v = lerValor(t); return v === null ? t || '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
+  const conta = (id: number | null) => (id === null ? '—' : contas.find((c) => c.id === id)?.nome ?? `#${id}`);
+  const plano = (c: string) => (c ? `${c} · ${planos.find((p) => p.codigo === c)?.nome ?? ''}`.trim() : '—');
+  const t = (x: string) => x.trim() || '—';
+  const campos: Array<[string, string, string]> = [
+    ['Descrição', t(antes.descricao), t(depois.descricao)],
+    [antes.tipo === 'receber' ? 'Cliente' : 'Fornecedor', antes.parte?.nome ?? '—', depois.parte?.nome ?? '—'],
+    ['Valor', reais(antes.valor), reais(depois.valor)],
+    ['Vencimento', br(antes.vencimento), br(depois.vencimento)],
+    ['Emissão', br(antes.emissao), br(depois.emissao)],
+    ['Competência', antes.competencia, depois.competencia],
+    ['Plano de contas', plano(antes.plano), plano(depois.plano)],
+    ['Forma de pagamento', t(antes.forma), t(depois.forma)],
+    ['Conta bancária', conta(antes.conta_id), conta(depois.conta_id)],
+    ['Nº do documento', t(antes.documento), t(depois.documento)],
+    ['Nº da nota fiscal', t(antes.nf), t(depois.nf)],
+    ['Nº do contrato', t(antes.contrato), t(depois.contrato)],
+    ['Observação', t(antes.observacao), t(depois.observacao)],
+  ];
+  return campos.filter(([, a, d]) => a !== d).map(([campo, a, d]) => ({ campo, antes: a, depois: d }));
 }
 
 /** Formulário de alteração a partir do lançamento salvo. */

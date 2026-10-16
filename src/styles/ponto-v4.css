@@ -570,6 +570,12 @@ button.fn-lanc:active { background: var(--surface-2); }
 .ld-acao-t { font-size: 15px; }
 .ld-acao-p { margin: 0; font-size: 13.5px; line-height: 1.45; }
 .ld-acao { max-height: 72vh; overflow-y: auto; }
+.nl-mudancas { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.nl-mudancas li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 0; border-bottom: 1px solid var(--border-2); }
+.nl-mudancas li:last-child { border-bottom: 0; }
+.nl-mudancas span { font-size: 10.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--text-mute); }
+.nl-mudancas s { color: var(--text-dim); overflow-wrap: anywhere; }
+.nl-mudancas b { font-weight: 600; overflow-wrap: anywhere; }
 .ld-restante { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px; border: 1px dashed var(--warn); background: var(--bg-2); font-size: 13px; line-height: 1.45; }
 .ld-restante b { font-family: var(--font-mono); font-weight: 600; }
 .ld-vinculo { display: flex; flex-direction: column; gap: 6px; }

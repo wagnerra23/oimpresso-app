@@ -91,12 +91,16 @@ export function LancamentoDetalhe({ id, contas, formas, planos, aoVoltar, aoAbri
         novo = await api.estornarLancamento(l.id, chave.current.valor);
         avisar?.(tipo === 'receber' ? 'Voltou para a receber.' : 'Voltou para a pagar.', 'ok');
       } else if (acao === 'excluir') {
+        const sig = 'excluir' + l.id + motivo.trim();
+        if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
         setEnviando(true);
-        novo = await api.excluirLancamento(l.id, motivo.trim() || null);
+        novo = await api.excluirLancamento(l.id, motivo.trim() || null, chave.current.valor);
         avisar?.('Lançamento excluído. Dá para reativar depois.', 'ok');
       } else {
+        const sig = 'reativar' + l.id;
+        if (chave.current?.sig !== sig) chave.current = { sig, valor: novaChave() };
         setEnviando(true);
-        novo = await api.reativarLancamento(l.id);
+        novo = await api.reativarLancamento(l.id, chave.current.valor);
         avisar?.('Lançamento reativado.', 'ok');
       }
       chave.current = null;

@@ -154,8 +154,7 @@ export function pdfRecibo(r: ReciboDados): Uint8Array {
     op(`BT /${fonte} ${tam} Tf ${x} ${y} Td `); ops.push(...literal(s)); op(' Tj ET\n');
   };
   const valor = reais(r.valor);
-  // Moldura, título, número e valor em destaque.
-  op('0.6 w 0.75 G\n'); op(`${M - 16} 470 ${larg + 32} 330 re S\n`); op('0 G\n');
+  // Título, número e valor em destaque (a moldura entra no fim, com a altura do que foi escrito).
   texto(M, 768, t.titulo, 20, 'F2');
   texto(M, 750, `Nº ${r.numero}`, 10);
   texto(W - M - largura(valor, 16, true), 762, valor, 16, 'F2');
@@ -169,6 +168,9 @@ export function pdfRecibo(r: ReciboDados): Uint8Array {
   op(`0.6 w ${W / 2 - 130} ${ya} m ${W / 2 + 130} ${ya} l S\n`);
   texto(W / 2 - largura(t.assinante, 11, true) / 2, ya - 15, t.assinante, 11, 'F2');
   if (t.assinanteDoc) texto(W / 2 - largura(t.assinanteDoc, 10) / 2, ya - 29, t.assinanteDoc, 10);
+  // Moldura do topo (800) até 24 pt abaixo da última linha, nunca menor que meia página nem fora da folha.
+  const base = Math.max(24, Math.min(470, ya - (t.assinanteDoc ? 29 : 15) - 24));
+  ops.unshift(...ascii(`0.6 w 0.75 G\n${M - 16} ${base} ${larg + 32} ${800 - base} re S\n0 G\n`));
 
   const objetos: number[][] = [
     ascii('<< /Type /Catalog /Pages 2 0 R >>'),

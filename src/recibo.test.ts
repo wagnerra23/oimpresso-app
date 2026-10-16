@@ -66,3 +66,14 @@ describe('pdfRecibo', () => {
     expect(linhas.join(' ')).toBe(textoRecibo(base).corpo);
   });
 });
+
+describe('moldura do recibo (revisão #98)', () => {
+  it('com texto longo, a moldura desce até abaixo da assinatura', () => {
+    const longo = pdfRecibo({ ...base, referente: 'x'.repeat(40) + ' ' + 'Pedido de fachada completa com letreiro iluminado e instalação '.repeat(2).slice(0, 120),
+      parte: { nome: 'Empresa de Nome Bem Comprido Comunicação Visual e Serviços Ltda', documento: '00.000.000/0002-72' } });
+    const txt = String.fromCharCode(...longo);
+    const [, yRet] = txt.match(/\d+ (\d+) \d+ \d+ re S/)!.map(Number);
+    const ys = [...txt.matchAll(/ (\d+(?:\.\d+)?) Td /g)].map((m) => Number(m[1]));
+    expect(yRet).toBeLessThan(Math.min(...ys));
+  });
+});
