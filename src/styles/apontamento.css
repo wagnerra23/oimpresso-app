@@ -58,3 +58,16 @@
 .ap-fila-l1 span { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
 .ap-fila-l2 { font-size: 12px; color: var(--text-dim); }
 .ap-motivo[type], .ap-corpo input[type="time"] { font-family: var(--font-mono); }
+
+/* Pausa com motivo (Mobile Producao.dc.html A3/A4): motivos em 2 colunas, toque ≥ 56 px; etapas pausadas. */
+.ap-motivos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ap-motivos button { min-height: 56px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--border); background: var(--bg);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 600; text-align: left; }
+.ap-motivos button.on { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 14%, var(--surface)); }
+.ap-pausada { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border);
+  border-left: 3px solid var(--warn); border-radius: 10px; background: var(--surface); }
+.ap-pausada .ap-job-l1 b { color: var(--text-dim); }
+.ap-pausada-m { font-size: 13px; font-weight: 600; color: var(--warn); }
+.ap-pausada-acoes { display: flex; align-items: center; gap: 12px; }
+.ap-pausada-acoes .ap-btn { flex: 1; height: 48px; }
+.ap-pausada-acoes .ap-link { color: var(--text-dim); }

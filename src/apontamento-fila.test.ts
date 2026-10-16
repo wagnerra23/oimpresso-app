@@ -76,4 +76,26 @@ describe('fila do apontamento', () => {
     expect(request).not.toHaveBeenCalled();
     expect(salvo().itens).toHaveLength(1);
   });
+
+  it('pausa sem internet: guarda o motivo e a etapa; ao voltar vai para o id do ERP com a mesma chave', async () => {
+    await fila.apontar({ acao: 'iniciar', momento: '2026-10-15T14:03:00-03:00', programacao_id: 80, pedido, etapa: 'Roland' }, false);
+    const ini = (salvo().itens[0] as unknown as { local: string }).local;
+    await fila.apontar({ acao: 'pausar', alvo: { ref: ini }, motivo_id: 31, motivo: 'Troca de bobina', momento: '2026-10-15T14:40:00-03:00', pedido, etapa: 'Roland' },
+      false, { programacao_id: 80, pedido, etapa: 'Roland', maquina: true });
+    expect(JSON.parse(guardado['oi.apontamento.fila']).pausadas).toMatchObject([{ programacao_id: 80, motivo: 'Troca de bobina', dono: 'marcos' }]);
+    request.mockResolvedValueOnce(resp(201, { id: 601, programacao_id: 80, iniciado_em: 'x' }))
+      .mockResolvedValueOnce(resp(503, {}));
+    expect((await fila.enviarFila()).parou?.tipo).toBe('tentar_de_novo');
+    request.mockResolvedValueOnce(resp(201, { id: 601, encerrado_por: 'pausa', origem: 'app', encerrado_em: 'x', minutos: 37 }));
+    const r = await fila.enviarFila();
+    expect(r.enviados.map((e) => e.item.acao)).toEqual(['pausar']);
+    expect(chamada(1).url).toMatch(/\/apontamentos\/601\/pausar$/);
+    expect(chamada(2).headers['Idempotency-Key']).toBe(chamada(1).headers['Idempotency-Key']);
+    expect(chamada(2).data).toEqual({ motivo_id: 31, momento: '2026-10-15T14:40:00-03:00' });
+    expect(salvo().itens).toHaveLength(0);
+    // Continua pausada até o Retomar (um iniciar na mesma etapa).
+    expect(JSON.parse(guardado['oi.apontamento.fila']).pausadas).toHaveLength(1);
+    await fila.apontar({ acao: 'iniciar', momento: '2026-10-15T15:00:00-03:00', programacao_id: 80, pedido, etapa: 'Roland' }, false);
+    expect(JSON.parse(guardado['oi.apontamento.fila']).pausadas).toEqual([]);
+  });
 });

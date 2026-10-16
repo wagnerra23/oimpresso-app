@@ -1,7 +1,8 @@
 // Regras puras do apontamento por QR (P8, tela 02).
 import { describe, expect, it } from 'vitest';
 import {
-  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, numeroDigitado, relogio, segundosDecorridos,
+  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, motivosDoPosto, numeroDigitado, relogio,
+  segundosDecorridos,
 } from './apontamento-regras';
 
 describe('apontamento — leitura da etiqueta', () => {
@@ -74,5 +75,23 @@ describe('apontamento — campos e erros', () => {
     expect(mensagemDoErro(erro(429, 'erro'))).toMatch(/Espere/);
     expect(mensagemDoErro(erro(0, 'rede'))).toMatch(/Sem conexão/);
     expect(mensagemDoErro(erro(503, 'indisponivel'))).toMatch(/ERP/);
+  });
+});
+
+describe('apontamento — motivos de pausa do posto', () => {
+  it('lista solta ou em `itens`/`motivos`; tira inválidos, inativos e repetidos; mantém a ordem do ERP', () => {
+    const lista = [{ id: 2, nome: ' Troca de bobina ' }, { id: 1, nome: 'Ajuste / setup' }, { id: 2, nome: 'repetido' }, { id: 0, nome: 'x' },
+      { id: 3, nome: '' }, { nome: 'sem id' }, null, { id: 4, nome: 'Inativo', ativo: false }];
+    const certo = [{ id: 2, nome: 'Troca de bobina' }, { id: 1, nome: 'Ajuste / setup' }];
+    expect(motivosDoPosto(lista, 5)).toEqual(certo);
+    expect(motivosDoPosto({ itens: lista }, 5)).toEqual(certo);
+    expect(motivosDoPosto({ motivos: lista }, null)).toEqual(certo);
+    expect(motivosDoPosto(null, 5)).toEqual([]);
+    expect(motivosDoPosto({ erro: 'x' }, 5)).toEqual([]);
+  });
+
+  it('se o ERP mandar o posto em cada motivo, fica só o do posto da etapa', () => {
+    const lista = [{ id: 1, nome: 'Bobina', posto_id: 5 }, { id: 2, nome: 'Secagem', posto_id: 4 }, { id: 3, nome: 'Intervalo' }];
+    expect(motivosDoPosto(lista, 5).map((m) => m.id)).toEqual([1, 3]);
   });
 });

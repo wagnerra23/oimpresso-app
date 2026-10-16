@@ -1,5 +1,5 @@
 // Fila do apontamento (P8): única porta de escrita da tela. Decisão [W] 2026-10-15 (exceção à regra 8, só aqui).
-// Todo toque (iniciar, concluir, corrigir) vira um item guardado no Preferences ANTES de sair do aparelho; depois a
+// Todo toque (iniciar, pausar, retomar, concluir, corrigir) vira um item guardado no Preferences ANTES de sair do aparelho; depois a
 // fila envia na ordem, com a chave e o `momento` do toque. Com internet isso acontece na hora; sem, quando a rede
 // volta (o App chama `enviarFila` ao voltar a conexão e ao voltar do segundo plano). Regras em apontamento-fila-regras.ts.
 import { useSyncExternalStore } from 'react';
@@ -7,7 +7,8 @@ import { Preferences } from '@capacitor/preferences';
 import { apontamentoApi, ErroApi } from './api';
 import { donoAtual } from './apontamento-dono';
 import {
-  aposFalha, aposSucesso, descartar, enfileirar, FILA_VAZIA, proximoEnvio, tipoDaFalha, type Fila, type ItemFila,
+  aposFalha, aposSucesso, descartar, enfileirar, esquecerPausa, FILA_VAZIA, pausar, proximoEnvio, tipoDaFalha, type Fila, type ItemFila,
+  type Pausada,
 } from './apontamento-fila-regras';
 import { mensagemDoErro } from './apontamento-regras';
 import { novaChave } from './venda';
@@ -50,13 +51,22 @@ function assinar(fn: () => void) {
 
 export type NovoItem = Omit<ItemFila, 'local' | 'dono' | 'chave' | 'estado' | 'tentativas'>;
 
-/** Guarda o toque (já com a chave gerada) e tenta enviar se houver conexão. */
-export async function apontar(novo: NovoItem, online: boolean): Promise<ResultadoEnvio> {
+/** Dados da etapa que a pausa guarda para o "Retomar". */
+export type DadosPausa = Omit<Pausada, 'dono' | 'por' | 'momento' | 'motivo'>;
+
+/** Guarda o toque (já com a chave gerada) e tenta enviar se houver conexão. Pausar leva os dados da etapa. */
+export async function apontar(novo: NovoItem, online: boolean, pausa?: DadosPausa): Promise<ResultadoEnvio> {
   await carregar();
   dono = await donoAtual();
   const item: ItemFila = { ...novo, local: novaChave(), dono, chave: novaChave(), estado: 'pendente', tentativas: 0 };
-  await gravar(enfileirar(fila, item));
+  await gravar(item.acao === 'pausar' && pausa ? pausar(fila, item, pausa) : enfileirar(fila, item));
   return online ? enviarFila() : { enviados: [], parou: null };
+}
+
+/** Tira uma etapa pausada da lista deste celular (não mexe no ERP). */
+export async function esquecerPausada(programacao: number): Promise<void> {
+  await carregar();
+  await gravar(esquecerPausa(fila, dono, programacao));
 }
 
 /** Descarta um item que o ERP recusou (e o que dependia dele). */
@@ -113,6 +123,10 @@ function enviarItem(item: ItemFila, apontamentoId: number | null): Promise<unkno
   if (item.acao === 'iniciar') {
     if (!item.programacao_id) return Promise.reject(new ErroApi(422, 'validacao', 'Etapa não informada.'));
     return apontamentoApi.iniciar({ programacao_id: item.programacao_id, momento: item.momento, ...(item.codigo ? { codigo: item.codigo } : {}) }, item.chave);
+  }
+  if (item.acao === 'pausar') {
+    if (!item.motivo_id) return Promise.reject(new ErroApi(422, 'validacao', 'Motivo da pausa não informado.'));
+    return apontamentoApi.pausar(apontamentoId!, { motivo_id: item.motivo_id, momento: item.momento }, item.chave);
   }
   if (item.acao === 'concluir') return apontamentoApi.concluir(apontamentoId!, { momento: item.momento }, item.chave);
   return apontamentoApi.corrigir(apontamentoId!, { momento: item.hora_certa ?? item.momento, justificativa: item.justificativa ?? '' }, item.chave);

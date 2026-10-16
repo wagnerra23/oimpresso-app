@@ -1,27 +1,33 @@
 // Apontamento por QR — P8, tela 02 (Mobile Propostas.dc.html#p8; Mobile Producao.dc.html A2/A3/A8). Abre pela
 // Produção ("Apontar"). Lê o QR da etiqueta (câmera nativa) ou o número digitado; mostra a OS e a etapa (posto e
-// responsável) que o ERP devolveu; Iniciar, Concluir e Corrigir horário. Grava no PCP (ADR 0431, contrato #9447).
+// responsável) que o ERP devolveu; Iniciar, Pausar com motivo, Retomar, Concluir e Corrigir horário. Grava no PCP
+// (ADR 0431, contrato #9447).
 // - Sem internet o toque NÃO trava: vai para a fila do celular com a hora do toque e é enviado quando a rede volta,
 //   sem duplicar (decisão [W] 2026-10-15, só o apontamento). Ler uma etiqueta nova ainda precisa de internet.
 // - O cronômetro é só exibição: parte do `iniciado_em` do ERP (ou da hora do toque, enquanto está no celular).
-// - Pausa fica fora: o contrato pede `motivo_id` do posto e não há rota com a lista de motivos.
+// - Pausa (A4): folha com os motivos do posto, guardados no celular para pausar sem internet. No ERP pausar encerra o
+//   apontamento; "Retomar" inicia de novo a mesma etapa. A etapa pausada fica listada até o retomar.
 // - `app_apontamento_exige_qr`: some "Digitar número" e o iniciar manda o código lido; o ERP confere de novo.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apontamentoApi, drift, type ApontamentoAberto, type Encerramento, type EtiquetaProducao } from '../api';
 import { useAjustes } from '../ajustes';
 import { useVoltar } from '../voltar';
 import {
-  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, numeroDigitado, relogio, segundosDecorridos,
+  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, motivosDoPosto, numeroDigitado, relogio,
+  segundosDecorridos, type MotivoPausa,
 } from '../apontamento-regras';
-import { momentoIso, relogioErrado, rodando, type ItemFila, type Rodando } from '../apontamento-fila-regras';
-import { apontar, descartarItem, enviarFila, useFila, type NovoItem, type ResultadoEnvio } from '../apontamento-fila';
+import { momentoIso, pausadasDe, relogioErrado, rodando, type ItemFila, type Pausada, type Rodando } from '../apontamento-fila-regras';
+import {
+  apontar, descartarItem, enviarFila, esquecerPausada, useFila, type DadosPausa, type NovoItem, type ResultadoEnvio,
+} from '../apontamento-fila';
+import { guardarLista, guardarMotivos, motivosDe, type Motivos } from '../apontamento-motivos';
 import '../styles/apontamento.css';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
 type Lido = { etiqueta: EtiquetaProducao; codigoQr: string | null };
 const voltarSvg = <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>;
 const TECLAS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'] as const;
-const ACAO: Record<ItemFila['acao'], string> = { iniciar: 'Início', concluir: 'Conclusão', corrigir: 'Correção de horário' };
+const ACAO: Record<ItemFila['acao'], string> = { iniciar: 'Início', pausar: 'Pausa', concluir:'Conclusão', corrigir: 'Correção de horário' };
 
 /** Dados de um cartão "rodando": do ERP ou do toque ainda no celular. */
 function dadosDe(r: Rodando<ApontamentoAberto>) {
@@ -32,7 +38,9 @@ function dadosDe(r: Rodando<ApontamentoAberto>) {
     resumo: s?.pedido?.resumo ?? i?.pedido.resumo ?? null,
     cliente: s?.pedido?.cliente ?? i?.pedido.cliente ?? null,
     etapa: s?.etapa?.posto?.nome ?? i?.etapa ?? '',
-    maquina: (s?.tipo ?? s?.etapa?.posto?.tipo) === 'maquina',
+    posto: s?.etapa?.posto?.id ?? i?.posto_id ?? 0,
+    maquina: s ? (s.tipo ?? s.etapa?.posto?.tipo) === 'maquina' : !!i?.maquina,
+    codigo: i?.codigo,
     // Do ERP: hora gravada (corrige o desvio do relógio). Do celular: a hora do toque, no relógio do próprio aparelho.
     iniciadoEm: s?.iniciado_em ?? i?.momento ?? '',
     noCelular: !s,
@@ -52,18 +60,33 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [corrigindo, setCorrigindo] = useState<Rodando<ApontamentoAberto> | null>(null);
+  const [pausando, setPausando] = useState<Rodando<ApontamentoAberto> | null>(null);
   const travado = useRef(false);
 
   const lista = rodando(servidor, fila, dono);
   const atual = aberto === null ? null : lista.find((r) => dadosDe(r).programacao === aberto) ?? null;
+  const pausadas = pausadasDe(fila, dono, lista.map((r) => dadosDe(r).programacao));
+  const folha = corrigindo !== null || pausando !== null;
 
-  useVoltar(corrigindo !== null, () => { if (!ocupado) setCorrigindo(null); });
-  useVoltar(corrigindo === null && (lido !== null || aberto !== null), () => { setLido(null); setAberto(null); });
+  useVoltar(folha, () => { if (!ocupado) { setCorrigindo(null); setPausando(null); } });
+  useVoltar(!folha && (lido !== null || aberto !== null), () => { setLido(null); setAberto(null); });
+
+  // Com rede, deixa no celular os motivos de pausa dos postos que estão rodando (para pausar se a internet cair). O que
+  // veio do ERP já traz `motivos_pausa` (guardado no recarregar); busca só o posto de um início ainda no celular.
+  const postos = lista.filter((r) => !r.servidor?.motivos_pausa).map((r) => dadosDe(r).posto).join(',');
+  useEffect(() => {
+    if (online && postos) guardarMotivos(postos.split(',').map(Number));
+  }, [online, postos]);
 
   const recarregar = useCallback(async () => {
     try {
       const r = await apontamentoApi.emAndamento();
-      setServidor([...(r.pessoa ? [r.pessoa] : []), ...r.maquinas]);
+      const abertos = [...(r.pessoa ? [r.pessoa] : []), ...r.maquinas];
+      setServidor(abertos);
+      for (const a of abertos) {
+        const posto = a.etapa?.posto?.id ?? 0;
+        if (posto && Array.isArray(a.motivos_pausa)) void guardarLista(posto, motivosDoPosto(a.motivos_pausa, posto)).catch(() => { /* fica a anterior */ });
+      }
     } catch { /* sem rede: fica o que já se sabia + a fila */ }
     setCarregando(false);
   }, []);
@@ -120,11 +143,11 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
   };
 
   /** Guarda o toque e tenta enviar. Diz ao operador onde ele ficou. */
-  const tocar = (novo: NovoItem, ok: (r: ResultadoEnvio) => string) => uma(async () => {
+  const tocar = (novo: NovoItem, ok: (r: ResultadoEnvio) => string, pausa?: DadosPausa) => uma(async () => {
     const relogioMal = relogioErrado(drift());
     if (relogioMal) { avisar(relogioMal, 'erro'); return; }
     let r: ResultadoEnvio;
-    try { r = await apontar(novo, online); } catch { avisar('Não foi possível guardar o apontamento no celular.', 'erro'); return; }
+    try { r = await apontar(novo, online, pausa); } catch { avisar('Não foi possível guardar o apontamento no celular.', 'erro'); return; }
     if (r.parou?.tipo === 'recusado') avisar(r.parou.mensagem, 'erro');
     else if (!online || r.parou) avisar('Sem internet: ficou guardado no celular e vai para o ERP quando a conexão voltar.', 'warn');
     else avisar(ok(r), 'ok');
@@ -135,10 +158,31 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
     if (!lido) return;
     const { etiqueta, codigoQr } = lido;
     const programacao = etiqueta.etapa.programacao_id;
+    const retomando = pausadas.some((p) => p.programacao_id === programacao);
     void tocar({
       acao: 'iniciar', momento: momentoIso(new Date()), programacao_id: programacao, ...(soQr && codigoQr ? { codigo: codigoQr } : {}),
       pedido: etiqueta.pedido, etapa: etiqueta.etapa.posto?.nome ?? 'Etapa',
-    }, () => `Iniciado · ${etiqueta.pedido.numero ?? ''}`).then(() => { setLido(null); setAberto(programacao); });
+      ...(etiqueta.etapa.posto ? { posto_id: etiqueta.etapa.posto.id, maquina: etiqueta.etapa.posto.tipo === 'maquina' } : {}),
+    }, () => `${retomando ? 'Retomado' : 'Iniciado'} · ${etiqueta.pedido.numero ?? ''}`).then(() => { setLido(null); setAberto(programacao); });
+  };
+
+  /** Pausar encerra o apontamento no ERP; a etapa fica em "Pausadas" até o Retomar. */
+  const pausar = (r: Rodando<ApontamentoAberto>, motivo: MotivoPausa) => {
+    const d = dadosDe(r);
+    const pedido = { id: 0, numero: d.numero, resumo: d.resumo, cliente: d.cliente };
+    const dados: DadosPausa = { programacao_id: d.programacao, pedido, etapa: d.etapa, maquina: d.maquina,
+      ...(d.posto ? { posto_id: d.posto } : {}), ...(d.codigo ? { codigo: d.codigo } : {}) };
+    void tocar({ acao: 'pausar', alvo: r.alvo, momento: momentoIso(new Date()), motivo_id: motivo.id, motivo: motivo.nome, pedido, etapa: d.etapa },
+      () => `Pausado · ${motivo.nome.toLowerCase()} · ${d.numero}`, dados).then(() => { setPausando(null); setAberto(null); });
+  };
+
+  /** Retomar = iniciar de novo a mesma etapa. Empresa que exige QR e pausa sem o código lido: lê a etiqueta. */
+  const retomar = (p: Pausada) => {
+    if (soQr && !p.codigo) { void ler(); return; }
+    void tocar({
+      acao: 'iniciar', momento: momentoIso(new Date()), programacao_id: p.programacao_id, ...(soQr && p.codigo ? { codigo: p.codigo } : {}),
+      pedido: p.pedido, etapa: p.etapa, ...(p.posto_id ? { posto_id: p.posto_id } : {}), maquina: p.maquina,
+    }, () => `Retomado · ${p.pedido.numero ?? ''}`).then(() => setAberto(p.programacao_id));
   };
 
   const concluir = (r: Rodando<ApontamentoAberto>) => {
@@ -188,6 +232,7 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
                   })}
                 </div>
               )}
+              {pausadas.length > 0 && <PausadasLista pausadas={pausadas} ocupado={ocupado} soQr={soQr} aoRetomar={retomar} />}
               {!soQr && (
                 <div className="np-seg" role="tablist" aria-label="Como identificar o pedido">
                   <button role="tab" aria-selected={modoAtual === 'qr'} className={modoAtual === 'qr' ? 'on' : ''} onClick={() => { setModo('qr'); setErro(''); }}>Ler QR</button>
@@ -242,7 +287,7 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
               )}
               <div className="ap-acoes">
                 <button className="ap-btn primario" onClick={iniciar} disabled={ocupado || !lido.etiqueta.pode_apontar} aria-busy={ocupado}>
-                  {ocupado ? 'Iniciando…' : 'Iniciar'}
+                  {ocupado ? 'Iniciando…' : pausadas.some((p) => p.programacao_id === etapaLida.programacao_id) ? 'Retomar' : 'Iniciar'}
                 </button>
                 <button className="ap-btn" onClick={() => setLido(null)} disabled={ocupado}>Outro pedido</button>
               </div>
@@ -261,9 +306,10 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
                 <Cronometro iniciadoEm={d.iniciadoEm} corrigeRelogio={!d.noCelular} />
                 {d.noCelular && <p className="np-ajuda" style={{ textAlign: 'center' }}>Início guardado no celular. Vai para o ERP quando a internet voltar.</p>}
                 <div className="ap-acoes">
+                  <button className="ap-btn" onClick={() => setPausando(atual)} disabled={ocupado}>Pausar</button>
                   <button className="ap-btn primario" onClick={() => concluir(atual)} disabled={ocupado} aria-busy={ocupado}>{ocupado ? 'Concluindo…' : 'Concluir etapa'}</button>
-                  <button className="ap-btn" onClick={() => setCorrigindo(atual)} disabled={ocupado}>Corrigir horário</button>
                 </div>
+                <button className="ap-link" onClick={() => setCorrigindo(atual)} disabled={ocupado}>Corrigir horário</button>
                 <button className="ap-link" onClick={() => setAberto(null)} disabled={ocupado}>
                   {d.maquina ? 'Deixar a máquina rodando e apontar outro' : 'Apontar outro pedido'}
                 </button>
@@ -276,6 +322,7 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
         </div>
       </div>
 
+      {pausando && <FolhaPausar alvo={pausando} online={online} ocupado={ocupado} aoFechar={() => setPausando(null)} aoConfirmar={(m) => pausar(pausando, m)} />}
       {corrigindo && <FolhaCorrigir alvo={corrigindo} ocupado={ocupado} aoFechar={() => setCorrigindo(null)} aoConfirmar={(h, j) => corrigir(corrigindo, h, j)} />}
     </>
   );
@@ -290,7 +337,7 @@ function Pendentes({ itens, online }: { itens: ItemFila[]; online: boolean }) {
       {itens.map((i) => (
         <div key={i.local} className={'ap-fila-item' + (i.estado === 'recusado' ? ' recusado' : '')}>
           <div className="ap-fila-l1"><b>{ACAO[i.acao]} · {i.pedido.numero}</b><span>{horaDe(i.momento)}</span></div>
-          <div className="ap-fila-l2">{i.etapa}</div>
+          <div className="ap-fila-l2">{i.etapa}{i.acao === 'pausar' && i.motivo ? ` · ${i.motivo}` : ''}</div>
           {i.estado === 'recusado' ? (
             <>
               <span className="np-erro">O ERP recusou: {i.erro}</span>
@@ -302,6 +349,77 @@ function Pendentes({ itens, online }: { itens: ItemFila[]; online: boolean }) {
         </div>
       ))}
       {itens.some((i) => i.estado === 'recusado') && <p className="p4-legal">Enquanto houver um recusado, os de trás esperam. Descartar não apaga nada no ERP.</p>}
+    </div>
+  );
+}
+
+/** Etapas pausadas neste celular, à espera do Retomar (A3 "Pausado · motivo"). */
+function PausadasLista({ pausadas, ocupado, soQr, aoRetomar }: { pausadas: Pausada[]; ocupado: boolean; soQr: boolean; aoRetomar: (p: Pausada) => void }) {
+  const [confirmar, setConfirmar] = useState<number | null>(null);
+  return (
+    <div className="ap-rodando">
+      <div className="p4-rotulo">Pausadas</div>
+      {pausadas.map((p) => (
+        <div key={p.programacao_id} className="ap-pausada">
+          <div className="ap-job-l1"><span>{p.pedido.numero}</span><b>{p.etapa}{p.maquina ? ' · máquina' : ''}</b></div>
+          <div className="ap-pausada-m">Pausado às {horaDe(p.momento)} · {p.motivo.toLowerCase()}</div>
+          <div className="ap-pausada-acoes">
+            <button className="ap-btn primario" onClick={() => aoRetomar(p)} disabled={ocupado}>{soQr && !p.codigo ? 'Ler QR e retomar' : 'Retomar'}</button>
+            <button className="ap-link" disabled={ocupado}
+              onClick={() => (confirmar === p.programacao_id ? void esquecerPausada(p.programacao_id) : setConfirmar(p.programacao_id))}>
+              {confirmar === p.programacao_id ? 'Toque de novo para tirar' : 'Tirar da lista'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A4 · "Por que parou?": um toque no motivo do posto, sem digitar. A lista vem do ERP ou da guardada no celular. */
+function FolhaPausar({ alvo, online, ocupado, aoFechar, aoConfirmar }: {
+  alvo: Rodando<ApontamentoAberto>; online: boolean; ocupado: boolean; aoFechar: () => void; aoConfirmar: (m: MotivoPausa) => void;
+}) {
+  const d = dadosDe(alvo);
+  // O em-andamento do ERP já traz os motivos do posto; sem ele (início ainda no celular), busca ou usa a guardada.
+  const doErp = alvo.servidor?.motivos_pausa;
+  const [lista, setLista] = useState<Motivos | null>(() => (doErp ? { motivos: motivosDoPosto(doErp, d.posto || null), guardadaEm: null } : null));
+  const [erro, setErro] = useState('');
+  const [escolhido, setEscolhido] = useState<MotivoPausa | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    if (doErp) return;
+    if (!d.posto) { setErro('Não deu para saber o posto desta etapa. Abra de novo com internet.'); return; }
+    motivosDe(d.posto, online).then(
+      (m) => { if (vivo) { setLista(m); setErro(''); } },
+      (e) => { if (vivo) setErro((e as { codigo?: string }).codigo === 'rede' ? 'Sem internet e sem a lista de motivos deste posto no celular. Pause quando a conexão voltar.' : mensagemDoErro(e)); },
+    );
+    return () => { vivo = false; };
+  }, [d.posto, online, doErp]);
+  return (
+    <div className="vr-folha" role="dialog" aria-modal="true" aria-label="Pausar etapa">
+      <div className="vr-veu" onClick={() => { if (!ocupado) aoFechar(); }} />
+      <div className="vr-painel">
+        <span className="vr-alca" aria-hidden="true" />
+        <div className="vr-folha-cab"><span>Por que parou?</span><button onClick={aoFechar} disabled={ocupado}>Fechar</button></div>
+        <p className="np-ajuda" style={{ marginTop: 0 }}>{d.numero} · {d.etapa}. O cronômetro para agora; o motivo mostra ao PCP onde a etapa perde tempo.</p>
+        {!lista && !erro && <p className="p4-legal">Carregando os motivos…</p>}
+        {erro && <span className="np-erro" role="alert">{erro}</span>}
+        {lista && lista.motivos.length === 0 && <span className="np-erro" role="alert">Este posto não tem motivos de pausa cadastrados. Peça ao PCP para cadastrar.</span>}
+        {lista && lista.motivos.length > 0 && (
+          <div className="ap-motivos" role="radiogroup" aria-label="Motivo da pausa">
+            {lista.motivos.map((m) => (
+              <button key={m.id} role="radio" aria-checked={escolhido?.id === m.id} className={escolhido?.id === m.id ? 'on' : ''}
+                onClick={() => setEscolhido(m)} disabled={ocupado}>{m.nome}</button>
+            ))}
+          </div>
+        )}
+        {lista?.guardadaEm && <p className="p4-legal">Lista guardada no celular em {new Date(lista.guardadaEm).toLocaleDateString('pt-BR')} às {horaDe(lista.guardadaEm)}.</p>}
+        <button className="p4-cta" onClick={() => { if (escolhido) aoConfirmar(escolhido); }} disabled={ocupado || !escolhido} aria-busy={ocupado}>
+          {ocupado ? 'Pausando…' : escolhido ? `Pausar · ${escolhido.nome.toLowerCase()}` : 'Escolha o motivo'}
+        </button>
+        {!online && <p className="p4-legal" style={{ textAlign: 'center' }}>Sem internet: a pausa fica guardada no celular com a hora de agora.</p>}
+      </div>
     </div>
   );
 }

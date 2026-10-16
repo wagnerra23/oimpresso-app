@@ -10,9 +10,12 @@
 // - O concluir/corrigir de um início que ainda está na fila aponta para ele (`ref`); o id do ERP entra quando o
 //   início é confirmado.
 // - Cada item tem dono (o usuário que tocou): outro login no mesmo celular não envia nem vê o que não é dele.
+// - Pausa com motivo: no ERP o pausar ENCERRA o apontamento (`encerrado_por: "pausa"`) e retomar é um novo iniciar na
+//   mesma etapa. A fila lembra a etapa pausada (`pausadas`) para mostrar "Retomar" mesmo sem internet; um iniciar na
+//   mesma etapa tira a pausa da lista (é o retomar).
 import type { PedidoApontamento } from './api';
 
-export type AcaoFila = 'iniciar' | 'concluir' | 'corrigir';
+export type AcaoFila = 'iniciar' | 'pausar' | 'concluir' | 'corrigir';
 /** Para onde vai concluir/corrigir: o id do ERP ou o `local` de um iniciar ainda na fila. */
 export type AlvoApontamento = { id: number } | { ref: string };
 
@@ -28,8 +31,14 @@ export interface ItemFila {
   /** iniciar: a etapa (`programacao_id`) e, se a empresa exige QR, o código lido. */
   programacao_id?: number;
   codigo?: string;
-  /** concluir/corrigir. */
+  /** iniciar: o posto da etapa (para a lista de motivos de pausa sem internet) e se é máquina. Só para o celular. */
+  posto_id?: number;
+  maquina?: boolean;
+  /** pausar/concluir/corrigir. */
   alvo?: AlvoApontamento;
+  /** pausar: o motivo do cadastro do posto (o nome é só para mostrar). */
+  motivo_id?: number;
+  motivo?: string;
   /** corrigir: a hora certa (ISO com fuso) e a justificativa. */
   hora_certa?: string;
   justificativa?: string;
@@ -41,10 +50,29 @@ export interface ItemFila {
   tentativas: number;
 }
 
+/** Etapa pausada por este celular, à espera do "Retomar". */
+export interface Pausada {
+  programacao_id: number;
+  dono: string;
+  /** `local` do item pausar que a criou (descartar o pausar recusado tira a pausa). */
+  por: string;
+  motivo: string;
+  /** Hora do toque em Pausar. */
+  momento: string;
+  /** Código lido no início, para o retomar quando a empresa exige QR. */
+  codigo?: string;
+  posto_id?: number;
+  maquina?: boolean;
+  pedido: ItemFila['pedido'];
+  etapa: string;
+}
+
 export interface Fila {
   itens: ItemFila[];
   /** `local` do iniciar → id do ERP, enquanto algum item ainda aponta para ele. */
   ids: Record<string, number>;
+  /** Etapas pausadas por este celular (ausente na fila gravada antes da pausa existir). */
+  pausadas?: Pausada[];
 }
 
 export const FILA_VAZIA: Fila = { itens: [], ids: {} };
@@ -63,7 +91,30 @@ export function relogioErrado(driftSeg: number | null): string | null {
   return driftSeg !== null && Math.abs(driftSeg) > 300 ? 'O relógio do celular está errado. Acerte a hora para apontar.' : null;
 }
 
-export const enfileirar = (f: Fila, item: ItemFila): Fila => ({ ...f, itens: [...f.itens, item] });
+/** Entra no fim da fila. Um iniciar na etapa que este dono pausou é o retomar: a pausa sai da lista. */
+export function enfileirar(f: Fila, item: ItemFila): Fila {
+  const pausadas = item.acao === 'iniciar'
+    ? f.pausadas?.filter((p) => !(p.dono === item.dono && p.programacao_id === item.programacao_id))
+    : f.pausadas;
+  return { ...f, itens: [...f.itens, item], ...(pausadas ? { pausadas } : {}) };
+}
+
+/** Pausar: o item vai para a fila e a etapa fica na lista de pausadas (uma por etapa e dono). */
+export function pausar(f: Fila, item: ItemFila, p: Omit<Pausada, 'dono' | 'por' | 'momento' | 'motivo'>): Fila {
+  const g = enfileirar(f, item);
+  const outras = (g.pausadas ?? []).filter((x) => !(x.dono === item.dono && x.programacao_id === p.programacao_id));
+  return { ...g, pausadas: [...outras, { ...p, dono: item.dono, por: item.local, momento: item.momento, motivo: item.motivo ?? '' }] };
+}
+
+/** Etapas pausadas do dono que não estão rodando (outro celular pode ter retomado: o ERP manda). */
+export function pausadasDe(f: Fila, dono: string, rodandoProgramacoes: number[] = []): Pausada[] {
+  const rodam = new Set(rodandoProgramacoes);
+  return (f.pausadas ?? []).filter((p) => p.dono === dono && !rodam.has(p.programacao_id));
+}
+
+/** O operador tira da lista uma etapa pausada (retomou em outro lugar ou não vai voltar a ela). Não mexe no ERP. */
+export const esquecerPausa = (f: Fila, dono: string, programacao: number): Fila =>
+  ({ ...f, pausadas: (f.pausadas ?? []).filter((p) => !(p.dono === dono && p.programacao_id === programacao)) });
 
 export type Proximo = { item: ItemFila; apontamentoId: number | null } | null;
 
@@ -83,7 +134,7 @@ export function aposSucesso(f: Fila, local: string, idDoErp?: number): Fila {
   const itens = f.itens.filter((i) => i.local !== local);
   const ids = { ...f.ids };
   if (item?.acao === 'iniciar' && typeof idDoErp === 'number') ids[local] = idDoErp;
-  return { itens, ids: limparIds(itens, ids) };
+  return { ...f, itens, ids: limparIds(itens, ids) };
 }
 
 /** Falha sem resposta definitiva (rede, 5xx, 429, sessão): fica como está para a próxima tentativa. Recusa do ERP
@@ -102,24 +153,26 @@ export function tipoDaFalha(status: number): 'tentar_de_novo' | 'recusado' {
   return status === 0 || status >= 500 || status === 429 || status === 401 ? 'tentar_de_novo' : 'recusado';
 }
 
-/** O operador descarta um item RECUSADO (e o que dependia dele: o concluir/corrigir de um início recusado). */
+/** O operador descarta um item RECUSADO (e o que dependia dele: o pausar/concluir/corrigir de um início recusado).
+ *  Pausar descartado: a pausa sai da lista (no ERP o apontamento continua como estava). */
 export function descartar(f: Fila, local: string): Fila {
   const item = f.itens.find((i) => i.local === local);
   if (!item || item.estado !== 'recusado') return f;
   const fora = new Set([local]);
   if (item.acao === 'iniciar') f.itens.forEach((i) => { if (i.alvo && 'ref' in i.alvo && i.alvo.ref === local) fora.add(i.local); });
   const itens = f.itens.filter((i) => !fora.has(i.local));
-  return { itens, ids: limparIds(itens, f.ids) };
+  const pausadas = f.pausadas?.filter((p) => !fora.has(p.por));
+  return { itens, ids: limparIds(itens, f.ids), ...(pausadas ? { pausadas } : {}) };
 }
 
 export const pendentesDe = (f: Fila, dono: string): ItemFila[] => f.itens.filter((i) => i.dono === dono);
 
 /** O que o operador vê rodando: o que o ERP disse (`servidor`) + inícios ainda na fila, menos o que já tem
- *  concluir na fila. `chave` identifica o cartão: `id:<n>` (do ERP) ou `local:<x>` (ainda no celular). */
+ *  concluir ou pausar na fila (os dois encerram o apontamento). `chave` identifica o cartão: `id:<n>` (do ERP) ou `local:<x>` (ainda no celular). */
 export interface Rodando<T> { chave: string; alvo: AlvoApontamento; servidor: T | null; item: ItemFila | null }
 export function rodando<T extends { id: number }>(servidor: T[], f: Fila, dono: string): Array<Rodando<T>> {
   const meus = pendentesDe(f, dono);
-  const concluidos = new Set(meus.filter((i) => i.acao === 'concluir' && i.alvo)
+  const concluidos = new Set(meus.filter((i) => (i.acao === 'concluir' || i.acao === 'pausar') && i.alvo)
     .map((i) => ('id' in i.alvo! ? `id:${i.alvo.id}` : `local:${i.alvo!.ref}`)));
   // Início já confirmado pelo ERP mas com concluir na fila apontando pelo local: o id também conta como concluído.
   for (const [local, id] of Object.entries(f.ids)) if (concluidos.has(`local:${local}`)) concluidos.add(`id:${id}`);
