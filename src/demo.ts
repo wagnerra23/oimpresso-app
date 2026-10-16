@@ -8,7 +8,7 @@ import type { AnexoOs, ParteFormulario } from './api';
 import { assinaturaValida } from './entrega-regras';
 import { dividirParcelas, proximaRecorrencia, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
 import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
-import { casaBusca } from './busca';
+import { casaBusca, semAcento } from './busca';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -538,7 +538,6 @@ const ANEXOS_OS: Record<number, AnexoOs[]> = {
 /** Idempotency-Key → corpo (OS + arquivo + legenda) e o anexo gravado, como o `app_idempotencia` do ERP. */
 const ANEXOS_POR_CHAVE: Record<string, { corpo: string; anexo: AnexoOs }> = {};
 let proximoAnexo = 900;
-const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** "12.50" → 1250 centavos; só aceita texto com exatamente 2 casas e ponto decimal (como o app manda). */
 const centavosDoTexto = (v: unknown): number | null => (typeof v === 'string' && /^\d+\.\d{2}$/.test(v) ? Number(v.replace('.', '')) : null);
 

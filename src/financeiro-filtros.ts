@@ -3,6 +3,8 @@
 // GET /api/app/financeiro (a lista é paginada: filtrar só o que já veio esconderia títulos de outras páginas).
 // `filtrarLancamentos` é a mesma regra rodando na demo; serve de referência para o lado do ERP.
 
+import { semAcento } from './busca';
+
 export type CampoData = 'vencimento' | 'pagamento' | 'emissao' | 'competencia' | 'venda';
 
 export const CAMPOS_DATA: Array<{ id: CampoData; label: string }> = [
@@ -93,7 +95,6 @@ export interface LancamentoFiltravel {
   plano_codigo?: string | null; documento?: string | null; excluido?: boolean; contrato?: string | null;
 }
 
-const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const soDigitos = (s: string) => s.replace(/\D/g, '');
 const compacto = (s: string) => semAcento(s).replace(/[^a-z0-9]/g, '');
 
