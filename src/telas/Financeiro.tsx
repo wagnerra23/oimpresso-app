@@ -215,7 +215,9 @@ export function Financeiro({ voltar, avisar }: { voltar?: ReactNode; avisar?: (t
             );
           })}
           {dados?.tem_mais && <button className="oi-btn block" style={{ minHeight: 44 }} disabled={carregandoMais} onClick={mais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</button>}
-          {dados && <p className="p4-legal">Baixar títulos, pagar e conciliar continuam no computador.</p>}
+          {dados && <p className="p4-legal">{LANCAMENTO_ACOES
+            ? 'Toque num lançamento para receber, pagar, alterar ou ver o recibo. Juros, multa e conciliação continuam no computador.'
+            : 'Baixar títulos, pagar e conciliar continuam no computador.'}</p>}
         </div>
       </div>
       )}

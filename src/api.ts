@@ -630,7 +630,8 @@ export interface Lancamento {
   /** Nº do contrato (lançamentos de recorrência). */
   contrato?: string | null;
 }
-/** GET /api/app/financeiro/lancamentos/{id} (formato proposto). `historico`: o que aconteceu, do mais antigo ao mais novo. */
+/** GET /api/app/financeiro/lancamentos/{id} (formato proposto). `historico`: o que aconteceu, do mais antigo ao mais novo.
+ *  Na alteração, o texto traz cada campo com antes → depois ("Valor: R$ 7.840,00 → R$ 8.000,00"), para a trilha de valor. */
 export interface LancamentoDetalhe extends Lancamento {
   parte_id: number | null; observacao: string | null; recorrencia_id: number | null; parcela: string | null;
   conta_nome: string | null; motivo_exclusao: string | null; historico: Array<{ quando: string; texto: string }>;

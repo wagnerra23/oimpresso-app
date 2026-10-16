@@ -30,6 +30,19 @@ describe('textoRecibo', () => {
     expect(t.corpo).toMatch(/^Recebi de Gráfica Demonstração, CNPJ 00\.000\.000\/0001-91, a importância/);
     expect([t.assinante, t.assinanteDoc]).toEqual(['Gráfica Lona Sul', null]);
   });
+  it('total: plena quitação, sem falar em restante', () => {
+    const t = textoRecibo(base);
+    expect(t.corpo).toContain('dando plena quitação do valor.');
+    expect(t.corpo).not.toContain('restante');
+  });
+  it('parcial: diz o que fica em aberto e quita só o valor recebido', () => {
+    const t = textoRecibo({ ...base, valor: 5000, restante: { valor: 2840, vencimento: '2026-11-16' } });
+    expect(t.corpo).toMatch(/fica em aberto o restante de R\$\s2\.840,00, com vencimento em 16\/11\/2026\./);
+    expect(t.corpo).toContain('dando quitação somente do valor aqui recebido.');
+    expect(t.corpo).not.toContain('plena quitação');
+    const pago = textoRecibo({ ...base, tipo: 'pagar', restante: { valor: 10, vencimento: '2026-11-01' } });
+    expect(pago.corpo).toContain('firmo o presente recibo, dando quitação somente do valor aqui recebido.');
+  });
   it('texto para copiar tem número, valor e assinatura', () => {
     const x = reciboComoTexto(base);
     expect(x.split('\n')[0]).toMatch(/^RECIBO Nº REC-2026-00902 — R\$\s1\.260,00$/);

@@ -17,6 +17,8 @@ export interface ReciboDados {
   documento: string | null;
   empresa: { nome: string; documento: string | null; cidade: string | null };
   parte: { nome: string; documento: string | null } | null;
+  /** Pagamento parcial: o que ficou em aberto (outro lançamento). Ausente ou null = pagamento total. */
+  restante?: { valor: number; vencimento: string } | null;
 }
 
 // ── Valor e data por extenso ──
@@ -80,9 +82,13 @@ export function textoRecibo(r: ReciboDados): { titulo: string; corpo: string; lo
   const valor = `${reais(r.valor)} (${valorPorExtenso(r.valor)})`;
   const ref = `referente a ${r.referente}${r.documento ? `, documento ${r.documento}` : ''}${r.forma ? `, pago via ${r.forma}` : ''}`;
   const parte = r.parte?.nome ?? (r.tipo === 'receber' ? 'cliente não informado' : 'fornecedor não informado');
+  // Parcial: diz o que ficou em aberto e dá quitação só do valor recebido, nunca do documento inteiro.
+  const resta = r.restante
+    ? ` Pagamento parcial: fica em aberto o restante de ${reais(r.restante.valor)}, com vencimento em ${r.restante.vencimento.split('-').reverse().join('/')}.` : '';
+  const quitacao = r.restante ? 'dando quitação somente do valor aqui recebido' : 'dando plena quitação do valor';
   const corpo = r.tipo === 'receber'
-    ? `Recebemos de ${parte}${doc(r.parte?.documento ?? null)} a importância de ${valor}, ${ref}. Para clareza, firmamos o presente recibo, dando plena quitação do valor.`
-    : `Recebi de ${r.empresa.nome}${doc(r.empresa.documento)} a importância de ${valor}, ${ref}. Para clareza, firmo o presente recibo, dando plena quitação do valor.`;
+    ? `Recebemos de ${parte}${doc(r.parte?.documento ?? null)} a importância de ${valor}, ${ref}.${resta} Para clareza, firmamos o presente recibo, ${quitacao}.`
+    : `Recebi de ${r.empresa.nome}${doc(r.empresa.documento)} a importância de ${valor}, ${ref}.${resta} Para clareza, firmo o presente recibo, ${quitacao}.`;
   return {
     titulo: 'RECIBO',
     corpo,
