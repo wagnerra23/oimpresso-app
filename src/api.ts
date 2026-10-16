@@ -1140,8 +1140,12 @@ export interface EtapaApontamento {
 /** GET /api/app/producao/etiqueta/{codigo}: QR (`oimpresso:p:<hash>:<id>`) ou número digitado. Etapa de outra pessoa
  *  vem com `pode_apontar: false` e o responsável. */
 export interface EtiquetaProducao { pedido: PedidoApontamento; etapa: EtapaApontamento; pode_apontar: boolean }
-/** Apontamento aberto. `id` é o da linha de início; `iniciado_em` é a hora gravada no ERP. */
-export interface ApontamentoAberto { id: number; tipo: string; pedido: PedidoApontamento | null; etapa: EtapaApontamento | null; iniciado_em: string }
+/** Apontamento aberto. `id` é o da linha de início; `iniciado_em` é a hora gravada no ERP. `motivos_pausa` = motivos
+ *  ativos do posto deste apontamento (#9476), a mesma lista do GET motivos-pausa?posto_id=. */
+export interface ApontamentoAberto {
+  id: number; tipo: string; pedido: PedidoApontamento | null; etapa: EtapaApontamento | null; iniciado_em: string;
+  motivos_pausa?: Array<{ id: number; nome: string }>;
+}
 export interface EmAndamento {
   pessoa: ApontamentoAberto | null; maquinas: ApontamentoAberto[];
   ponto: { entrada: string | null; saida: string | null; presenca_minutos: number | null } | null;
@@ -1155,7 +1159,8 @@ export const apontamentoApi = {
    *  422 bloqueado / campos.codigo / campos.momento. */
   iniciar: (corpo: { programacao_id: number; momento: string; codigo?: string }, chave: string) =>
     chamar<{ id: number; programacao_id: number; iniciado_em: string }>('POST', '/api/app/producao/apontamentos/iniciar', corpo, { 'Idempotency-Key': chave }),
-  /** Motivos de pausa ativos do posto (cadastro da thread 03). Resposta crua: `motivosDoPosto` normaliza. */
+  /** Motivos de pausa ativos do posto (cadastro da thread 03, #9476): `{ motivos: [{ id, posto_id, nome }] }`; posto de
+   *  outra empresa → `{ motivos: [] }`. Resposta crua: `motivosDoPosto` normaliza. */
   motivosPausa: (postoId: number) => chamar<unknown>('GET', `/api/app/producao/motivos-pausa?posto_id=${postoId}`),
   /** Pausa ENCERRA o apontamento (`encerrado_por: "pausa"`); retomar = iniciar de novo na mesma etapa.
    *  422 campos.motivo_id (motivo de outro posto ou inativo) / campos.momento / bloqueado. */

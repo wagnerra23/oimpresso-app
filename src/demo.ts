@@ -465,7 +465,8 @@ const erroDemo = (status: number, codigo: string, mensagem: string, extra: Recor
   Object.assign(new Error(mensagem), { status, codigo, ...extra });
 const pedidoApontamento = (o: OsApontamentoDemo) => ({ id: o.id, numero: o.numero, resumo: o.resumo, cliente: o.cliente });
 const etapaApontamento = (o: OsApontamentoDemo) => ({ ...o.etapa, inicio_previsto: null });
-const abertoDemo = (a: AbertoDemo) => ({ id: a.id, tipo: a.os.etapa.posto.tipo, pedido: pedidoApontamento(a.os), etapa: etapaApontamento(a.os), iniciado_em: a.iniciado_em });
+const abertoDemo = (a: AbertoDemo) => ({ id: a.id, tipo: a.os.etapa.posto.tipo, pedido: pedidoApontamento(a.os), etapa: etapaApontamento(a.os),
+  iniciado_em: a.iniciado_em, motivos_pausa: MOTIVOS_PAUSA_DEMO[a.os.etapa.posto.id] ?? [] });
 /** QR ou número → OS. QR de outra empresa ou OS inexistente → undefined (404 sem dizer se existe). */
 function osDoCodigo(codigo: string): OsApontamentoDemo | undefined | 'numero' {
   // Formato do PR 07 (`…:<os_tipo>:<id>`) ou o antigo sem tipo (= comvis_os). Outro tipo de OS → 404, como o ERP.
@@ -662,8 +663,12 @@ export const demo = {
           maquinas: apontamentosAbertos.filter((a) => a.os.etapa.posto.tipo === 'maquina').map(abertoDemo),
           ponto: { entrada: '07:02', saida: null, presenca_minutos: null } });
       }
+      // Como o ERP #9476: { motivos: [{ id, posto_id, nome }] }; sem posto_id, todos; posto alheio → lista vazia.
       if (metodo === 'GET' && caminho.startsWith('/api/app/producao/motivos-pausa')) {
-        return r(MOTIVOS_PAUSA_DEMO[Number((caminho.match(/posto_id=(\d+)/) || [])[1])] ?? []);
+        const q = /posto_id=([^&]*)/.exec(caminho)?.[1];
+        if (q !== undefined && !/^[1-9]\d*$/.test(q)) throw erroDemo(422, 'validacao', 'O posto é um número.', { campos: { posto_id: 'O posto é um número.' } });
+        const postos = q === undefined ? Object.keys(MOTIVOS_PAUSA_DEMO).map(Number) : [Number(q)];
+        return r({ motivos: postos.flatMap((p) => (MOTIVOS_PAUSA_DEMO[p] ?? []).map((m) => ({ id: m.id, posto_id: p, nome: m.nome }))) });
       }
       if (metodo === 'GET' && caminho.startsWith('/api/app/producao/etiqueta/')) {
         const o = osDoCodigo(decodeURIComponent(caminho.slice('/api/app/producao/etiqueta/'.length)));

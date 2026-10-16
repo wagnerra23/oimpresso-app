@@ -51,6 +51,11 @@ export async function motivosDe(posto: number, online: boolean): Promise<Motivos
   return { motivos: g.motivos, guardadaEm: g.em };
 }
 
+/** Guarda a lista que já veio no `motivos_pausa` do em-andamento (sem outra chamada ao ERP). */
+export async function guardarLista(posto: number, motivos: MotivoPausa[]): Promise<void> {
+  if (posto > 0) await gravar(chaveDe(await donoAtual(), posto), { motivos, em: new Date().toISOString() });
+}
+
 /** Deixa a lista pronta no celular para quando a internet cair (chamado ao ver uma etapa rodando, com rede). */
 export function guardarMotivos(postos: number[]): void {
   for (const p of new Set(postos)) if (p > 0) void motivosDe(p, true).catch(() => { /* tenta na próxima */ });

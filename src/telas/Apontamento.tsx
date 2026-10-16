@@ -13,14 +13,14 @@ import { apontamentoApi, drift, type ApontamentoAberto, type Encerramento, type 
 import { useAjustes } from '../ajustes';
 import { useVoltar } from '../voltar';
 import {
-  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, numeroDigitado, relogio, segundosDecorridos,
-  type MotivoPausa,
+  codigoDoQr, duracao, erroJustificativa, horaDe, horaNoDia, mensagemDoErro, motivosDoPosto, numeroDigitado, relogio,
+  segundosDecorridos, type MotivoPausa,
 } from '../apontamento-regras';
 import { momentoIso, pausadasDe, relogioErrado, rodando, type ItemFila, type Pausada, type Rodando } from '../apontamento-fila-regras';
 import {
   apontar, descartarItem, enviarFila, esquecerPausada, useFila, type DadosPausa, type NovoItem, type ResultadoEnvio,
 } from '../apontamento-fila';
-import { guardarMotivos, motivosDe, type Motivos } from '../apontamento-motivos';
+import { guardarLista, guardarMotivos, motivosDe, type Motivos } from '../apontamento-motivos';
 import '../styles/apontamento.css';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
@@ -71,8 +71,9 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
   useVoltar(folha, () => { if (!ocupado) { setCorrigindo(null); setPausando(null); } });
   useVoltar(!folha && (lido !== null || aberto !== null), () => { setLido(null); setAberto(null); });
 
-  // Com rede, deixa no celular os motivos de pausa dos postos que estão rodando (para pausar se a internet cair).
-  const postos = lista.map((r) => dadosDe(r).posto).join(',');
+  // Com rede, deixa no celular os motivos de pausa dos postos que estão rodando (para pausar se a internet cair). O que
+  // veio do ERP já traz `motivos_pausa` (guardado no recarregar); busca só o posto de um início ainda no celular.
+  const postos = lista.filter((r) => !r.servidor?.motivos_pausa).map((r) => dadosDe(r).posto).join(',');
   useEffect(() => {
     if (online && postos) guardarMotivos(postos.split(',').map(Number));
   }, [online, postos]);
@@ -80,7 +81,12 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
   const recarregar = useCallback(async () => {
     try {
       const r = await apontamentoApi.emAndamento();
-      setServidor([...(r.pessoa ? [r.pessoa] : []), ...r.maquinas]);
+      const abertos = [...(r.pessoa ? [r.pessoa] : []), ...r.maquinas];
+      setServidor(abertos);
+      for (const a of abertos) {
+        const posto = a.etapa?.posto?.id ?? 0;
+        if (posto && Array.isArray(a.motivos_pausa)) void guardarLista(posto, motivosDoPosto(a.motivos_pausa, posto)).catch(() => { /* fica a anterior */ });
+      }
     } catch { /* sem rede: fica o que já se sabia + a fila */ }
     setCarregando(false);
   }, []);
@@ -375,18 +381,21 @@ function FolhaPausar({ alvo, online, ocupado, aoFechar, aoConfirmar }: {
   alvo: Rodando<ApontamentoAberto>; online: boolean; ocupado: boolean; aoFechar: () => void; aoConfirmar: (m: MotivoPausa) => void;
 }) {
   const d = dadosDe(alvo);
-  const [lista, setLista] = useState<Motivos | null>(null);
+  // O em-andamento do ERP já traz os motivos do posto; sem ele (início ainda no celular), busca ou usa a guardada.
+  const doErp = alvo.servidor?.motivos_pausa;
+  const [lista, setLista] = useState<Motivos | null>(() => (doErp ? { motivos: motivosDoPosto(doErp, d.posto || null), guardadaEm: null } : null));
   const [erro, setErro] = useState('');
   const [escolhido, setEscolhido] = useState<MotivoPausa | null>(null);
   useEffect(() => {
     let vivo = true;
+    if (doErp) return;
     if (!d.posto) { setErro('Não deu para saber o posto desta etapa. Abra de novo com internet.'); return; }
     motivosDe(d.posto, online).then(
       (m) => { if (vivo) { setLista(m); setErro(''); } },
       (e) => { if (vivo) setErro((e as { codigo?: string }).codigo === 'rede' ? 'Sem internet e sem a lista de motivos deste posto no celular. Pause quando a conexão voltar.' : mensagemDoErro(e)); },
     );
     return () => { vivo = false; };
-  }, [d.posto, online]);
+  }, [d.posto, online, doErp]);
   return (
     <div className="vr-folha" role="dialog" aria-modal="true" aria-label="Pausar etapa">
       <div className="vr-veu" onClick={() => { if (!ocupado) aoFechar(); }} />

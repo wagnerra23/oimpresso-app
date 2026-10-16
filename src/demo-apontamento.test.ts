@@ -82,9 +82,16 @@ describe('apontamento na demo', () => {
   });
 
   it('pausa com motivo do posto encerra o apontamento; retomar = iniciar de novo na mesma etapa', async () => {
-    expect(await demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=5')).toContainEqual({ id: 31, nome: 'Troca de bobina' });
-    expect(await demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=999')).toEqual([]);
+    // Formato do ERP #9476.
+    const m5 = await demo.chamar<{ motivos: unknown[] }>('GET', '/api/app/producao/motivos-pausa?posto_id=5');
+    expect(m5.motivos).toContainEqual({ id: 31, posto_id: 5, nome: 'Troca de bobina' });
+    expect(await demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=999')).toEqual({ motivos: [] });
+    await expect(demo.chamar('GET', '/api/app/producao/motivos-pausa?posto_id=x')).rejects.toMatchObject({ campos: { posto_id: expect.any(String) } });
+    const todos = await demo.chamar<{ motivos: Array<{ posto_id: number }> }>('GET', '/api/app/producao/motivos-pausa');
+    expect(new Set(todos.motivos.map((m) => m.posto_id))).toEqual(new Set([3, 4, 5]));
     const a = await iniciar({ programacao_id: 80 }, 'pa1');
+    // O em-andamento traz os motivos do posto do apontamento.
+    expect((await emAndamento()).maquinas[0].motivos_pausa).toContainEqual({ id: 31, nome: 'Troca de bobina' });
     // Motivo de outro posto (Impressão) → 422 campos.motivo_id.
     await expect(post(`${a.id}/pausar`, { motivo_id: 11, momento: agora() }, 'pa2')).rejects.toMatchObject({ status: 422, campos: { motivo_id: expect.any(String) } });
     const corpo = { motivo_id: 31, momento: agora() };

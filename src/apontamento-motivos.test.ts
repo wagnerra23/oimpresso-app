@@ -13,7 +13,7 @@ vi.mock('@capacitor/preferences', () => ({
   },
 }));
 
-const { motivosDe } = await import('./apontamento-motivos');
+const { guardarLista, motivosDe } = await import('./apontamento-motivos');
 const { guardarDono } = await import('./apontamento-dono');
 const resp = (status: number, data: unknown = {}) => ({ status, data, headers: {}, url: '' });
 
@@ -24,8 +24,14 @@ beforeEach(async () => {
 });
 
 describe('motivos de pausa no celular', () => {
+  it('a lista que veio no em-andamento (motivos_pausa) fica guardada sem chamar o ERP', async () => {
+    await guardarLista(5, [{ id: 31, nome: 'Troca de bobina' }]);
+    expect((await motivosDe(5, false)).motivos).toEqual([{ id: 31, nome: 'Troca de bobina' }]);
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('com rede busca o do posto e guarda; sem rede devolve o guardado sem chamar o ERP', async () => {
-    request.mockResolvedValueOnce(resp(200, [{ id: 31, nome: 'Troca de bobina' }]));
+    request.mockResolvedValueOnce(resp(200, { motivos: [{ id: 31, posto_id: 5, nome: 'Troca de bobina' }] }));
     expect(await motivosDe(5, true)).toEqual({ motivos: [{ id: 31, nome: 'Troca de bobina' }], guardadaEm: null });
     expect((request.mock.calls[0][0] as { url: string }).url).toMatch(/\/motivos-pausa\?posto_id=5$/);
     const off = await motivosDe(5, false);
@@ -35,7 +41,7 @@ describe('motivos de pausa no celular', () => {
   });
 
   it('ERP fora: vale a guardada; sem guardada para o posto ou para o usuário, erro de rede', async () => {
-    request.mockResolvedValueOnce(resp(200, [{ id: 11, nome: 'Setup' }]));
+    request.mockResolvedValueOnce(resp(200, { motivos: [{ id: 11, posto_id: 3, nome: 'Setup' }] }));
     await motivosDe(3, true);
     // Rota ainda não publicada (404) ou ERP fora: fica a última lista que veio.
     request.mockResolvedValueOnce(resp(404, { erro: 'nao_encontrado' }));
@@ -46,7 +52,8 @@ describe('motivos de pausa no celular', () => {
   });
 
   it('duas buscas ao mesmo tempo (postos diferentes) guardam as duas', async () => {
-    request.mockResolvedValueOnce(resp(200, [{ id: 11, nome: 'Setup' }])).mockResolvedValueOnce(resp(200, [{ id: 31, nome: 'Bobina' }]));
+    request.mockResolvedValueOnce(resp(200, { motivos: [{ id: 11, posto_id: 3, nome: 'Setup' }] }))
+      .mockResolvedValueOnce(resp(200, { motivos: [{ id: 31, posto_id: 5, nome: 'Bobina' }] }));
     await Promise.all([motivosDe(3, true), motivosDe(5, true)]);
     expect((await motivosDe(3, false)).motivos[0].id).toBe(11);
     expect((await motivosDe(5, false)).motivos[0].id).toBe(31);

@@ -95,8 +95,9 @@ export function mensagemDoErro(e: unknown): string {
 /** Motivo de pausa do cadastro do posto (ERP, thread 03). */
 export interface MotivoPausa { id: number; nome: string }
 
-/** Resposta de GET /api/app/producao/motivos-pausa → motivos do posto, na ordem do ERP, sem repetidos nem inválidos.
- *  Aceita a lista solta ou dentro de `itens`/`motivos`; se vier `posto_id` em cada motivo, fica só o do posto. */
+/** Resposta de GET /api/app/producao/motivos-pausa (`{ motivos: [{ id, posto_id, nome }] }`, #9476) ou o `motivos_pausa`
+ *  do em-andamento (lista solta) → motivos do posto, na ordem do ERP, sem repetidos nem inválidos. Com `posto_id` em
+ *  cada motivo, fica só o do posto. */
 export function motivosDoPosto(resposta: unknown, postoId: number | null): MotivoPausa[] {
   const r = resposta as { itens?: unknown; motivos?: unknown } | null;
   const lista = Array.isArray(resposta) ? resposta : Array.isArray(r?.itens) ? r.itens : Array.isArray(r?.motivos) ? r.motivos : [];
