@@ -313,7 +313,7 @@ export function Apontamento({ aoVoltar, avisar, online }: { aoVoltar: () => void
                 <button className="ap-link" onClick={() => setAberto(null)} disabled={ocupado}>
                   {d.maquina ? 'Deixar a máquina rodando e apontar outro' : 'Apontar outro pedido'}
                 </button>
-                <p className="p4-legal">O tempo que vale é o do ERP. Errou o horário? Peça a correção: o gestor confere e o registro original fica.</p>
+                <p className="p4-legal">Vale a hora em que você tocou no celular, mesmo sem internet. Errou o horário? Peça a correção: o gestor confere e o registro original fica.</p>
               </>
             );
           })()}

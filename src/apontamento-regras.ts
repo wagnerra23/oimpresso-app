@@ -2,7 +2,8 @@
 // Contrato: memory/requisitos/AppMobile/api/tela-02-apontamento.md no ERP (#9447) — grava no PCP (Modules/Producao,
 // ADR 0431). A fila sem internet tem as regras dela em apontamento-fila-regras.ts.
 //
-// O cronômetro é só exibição: o tempo que vale é o que o ERP gravou. A conta parte do `iniciado_em` devolvido e
+// O cronômetro é só exibição: o ERP grava o `momento` do toque no celular (decisão [W] 2026-10-15) e devolve o
+// `iniciado_em`. A conta parte desse `iniciado_em` e
 // desconta o desvio do relógio do aparelho (header Date, `drift()` do api.ts), para um celular adiantado não mostrar
 // minutos a mais.
 
