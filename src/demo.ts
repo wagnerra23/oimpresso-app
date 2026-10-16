@@ -6,6 +6,7 @@
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
 import type { AnexoOs, ParteFormulario } from './api';
 import { assinaturaValida } from './entrega-regras';
+import { casaBusca } from './busca';
 
 interface MarcacaoDemo { id: string; nsr: number; tipo: string; origem: string; hora: string; hash_trunc: string; revisar: boolean }
 
@@ -644,7 +645,10 @@ export const demo = {
       const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
       const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? PEDIDOS.filter((p) => p.etapa.grupo === 'concluido')
         : filtro === 'atrasados' ? PEDIDOS.filter((p) => p.atrasado) : ativos;
-      return r({ itens: lista.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
+      // `q` (busca da lista): a demo usa a mesma regra do aparelho; o ERP busca do jeito dele.
+      const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '');
+      const achados = lista.filter((p) => casaBusca(q, [p.numero, p.cliente, p.itens[0]?.produto]));
+      return r({ itens: achados.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
           concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
     }
