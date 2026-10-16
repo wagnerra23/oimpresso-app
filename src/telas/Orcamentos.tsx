@@ -56,7 +56,7 @@ export function Orcamentos({ voltar, avisar, online }: { voltar?: ReactNode; avi
   const c = dados?.contadores;
   if (novo) {
     return <OrcamentoNovo avisar={avisar} online={online} aoVoltar={() => setNovo(false)}
-      aoSalvar={(o) => { setNovo(false); avisar(`${o.numero} salvo como rascunho`); if (filtro === 'todos' || filtro === 'rascunho') carregar(filtro); else setFiltro('rascunho'); }} />;
+      aoSalvar={(o) => { setNovo(false); setBusca(''); avisar(`${o.numero} salvo como rascunho`); if (filtro === 'todos' || filtro === 'rascunho') carregar(filtro); else setFiltro('rascunho'); }} />;
   }
   const itens = dados?.itens.filter((q) => casaBusca(busca, [q.numero, q.titulo, q.cliente])) ?? [];
   return (
@@ -78,7 +78,7 @@ export function Orcamentos({ voltar, avisar, online }: { voltar?: ReactNode; avi
           <div className="pd-chips" role="tablist" aria-label="Situação do orçamento">
             {FILTROS.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
-                {f.label}{c && <span>{c[f.id]}</span>}
+                {f.label}{c && !busca.trim() && <span>{c[f.id]}</span>}
               </button>
             ))}
           </div>

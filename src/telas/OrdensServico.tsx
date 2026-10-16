@@ -145,7 +145,8 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
             <div className="man-kpis" aria-label="Pátio da oficina">
               {kpisPatio(dados).map((k) => (
                 <button key={k.chave} className={'man-kpi ' + k.tom + (etapa === k.chave ? ' on' : '')} aria-pressed={etapa === k.chave} onClick={() => setEtapa(k.chave)}>
-                  <span>{k.rotulo}</span><b>{k.valor}</b>
+                  {/* Durante a busca os totais seriam sem o texto: traço no lugar. */}
+                  <span>{k.rotulo}</span><b>{busca.trim() ? '–' : k.valor}</b>
                 </button>
               ))}
             </div>
@@ -153,11 +154,11 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
           {dados && (
             <div className="pd-chips" role="tablist" aria-label="Etapa da OS">
               <button role="tab" aria-selected={etapa === 'todas'} className={'pd-chip' + (etapa === 'todas' ? ' on' : '')} onClick={() => setEtapa('todas')}>
-                Todas<span>{dados.total}</span>
+                Todas{!busca.trim() && <span>{dados.total}</span>}
               </button>
               {dados.etapas.filter((x) => x.total > 0 || x.chave === etapa).map((x) => (
                 <button key={x.chave} role="tab" aria-selected={etapa === x.chave} className={'pd-chip' + (etapa === x.chave ? ' on' : '')} onClick={() => setEtapa(x.chave)}>
-                  {x.rotulo}<span>{x.total}</span>
+                  {x.rotulo}{!busca.trim() && <span>{x.total}</span>}
                 </button>
               ))}
             </div>

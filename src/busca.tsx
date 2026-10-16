@@ -3,7 +3,7 @@
 import type { ReactElement } from 'react';
 
 /** Minúsculas e sem acento: "Clínica" casa com "clinica". */
-export const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /** Só letras e números (já sem acento): "RLV-2E48" vira "rlv2e48" e "OS-01044" vira "os01044". */
 const compacto = (s: string) => s.replace(/[^a-z0-9]/g, '');

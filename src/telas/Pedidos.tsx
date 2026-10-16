@@ -89,7 +89,8 @@ function Lista({ aoAbrir, aoVender, voltar }: { aoAbrir: (id: number) => void; a
           <div className="pd-chips" role="tablist" aria-label="Filtro de pedidos">
             {FILTROS.map((f) => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} className={'pd-chip' + (filtro === f.id ? ' on' : '')} onClick={() => setFiltro(f.id)}>
-                {f.label}{c && <span>{c[f.id]}</span>}
+                {/* Durante a busca os contadores seriam do filtro sem o texto: somem para não confundir. */}
+                {f.label}{c && !q && <span>{c[f.id]}</span>}
               </button>
             ))}
           </div>
