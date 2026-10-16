@@ -4,7 +4,7 @@
 // Os números imitam o protótipo (prototipo-ui/cowork/Wagner/ponto-mobile.jsx).
 
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
-import type { AnexoOs, ParteFormulario } from './api';
+import type { AnexoOs, GrupoEtapa, ParteFormulario } from './api';
 import { assinaturaValida } from './entrega-regras';
 import { dividirParcelas, proximaRecorrencia, recorrenciaVigente, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
 import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
@@ -44,44 +44,73 @@ const respostaJana = (t: string) => {
   return 'Posso ajudar com pedidos, produção, estoque e ponto. Toque numa sugestão ou escreva sua dúvida.';
 };
 
-// Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2).
+// Pedidos de demonstração no formato do contrato (API-CONTRATO-v1 §2). Só etapas oficiais da FSM venda_com_producao
+// (FsmProcessoVendaComProducaoSeeder), com o rótulo do seed e o grupo de PedidosController::GRUPOS do ERP.
 const diaRel = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const PEDIDOS = [
-  { id: 106, numero: '0043', cliente: 'Papelaria Sol', valor: 360.0, prazo: diaRel(2), atrasado: false, progresso: 0.4,
-    etapa: { chave: 'quote_approved', rotulo: 'Aprovado pelo cliente', grupo: 'aprovacao' as const },
+interface EtapaPedidoDemo { chave: string; rotulo: string; grupo: GrupoEtapa }
+const ETAPAS_DEMO = {
+  quote_draft: { chave: 'quote_draft', rotulo: 'Orçamento — Rascunho', grupo: 'orcamento' },
+  quote_sent: { chave: 'quote_sent', rotulo: 'Orçamento — Enviado', grupo: 'orcamento' },
+  quote_approved: { chave: 'quote_approved', rotulo: 'Aprovado pelo cliente', grupo: 'aprovacao' },
+  in_production: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' },
+  on_hold: { chave: 'on_hold', rotulo: 'Em espera', grupo: 'producao' },
+  ready_for_invoice: { chave: 'ready_for_invoice', rotulo: 'Pronto pra faturar', grupo: 'entrega' },
+  invoiced: { chave: 'invoiced', rotulo: 'Faturada', grupo: 'entrega' },
+  paid: { chave: 'paid', rotulo: 'Paga', grupo: 'entrega' },
+  delivered: { chave: 'delivered', rotulo: 'Entregue', grupo: 'entrega' },
+  completed: { chave: 'completed', rotulo: 'Concluída', grupo: 'concluido' },
+  cancelled: { chave: 'cancelled', rotulo: 'Cancelada', grupo: 'cancelado' },
+} satisfies Record<string, EtapaPedidoDemo>;
+type ChaveEtapaDemo = keyof typeof ETAPAS_DEMO;
+const etapaDemo = (k: ChaveEtapaDemo): EtapaPedidoDemo => ({ ...ETAPAS_DEMO[k] });
+/** Etapas terminais (is_terminal no seed): ficam fora de "ativos" e entram em "concluídos", como no ERP. */
+const terminalDemo = (g: GrupoEtapa) => g === 'concluido' || g === 'cancelado';
+interface PedidoDemo {
+  id: number; numero: string; cliente: string; valor: number; prazo: string | null; atrasado: boolean; progresso: number;
+  etapa: EtapaPedidoDemo; itens: Array<{ produto: string; quantidade: number; total: number }>;
+}
+const PEDIDOS: PedidoDemo[] = [
+  { id: 106, numero: '0043', cliente: 'Papelaria Sol', valor: 360.0, prazo: diaRel(2), atrasado: false, progresso: 0.25,
+    etapa: etapaDemo('quote_approved'),
     itens: [{ produto: 'Adesivo vinil recortado — 50 un', quantidade: 50, total: 360.0 }] },
   { id: 107, numero: '0044', cliente: 'Clínica Vita', valor: 890.0, prazo: diaRel(-2), atrasado: true, progresso: 0.5,
-    etapa: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' as const },
+    etapa: etapaDemo('in_production'),
     itens: [{ produto: 'Placa ACM 1×0,5 m', quantidade: 2, total: 890.0 }] },
   { id: 108, numero: '0045', cliente: 'Bistrô do Forno', valor: 210.0, prazo: diaRel(4), atrasado: false, progresso: 0.5,
-    etapa: { chave: 'on_hold', rotulo: 'Em espera', grupo: 'producao' as const },
+    etapa: etapaDemo('on_hold'),
     itens: [{ produto: 'Cardápio A3 laminado', quantidade: 20, total: 210.0 }] },
   { id: 109, numero: '0046', cliente: 'Restaurante 88', valor: 155.0, prazo: diaRel(1), atrasado: false, progresso: 0.75,
-    etapa: { chave: 'ready_for_invoice', rotulo: 'Pronto pra faturar', grupo: 'producao' as const },
+    etapa: etapaDemo('ready_for_invoice'),
     itens: [{ produto: 'Etiqueta 5×3 cm — 500 un', quantidade: 500, total: 155.0 }] },
-  { id: 101, numero: '0042', cliente: 'Marília Costa', valor: 248.0, prazo: diaRel(-1), atrasado: true, progresso: 0.25,
-    etapa: { chave: 'awaiting_approval', rotulo: 'Aguardando aprovação', grupo: 'aprovacao' as const },
+  { id: 101, numero: '0042', cliente: 'Marília Costa', valor: 248.0, prazo: diaRel(-1), atrasado: true, progresso: 0,
+    etapa: etapaDemo('quote_sent'),
     itens: [{ produto: 'Cartão de visita 9×5 4/4 — 1.000 un', quantidade: 1, total: 248.0 }] },
   { id: 102, numero: '0041', cliente: 'Clínica Vita', valor: 612.0, prazo: diaRel(1), atrasado: false, progresso: 0.75,
-    etapa: { chave: 'out_for_delivery', rotulo: 'Saiu para entrega', grupo: 'entrega' as const },
+    etapa: etapaDemo('paid'),
     itens: [{ produto: 'Folder A4 4/4', quantidade: 500, total: 540.0 }, { produto: 'Envelope ofício', quantidade: 100, total: 72.0 }] },
+  { id: 110, numero: '0047', cliente: 'Escola Aprender', valor: 1480.0, prazo: diaRel(2), atrasado: false, progresso: 0.75,
+    etapa: etapaDemo('invoiced'),
+    itens: [{ produto: 'Banner formatura 2×1 m', quantidade: 4, total: 1480.0 }] },
   { id: 103, numero: '0040', cliente: 'Restaurante 88', valor: 480.0, prazo: diaRel(3), atrasado: false, progresso: 0.5,
-    etapa: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' as const },
+    etapa: etapaDemo('in_production'),
     itens: [{ produto: 'Banner 3×1 m lona', quantidade: 1, total: 480.0 }] },
   { id: 104, numero: '0039', cliente: 'Bistrô do Forno', valor: 320.0, prazo: diaRel(5), atrasado: false, progresso: 0,
-    etapa: { chave: 'quote_draft', rotulo: 'Orçamento', grupo: 'orcamento' as const },
+    etapa: etapaDemo('quote_draft'),
     itens: [{ produto: 'Cardápio A3 dobrado', quantidade: 50, total: 320.0 }] },
   { id: 105, numero: '0038', cliente: 'Papelaria Sol', valor: 1190.5, prazo: diaRel(-3), atrasado: false, progresso: 1,
-    etapa: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' as const },
+    etapa: etapaDemo('completed'),
     itens: [{ produto: 'Adesivo vinil recortado', quantidade: 200, total: 1190.5 }] },
+  { id: 111, numero: '0037', cliente: 'Studio Forma', valor: 540.0, prazo: diaRel(-6), atrasado: false, progresso: 0,
+    etapa: etapaDemo('cancelled'),
+    itens: [{ produto: 'Placa PS 2 mm 60×40', quantidade: 6, total: 540.0 }] },
 ];
 
 // P1 · avançar etapa (tela 22, ERP #9445). Só a lista segura do ERP (AcoesDoPedido::SEGURAS), cada uma saindo de uma
 // etapa só, como no processo venda_com_producao. As outras ações ficam na web e não vêm em acoes[].
-const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: { chave: string; rotulo: string; grupo: 'producao' | 'concluido' }; progresso: number }> = {
-  quote_approved: { chave: 'iniciar_producao', rotulo: 'Iniciar produção', para: { chave: 'in_production', rotulo: 'Em produção', grupo: 'producao' }, progresso: 0.5 },
-  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: { chave: 'on_hold', rotulo: 'Em espera', grupo: 'producao' }, progresso: 0.5 },
-  delivered: { chave: 'concluir', rotulo: 'Concluir', para: { chave: 'completed', rotulo: 'Concluído', grupo: 'concluido' }, progresso: 1 },
+const ACOES_SEGURAS_DEMO: Record<string, { chave: string; rotulo: string; para: ChaveEtapaDemo; progresso: number }> = {
+  quote_approved: { chave: 'iniciar_producao', rotulo: 'Iniciar produção', para: 'in_production', progresso: 0.5 },
+  in_production: { chave: 'pausar_producao', rotulo: 'Pausar produção', para: 'on_hold', progresso: 0.5 },
+  delivered: { chave: 'concluir', rotulo: 'Concluir venda', para: 'completed', progresso: 1 },
 };
 /** `false` simula o usuário sem o RBAC da FSM (a ação vem com pode: false). Só para teste. */
 let podeAcoesPedidoDemo = true;
@@ -90,12 +119,17 @@ const HISTORICO_PEDIDO: Record<number, Array<{ em: string; quem: string | null; 
 /** Idempotency-Key → corpo + resposta (repetição com o mesmo corpo devolve a mesma, sem mover de novo). */
 const ACOES_PEDIDO_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
 const horasAtras = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
-function historicoPedidoDemo(p: (typeof PEDIDOS)[number]) {
+function historicoPedidoDemo(p: PedidoDemo) {
   if (!HISTORICO_PEDIDO[p.id]) {
-    const h: (typeof HISTORICO_PEDIDO)[number] = [{ em: horasAtras(72), quem: 'Ana Souza', de: null, para: 'Orçamento', origem: 'web' }];
-    if (p.etapa.grupo !== 'orcamento') h.unshift({ em: horasAtras(30), quem: 'Ana Souza', de: 'Orçamento', para: 'Aprovado pelo cliente', origem: 'web' });
-    if (p.etapa.chave !== 'quote_approved' && p.etapa.grupo !== 'orcamento' && p.etapa.chave !== 'awaiting_approval') {
-      h.unshift({ em: horasAtras(5), quem: 'Bruno Lima', de: 'Aprovado pelo cliente', para: p.etapa.rotulo, origem: 'app' });
+    const r = (k: ChaveEtapaDemo) => ETAPAS_DEMO[k].rotulo;
+    const h: (typeof HISTORICO_PEDIDO)[number] = [{ em: horasAtras(72), quem: 'Ana Souza', de: null, para: r('quote_draft'), origem: 'web' }];
+    if (p.etapa.chave === 'cancelled') h.unshift({ em: horasAtras(48), quem: 'Ana Souza', de: r('quote_draft'), para: p.etapa.rotulo, origem: 'web' });
+    else if (p.etapa.chave !== 'quote_draft') {
+      h.unshift({ em: horasAtras(48), quem: 'Ana Souza', de: r('quote_draft'), para: r('quote_sent'), origem: 'web' });
+      if (p.etapa.chave !== 'quote_sent') h.unshift({ em: horasAtras(30), quem: 'Ana Souza', de: r('quote_sent'), para: r('quote_approved'), origem: 'web' });
+      if (p.etapa.chave !== 'quote_sent' && p.etapa.chave !== 'quote_approved') {
+        h.unshift({ em: horasAtras(5), quem: 'Bruno Lima', de: r('quote_approved'), para: p.etapa.rotulo, origem: 'app' });
+      }
     }
     HISTORICO_PEDIDO[p.id] = h;
   }
@@ -107,8 +141,8 @@ const acoesPedidoDemo = (etapa: string, liberadas: string[]) => {
 };
 
 // P3 · entrega (tela 22, ERP #9464). A ação `entregar` da FSM sai de uma etapa só e NÃO vem em acoes[]: o detalhe manda
-// `entrega: { pode }`. Na demo, sai de "Saiu para entrega" e vai para "Entregue" (de onde o P1 oferece "Concluir").
-const ENTREGA_DEMO = { de: 'out_for_delivery', para: { chave: 'delivered', rotulo: 'Entregue', grupo: 'entrega' as const }, progresso: 0.9 };
+// `entrega: { pode }`. Na demo, como no seed, sai de "Paga" e vai para "Entregue" (de onde o P1 oferece "Concluir venda").
+const ENTREGA_DEMO = { de: 'paid', para: 'delivered' as const, progresso: 0.9 };
 /** Linha de topo da venda (`itens_venda[].linha_id`), estável por pedido. */
 const linhaIdDemo = (pedidoId: number, i: number) => pedidoId * 100 + i + 1;
 /** Próximo número do protocolo (ENT-NNNN por business). */
@@ -117,7 +151,7 @@ let protocoloEntregaDemo = 418;
 const ENTREGAS_POR_CHAVE: Record<string, { corpo: string; resposta: unknown }> = {};
 const entregaDemo = (etapa: string) => (etapa === ENTREGA_DEMO.de ? { pode: podeAcoesPedidoDemo } : null);
 /** Os erros por campo do contrato (422 validacao), na ordem em que o ERP confere. */
-function camposEntregaDemo(p: (typeof PEDIDOS)[number], n: Record<string, unknown>, chave: string | undefined) {
+function camposEntregaDemo(p: PedidoDemo, n: Record<string, unknown>, chave: string | undefined) {
   const campos: Record<string, string> = {};
   const txt = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
   if (!chave) campos.idempotency_key = 'Falta a chave de idempotência.';
@@ -753,7 +787,8 @@ export const demo = {
       if (m) {
         const p = PEDIDOS.find((x) => x.id === Number(m[1]));
         if (!p) throw Object.assign(new Error('Pedido não encontrado.'), { status: 404 });
-        const ordem = ['orcamento', 'aprovacao', 'producao', 'entrega', 'concluido'] as const;
+        // Como PedidosController::ORDEM: `cancelado` não entra na barra (todas ficam "futuro").
+        const ordem: readonly GrupoEtapa[] = ['orcamento', 'aprovacao', 'producao', 'entrega', 'concluido'];
         const rot = ['Orçamento', 'Aprovação', 'Produção', 'Entrega', 'Concluído'];
         const pos = ordem.indexOf(p.etapa.grupo);
         return r({ ...p, resumo: p.itens[0]?.produto ?? null, cliente: { id: p.id + 500, nome: p.cliente, telefone: '(48) 99999-0000' },
@@ -761,15 +796,16 @@ export const demo = {
           acoes: acoesPedidoDemo(p.etapa.chave, ajustesDemo.app_acoes_fsm_liberadas), historico: historicoPedidoDemo(p) });
       }
       const filtro = (caminho.match(/filtro=(\w+)/) || [])[1] || 'ativos';
-      const ativos = PEDIDOS.filter((p) => p.etapa.grupo !== 'concluido');
-      const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? PEDIDOS.filter((p) => p.etapa.grupo === 'concluido')
+      const ativos = PEDIDOS.filter((p) => !terminalDemo(p.etapa.grupo));
+      const concluidos = PEDIDOS.filter((p) => terminalDemo(p.etapa.grupo));
+      const lista = filtro === 'todos' ? PEDIDOS : filtro === 'concluidos' ? concluidos
         : filtro === 'atrasados' ? PEDIDOS.filter((p) => p.atrasado) : ativos;
       // `q` (busca da lista): a demo usa a mesma regra do aparelho; o ERP busca do jeito dele.
       const q = decodeURIComponent((caminho.match(/[?&]q=([^&]*)/) || [])[1] || '');
       const achados = lista.filter((p) => casaBusca(q, [p.numero, p.cliente, p.itens[0]?.produto]));
       return r({ itens: achados.map(({ itens, ...p }) => ({ ...p, resumo: itens[0]?.produto ?? null })), pagina: 1, tem_mais: false,
         contadores: { ativos: ativos.length, atrasados: PEDIDOS.filter((p) => p.atrasado).length,
-          concluidos: PEDIDOS.filter((p) => p.etapa.grupo === 'concluido').length, todos: PEDIDOS.length } });
+          concluidos: concluidos.length, todos: PEDIDOS.length } });
     }
     // ── Apontamento por QR (P8 · PR 08) ──
     if (caminho.startsWith('/api/app/producao/')) {
@@ -874,8 +910,8 @@ export const demo = {
         throw Object.assign(new Error('O pedido mudou de etapa. Atualize a tela.'), { status: 409, codigo: 'etapa_mudou' });
       }
       const de = p.etapa.rotulo;
-      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de, para: a.para.rotulo, origem: 'app' });
-      p.etapa = { ...a.para }; p.progresso = a.progresso;
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de, para: ETAPAS_DEMO[a.para].rotulo, origem: 'app' });
+      p.etapa = etapaDemo(a.para); p.progresso = a.progresso;
       const resposta = await demo.chamar('GET', `/api/app/pedidos/${p.id}`);
       ACOES_PEDIDO_POR_CHAVE[chave] = { corpo: corpoTxt, resposta };
       return r(resposta);
@@ -898,8 +934,8 @@ export const demo = {
       const campos = camposEntregaDemo(p, n, chave);
       if (Object.keys(campos).length) throw Object.assign(new Error(Object.values(campos)[0]), { status: 422, codigo: 'validacao', campos });
       const protocolo = 'ENT-' + String(protocoloEntregaDemo++).padStart(4, '0');
-      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de: p.etapa.rotulo, para: ENTREGA_DEMO.para.rotulo, origem: 'app' });
-      p.etapa = { ...ENTREGA_DEMO.para }; p.progresso = ENTREGA_DEMO.progresso;
+      historicoPedidoDemo(p).unshift({ em: new Date().toISOString(), quem: 'Você', de: p.etapa.rotulo, para: ETAPAS_DEMO[ENTREGA_DEMO.para].rotulo, origem: 'app' });
+      p.etapa = etapaDemo(ENTREGA_DEMO.para); p.progresso = ENTREGA_DEMO.progresso;
       const resposta = { protocolo, registrado_em: new Date().toISOString(), recebido_por: String(n.recebido_por).trim(),
         com_assinatura: typeof n.assinatura_png === 'string' && !!n.assinatura_png, pedido: await demo.chamar('GET', `/api/app/pedidos/${p.id}`) };
       ENTREGAS_POR_CHAVE[chave!] = { corpo: corpoTxt, resposta };

@@ -56,7 +56,8 @@ export interface MarcacaoCriada {
 }
 
 // ── Pedidos (API-CONTRATO-v1 §2, ERP #8492). Pedido = venda do ERP; etapas agrupam a FSM. ──
-export type GrupoEtapa = 'orcamento' | 'aprovacao' | 'producao' | 'entrega' | 'concluido';
+/** `cancelado` = etapa terminal `cancelled` (PedidosController::GRUPOS); fica fora da barra de etapas do detalhe. */
+export type GrupoEtapa = 'orcamento' | 'aprovacao' | 'producao' | 'entrega' | 'concluido' | 'cancelado';
 export type FiltroPedidos = 'ativos' | 'atrasados' | 'concluidos' | 'todos';
 export interface PedidoResumo {
   id: number; numero: string; cliente: string;
