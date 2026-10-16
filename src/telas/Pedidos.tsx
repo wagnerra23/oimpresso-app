@@ -22,6 +22,7 @@ const FILTROS: Array<{ id: FiltroPedidos; label: string }> = [
 ];
 const TINTA: Record<GrupoEtapa, string> = {
   orcamento: 'var(--text-dim)', aprovacao: 'var(--warn)', producao: 'var(--accent-text)', entrega: 'var(--info)', concluido: 'var(--text-mute)',
+  cancelado: 'var(--danger)',
 };
 export const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
