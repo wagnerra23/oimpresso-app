@@ -10,12 +10,12 @@ import { api, COLUNAS_PRODUCAO, ErroApi, type ColunaProducao, type FilaProducao 
 import { useVoltar } from '../voltar';
 import { Detalhe, reais } from './Pedidos';
 import { Apontamento } from './Apontamento';
+import { semAcento } from '../busca';
 
 const TINTA: Record<ColunaProducao, string> = {
   quote_approved: 'var(--info)', in_production: 'var(--accent)', on_hold: 'var(--warn)', ready_for_invoice: 'var(--ok)',
 };
 const dataCurta = (iso: string | null) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—');
-const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** `voltar`: botão para Mais, quando Produção não está na barra (tela 30). `avisar`/`online`: o rodapé do Detalhe do
  *  pedido move a etapa (P1); sem `online` a escrita fica travada. */

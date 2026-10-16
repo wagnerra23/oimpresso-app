@@ -141,6 +141,7 @@ function Lista({ voltar, abas, aoAbrir, aoNova }: { voltar?: ReactNode; abas: Re
       <div className="oi-scroll">
         <div className="pd-corpo">
           <CampoBusca valor={busca} aoMudar={setBusca} placeholder="Cliente, número da OS ou placa" rotulo="Buscar OS" />
+          {busca.trim() && dados && dados.itens.length > 0 && <p className="p4-legal" aria-live="polite">{itens.length} de {dados.itens.length} carregadas combinam com a busca. Os contadores mostram o total, sem a busca.</p>}
           {dados && (
             <div className="man-kpis" aria-label="Pátio da oficina">
               {kpisPatio(dados).map((k) => (
