@@ -1,7 +1,7 @@
 // Novo lançamento (tela 06): validação por campo e corpo que vai ao ERP. Mexe em valor (regra mestre): o corpo
 // leva só os campos do contrato, montados um a um, e o valor arredondado em centavos.
 import { describe, expect, it } from 'vitest';
-import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, validarBaixa, corpoBaixa, formBaixa, restanteDaBaixa, mudancasAlteracao, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
+import { acoesDoLancamento, contaAnalitica, corpoAlteracao, corpoLancamento, dataGeracao, formDoLancamento, rotuloAcao, recorrenciaVigente, validarBaixa, corpoBaixa, formBaixa, restanteDaBaixa, mudancasAlteracao, dividirParcelas, formVazio, planosDoTipo, previaParcelas, proximaRecorrencia, somarMeses,
   validarLancamento, type FormLancamento } from './lancamento-regras';
 
 const PLANOS = [
@@ -193,5 +193,14 @@ describe('revisão #98', () => {
       { campo: 'Conta bancária', antes: 'Conta movimento', depois: 'Caixa balcão' },
     ]);
     expect(mudancasAlteracao(antes, { ...antes, valor: '1250,5' })).toEqual([]);
+  });
+});
+
+describe('contrato vigente', () => {
+  it('ativa sem término ou com término de hoje em diante', () => {
+    expect(recorrenciaVigente({ status: 'ativa', termino: null }, '2026-10-16')).toBe(true);
+    expect(recorrenciaVigente({ status: 'ativa', termino: '2026-10-16' }, '2026-10-16')).toBe(true);
+    expect(recorrenciaVigente({ status: 'ativa', termino: '2026-10-15' }, '2026-10-16')).toBe(false);
+    expect(recorrenciaVigente({ status: 'interrompida', termino: null }, '2026-10-16')).toBe(false);
   });
 });

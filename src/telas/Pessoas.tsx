@@ -3,7 +3,7 @@
 // (PessoaCadastro.tsx). Fora do v4 de propósito "Editar" e "Novo pedido" — não estão no contrato. Os chips seguem o contrato
 // (Todos/Clientes/Fornecedores/Funcionários/Em débito), não os do protótipo (PJ/PF).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, ErroApi, type FiltroPessoas, type ListaPessoas, type PapelPessoa, type PessoaDetalhe, type PessoaResumo } from '../api';
+import { api, ErroApi, RECORRENCIAS, type FiltroPessoas, type Recorrencia, type ListaPessoas, type PapelPessoa, type PessoaDetalhe, type PessoaResumo } from '../api';
 import { useVoltar } from '../voltar';
 import { reais } from './Pedidos';
 import { Cadastro } from './PessoaCadastro';
@@ -126,10 +126,18 @@ function Lista({ aoAbrir, aoNova, voltar }: { aoAbrir: (id: number) => void; aoN
   );
 }
 
+const FREQ: Record<Recorrencia['frequencia'], string> = { mensal: 'Mensal', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
+
 function Ficha({ id, aoVoltar, aoAbrirCadastro }: { id: number; aoVoltar: () => void; aoAbrirCadastro: () => void }) {
   const [p, setP] = useState<PessoaDetalhe | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { api.pessoa(id).then(setP).catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.')); }, [id]);
+  // Contratos vigentes (recorrências do Financeiro desta pessoa). Falha aqui não derruba a ficha: só some a seção.
+  const [contratos, setContratos] = useState<Recorrencia[] | null>(null);
+  useEffect(() => {
+    if (!RECORRENCIAS) return;
+    api.recorrencias({ contato_id: id, vigentes: true }).then((r) => setContratos(r.itens)).catch(() => setContratos(null));
+  }, [id]);
 
   const fone = p?.contato.telefone?.replace(/\D/g, '') ?? '';
   const whats = fone ? `https://wa.me/${fone.length <= 11 ? '55' + fone : fone}` : '';
@@ -193,6 +201,26 @@ function Ficha({ id, aoVoltar, aoAbrirCadastro }: { id: number; aoVoltar: () => 
                 </div>
               ))}
             </div>
+            {contratos && (
+              <>
+                <div className="p4-rotulo">Contratos vigentes</div>
+                <div className="p4-lista">
+                  {contratos.length === 0 && <div className="ps-dado" style={{ justifyContent: 'center' }}><span style={{ width: 'auto' }}>Nenhum contrato vigente</span></div>}
+                  {contratos.map((x) => (
+                    <div key={x.id} className="pd-item">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="pd-item-d">{x.descricao}</div>
+                        <div className="pd-item-m">
+                          {[x.contrato, FREQ[x.frequencia], x.proximo_vencimento ? `próximo ${x.proximo_vencimento.split('-').reverse().join('/')}` : null,
+                            x.termino ? `até ${x.termino.split('-').reverse().join('/')}` : 'sem término'].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <span className="pd-item-v" style={{ color: x.tipo === 'receber' ? 'var(--ok)' : 'var(--danger)' }}>{x.tipo === 'receber' ? '+ ' : '− '}{reais(x.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             <p className="p4-legal">Editar o cadastro continua no computador.</p>
           </div>
         )}

@@ -137,6 +137,11 @@ export function proximaRecorrencia(inicio: string, frequencia: Frequencia, dia: 
   return null;
 }
 
+/** Contrato vigente: recorrência ativa (não interrompida) e sem término ou com término de hoje em diante. */
+export function recorrenciaVigente(r: { status: string; termino: string | null }, hoje: string): boolean {
+  return r.status === 'ativa' && (!r.termino || r.termino >= hoje);
+}
+
 /** Erros por campo, em PT-BR. Vazio = pode enviar. */
 export function validarLancamento(f: FormLancamento, planos: Array<{ codigo: string }>): Record<string, string> {
   const e: Record<string, string> = {};

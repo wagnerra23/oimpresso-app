@@ -667,6 +667,8 @@ export const LANCAMENTO_ACOES = DEMO;
  *  contrato terminou); `gerados`: quantos lançamentos ela já criou. */
 export interface Recorrencia {
   id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
+  /** Cliente ou fornecedor do contrato (id de Pessoas); null quando a recorrência não tem pessoa. */
+  parte_id: number | null;
   frequencia: Frequencia; dia_geracao: number; dia_vencimento: number; inicio: string; termino: string | null;
   proxima_geracao: string | null; proximo_vencimento: string | null; gerados: number;
   status: 'ativa' | 'interrompida'; interrompida_em: string | null; contrato: string | null;
@@ -1147,7 +1149,11 @@ export const api = {
    *  422 idempotencia_conflito · 409 em_andamento · 403 sem_permissao. `chave` = Idempotency-Key da tentativa. */
   criarLancamento: (corpo: NovoLancamento, chave: string) =>
     chamar<{ id: number; ids: number[]; recorrencia_id: number | null }>('POST', '/api/app/financeiro/lancamentos', corpo, { 'Idempotency-Key': chave }),
-  recorrencias: () => chamar<{ itens: Recorrencia[] }>('GET', '/api/app/financeiro/recorrencias'),
+  /** Sem filtro: todas (aba Recorrências). `contato_id` + `vigentes`: os contratos vigentes de uma pessoa (ficha em Pessoas). */
+  recorrencias: (f: { contato_id?: number; vigentes?: boolean } = {}) => {
+    const q = [f.contato_id !== undefined && `contato_id=${f.contato_id}`, f.vigentes && 'vigentes=1'].filter(Boolean).join('&');
+    return chamar<{ itens: Recorrencia[] }>('GET', `/api/app/financeiro/recorrencias${q ? `?${q}` : ''}`);
+  },
   // Detalhe e ações do lançamento. Todas devolvem o lançamento atualizado; 409 { erro: "estado" } quando a situação
   // não permite (ex.: receber o que já foi recebido, excluir o que está pago).
   lancamento: (id: number) => chamar<LancamentoDetalhe>('GET', `/api/app/financeiro/lancamentos/${id}`),

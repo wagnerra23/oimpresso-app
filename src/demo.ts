@@ -6,7 +6,7 @@
 import { AJUSTES_PADRAO, type AjustesEmpresa } from './ajustes-regras';
 import type { AnexoOs, ParteFormulario } from './api';
 import { assinaturaValida } from './entrega-regras';
-import { dividirParcelas, proximaRecorrencia, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
+import { dividirParcelas, proximaRecorrencia, recorrenciaVigente, somarMeses, type Frequencia, type NovoLancamento as NovoLancamentoDemo } from './lancamento-regras';
 import { filtrarLancamentos, lerParams, lerSituacoes, ordenarLancamentos, situacaoDe, SITUACOES } from './financeiro-filtros';
 import { casaBusca, semAcento } from './busca';
 
@@ -406,20 +406,21 @@ const RECORRENCIAS_SEMENTE = [
   { id: 801, tipo: 'pagar', descricao: 'Aluguel do galpão', parte: 'Imobiliária Centro', plano: 'Aluguel', valor: 3500, frequencia: 'mensal', dia: 1, ini: -350, fim: null, gerados: 12, parou: null , contrato: 'CT-2025/014' },
   { id: 802, tipo: 'receber', descricao: 'Contrato · manutenção de fachada', parte: 'Clínica Vita', plano: 'Comunicação visual', valor: 450, frequencia: 'mensal', dia: 20, ini: -115, fim: 250, gerados: 4, parou: null , contrato: 'CT-2026/031' },
   { id: 803, tipo: 'pagar', descricao: 'Licença do software de corte', parte: 'Software Corte Ltda', plano: 'Insumos', valor: 1890, frequencia: 'anual', dia: 5, ini: -200, fim: null, gerados: 1, parou: null , contrato: 'LIC-8841' },
+  { id: 805, tipo: 'receber', descricao: 'Contrato · locação de painel de fachada', parte: 'Clínica Vita', plano: 'Comunicação visual', valor: 380, frequencia: 'mensal', dia: 1, ini: -45, fim: 320, gerados: 2, parou: null, contrato: 'CT-2026/044' },
   { id: 804, tipo: 'receber', descricao: 'Contrato · painel de LED', parte: 'Bistrô do Forno', plano: 'Comunicação visual', valor: 300, frequencia: 'mensal', dia: 10, ini: -190, fim: null, gerados: 6, parou: -20 , contrato: 'CT-2026/009' },
 ] as const;
-type RecDemo = { id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; plano_nome: string | null; valor: number;
+type RecDemo = { id: number; tipo: 'receber' | 'pagar'; descricao: string; parte: string | null; parte_id: number | null; plano_nome: string | null; valor: number;
   frequencia: Frequencia; dia_geracao: number; inicio: string; termino: string | null; gerados: number; interrompida_em: string | null;
   contrato: string | null };
 let recorrenciasDemo: RecDemo[] | null = null;
 const recorrencias = (): RecDemo[] => (recorrenciasDemo ??= RECORRENCIAS_SEMENTE.map((s) => ({ id: s.id, tipo: s.tipo, descricao: s.descricao,
-  parte: s.parte, plano_nome: s.plano, valor: s.valor, frequencia: s.frequencia, dia_geracao: s.dia, inicio: diaRel(s.ini),
+  parte: s.parte, parte_id: PESSOAS.find((p) => p.nome === s.parte)?.id ?? null, plano_nome: s.plano, valor: s.valor, frequencia: s.frequencia, dia_geracao: s.dia, inicio: diaRel(s.ini),
   termino: s.fim === null ? null : diaRel(s.fim), gerados: s.gerados, interrompida_em: s.parou === null ? null : diaRel(s.parou),
   contrato: s.contrato })));
 /** Formato da rota: próxima criação calculada na hora, pela mesma regra do app. */
 const verRecorrencia = (r: RecDemo) => {
   const prox = r.interrompida_em ? null : proximaRecorrencia(r.inicio, r.frequencia, r.dia_geracao, r.termino, diaRel(0));
-  return { id: r.id, tipo: r.tipo, descricao: r.descricao, parte: r.parte, plano_nome: r.plano_nome, valor: r.valor, frequencia: r.frequencia,
+  return { id: r.id, tipo: r.tipo, descricao: r.descricao, parte: r.parte, parte_id: r.parte_id, plano_nome: r.plano_nome, valor: r.valor, frequencia: r.frequencia,
     dia_geracao: r.dia_geracao, dia_vencimento: Number(r.inicio.slice(8, 10)), inicio: r.inicio, termino: r.termino,
     proxima_geracao: prox?.geracao ?? null, proximo_vencimento: prox?.vencimento ?? null, gerados: r.gerados,
     status: r.interrompida_em ? 'interrompida' : 'ativa', interrompida_em: r.interrompida_em, contrato: r.contrato };
@@ -1256,7 +1257,7 @@ export const demo = {
       const qtd = n.parcelas ?? 1;
       const valores = n.parcelas ? dividirParcelas(n.valor!, qtd) : [n.valor!];
       const ids: number[] = [];
-      const recorrencia_id: number | null = n.recorrencia ? 805 + recorrencias().length : null;
+      const recorrencia_id: number | null = n.recorrencia ? 806 + recorrencias().length : null;
       valores.forEach((valor, i) => {
         const id = 950 + LANC_CRIADOS.length;
         ids.push(id);
@@ -1268,7 +1269,7 @@ export const demo = {
           parcela: n.parcelas ? `${i + 1}/${qtd}` : null });
       });
       if (n.recorrencia && recorrencia_id !== null) {
-        recorrencias().unshift({ id: recorrencia_id, tipo: n.tipo!, descricao: desc, parte, plano_nome: plano!.nome, valor: n.valor!,
+        recorrencias().unshift({ id: recorrencia_id, tipo: n.tipo!, descricao: desc, parte, parte_id: n.contato_id ?? null, plano_nome: plano!.nome, valor: n.valor!,
           frequencia: n.recorrencia.frequencia, dia_geracao: n.recorrencia.dia_geracao, inicio: n.vencimento!, termino: n.recorrencia.termino,
           gerados: 1, interrompida_em: null, contrato: n.recorrencia.contrato ?? null });
       }
@@ -1396,8 +1397,13 @@ export const demo = {
       await espera(400);
       return r(detalheDemo(achar()!));
     }
-    if (metodo === 'GET' && caminho === '/api/app/financeiro/recorrencias') {
-      return r({ itens: recorrencias().map(verRecorrencia) });
+    if (metodo === 'GET' && /^\/api\/app\/financeiro\/recorrencias(\?|$)/.test(caminho)) {
+      // Filtros da ficha da pessoa: contato_id e vigentes=1 (ativa e sem término vencido).
+      const contato = (caminho.match(/[?&]contato_id=(\d+)/) || [])[1];
+      const vigentes = /[?&]vigentes=1/.test(caminho);
+      return r({ itens: recorrencias().map(verRecorrencia)
+        .filter((x) => contato === undefined || x.parte_id === Number(contato))
+        .filter((x) => !vigentes || recorrenciaVigente(x, diaRel(0))) });
     }
     const parar = caminho.match(/^\/api\/app\/financeiro\/recorrencias\/(\d+)\/interromper$/);
     if (metodo === 'POST' && parar) {
