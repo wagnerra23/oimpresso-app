@@ -1289,7 +1289,8 @@ export const demo = {
         const p = l.parte_id ? PESSOAS.find((x) => x.id === l.parte_id) : PESSOAS.find((x) => x.nome === l.parte);
         return r({ numero: `REC-${l.pago_em!.slice(0, 4)}-${String(l.id).padStart(5, '0')}`, tipo: l.tipo, valor: l.valor, data: l.pago_em!,
           referente: l.descricao, forma: l.forma_pagamento, documento: l.documento, empresa: EMPRESA_DEMO,
-          parte: l.parte ? { nome: l.parte, documento: p?.documento ?? null } : null });
+          parte: l.parte ? { nome: l.parte, documento: p?.documento ?? null } : null,
+          restante: (({ restante }) => (restante ? { valor: restante.valor, vencimento: restante.vencimento } : null))(detalheDemo(l)) });
       }
       const falha = (msg: string): never => { throw Object.assign(new Error(msg), { status: 409, codigo: 'estado' }); };
       const chave = cabecalhos['Idempotency-Key'];
@@ -1320,7 +1321,13 @@ export const demo = {
           competencia: 'competência', forma_pagamento: 'forma', conta_id: 'conta', plano_codigo: 'plano de contas', documento: 'documento',
           nf_numero: 'nota fiscal', observacao: 'observação', contrato: 'contrato', parte: recebe ? 'cliente' : 'fornecedor' };
         aj.campos = { ...aj.campos, ...novo };
-        if (mudou.length) aj.historico.push({ quando: hoje, texto: `Alterado: ${mudou.map((k) => NOMES[k] ?? k).join(', ')}` });
+        // Cada campo com antes → depois (valor em reais, datas em DD/MM/AAAA), como o ERP deve registrar.
+        const mostra = (k: keyof LancDemo, v: unknown) => (v === null || v === undefined || v === '' ? '—'
+          : k === 'valor' ? (v as number).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+          : k === 'vencimento' || k === 'emissao' ? brDemo(String(v))
+          : k === 'conta_id' ? CONTAS_DEMO.find((c) => c.id === v)?.nome ?? `#${v}` : String(v));
+        if (mudou.length) aj.historico.push({ quando: hoje,
+          texto: `Alterado: ${mudou.map((k) => `${NOMES[k] ?? k} ${mostra(k, l[k])} → ${mostra(k, novo[k])}`).join('; ')}` });
       } else if (metodo === 'POST' && acao === 'baixar') {
         if (l.excluido) falha('Lançamento excluído: reative antes de dar baixa.');
         if (l.status === 'liquidado') falha(recebe ? 'Este lançamento já foi recebido.' : 'Este lançamento já foi pago.');
