@@ -2,7 +2,7 @@
 // ele vence; "Interromper" para de gerar daqui pra frente (os lançamentos já criados continuam e se baixam normal).
 // Rotas GET /api/app/financeiro/recorrencias e POST .../{id}/interromper (formato proposto ao ERP).
 import { useEffect, useState } from 'react';
-import { api, ErroApi, type Recorrencia } from '../api';
+import { api, ErroApi, NOVA_RECORRENCIA, type Recorrencia } from '../api';
 import { FREQUENCIAS } from '../lancamento-regras';
 import { reais } from './Pedidos';
 
@@ -49,7 +49,7 @@ export function Recorrencias({ avisar }: { avisar?: (texto: string, tom?: 'ok' |
         </div>
       )}
       {itens && lista.length === 0 && (
-        <div className="p4-vazio"><b>Nenhuma recorrência aqui</b><span>Crie em + Novo, escolhendo "Recorrente" em Repetição.</span></div>
+        <div className="p4-vazio"><b>Nenhuma recorrência aqui</b><span>{NOVA_RECORRENCIA ? 'Crie em + Novo, escolhendo "Recorrente" em Repetição.' : 'Contratos e contas fixas cadastrados no computador aparecem aqui.'}</span></div>
       )}
       {lista.map((r) => {
         const freq = FREQUENCIAS.find((f) => f.id === r.frequencia)?.label ?? r.frequencia;

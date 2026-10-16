@@ -2,7 +2,7 @@
 // Com `editar`, é o "Alterar": mostra o antes→depois e só envia o PATCH depois do "Confirmar" (mexe em valor, Tier 0).
 // Regras, validação e corpo em ../lancamento-regras. Cliente/fornecedor vem da mesma rota da tela Pessoas.
 import { useEffect, useRef, useState } from 'react';
-import { api, camposDoErro, type LancamentoDetalhe, type PessoaResumo } from '../api';
+import { api, camposDoErro, NOVA_RECORRENCIA, type LancamentoDetalhe, type PessoaResumo } from '../api';
 import { FORMAS_PADRAO, lerValor } from '../financeiro-filtros';
 import { contaAnalitica, corpoAlteracao, corpoLancamento, formVazio, mudancasAlteracao, FREQUENCIAS, MAX_PARCELAS, planosDoTipo, previaParcelas, proximaRecorrencia, REPETICOES,
   validarLancamento, type FormLancamento, type TipoLancamento } from '../lancamento-regras';
@@ -173,7 +173,7 @@ export function NovoLancamento({ tipoInicial, contas, formas, planos, aoVoltar, 
           {!editar && <div className="p4-campo">
             <label id="nl-l-rep">Repetição</label>
             <div className="np-seg tres" role="radiogroup" aria-labelledby="nl-l-rep">
-              {REPETICOES.map((r) => (
+              {REPETICOES.filter((r) => NOVA_RECORRENCIA || r.id !== 'recorrente').map((r) => (
                 <button key={r.id} role="radio" aria-checked={f.repeticao === r.id} className={f.repeticao === r.id ? 'on' : ''} onClick={() => mudar('repeticao', r.id)}>{r.label}</button>
               ))}
             </div>

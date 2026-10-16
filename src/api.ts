@@ -673,14 +673,18 @@ export interface PainelFinanceiro {
   /** Plano de contas da empresa (grupos e contas, na ordem do código) para o filtro avançado; sem ele, o filtro some. */
   planos_conta?: Array<{ codigo: string; nome: string; tipo?: 'receita' | 'despesa' }>;
 }
-/** Liga o "Filtro avançado" do Financeiro. Só na demo até o ERP aceitar os filtros na rota §10.1
- *  (parâmetros em financeiro-filtros.ts → paramsFiltros); com o ERP pronto, vira true. */
-export const FILTRO_FINANCEIRO = DEMO;
+/** Liga o "Filtro avançado" do Financeiro: a rota §10.1 aceita os filtros e `situacao=` desde o ERP #9520
+ *  (parâmetros em financeiro-filtros.ts → paramsFiltros). Só leitura. */
+export const FILTRO_FINANCEIRO = true;
 /** Liga "+ Novo" no Financeiro (POST /api/app/financeiro/lancamentos, formato em lancamento-regras.ts). Mexe em valor:
  *  regra mestre Tier 0 (dupla prova e ok do [W]). Só na demo até o ERP ter a rota. */
 export const NOVO_LANCAMENTO = DEMO;
-/** Liga a aba Recorrências do Financeiro (contratos e contas fixas, com "Interromper"). Só na demo até o ERP ter as rotas. */
-export const RECORRENCIAS = DEMO;
+/** Liga a aba Recorrências do Financeiro (contratos e contas fixas, com "Interromper") e os contratos vigentes na ficha
+ *  da pessoa. Rotas no ERP desde o #9523 (`contato_id`, `vigentes`, `parte_id`). Não mexe em valor. */
+export const RECORRENCIAS = true;
+/** "Recorrente" no + Novo: o ERP (#9526) ainda recusa `recorrencia` no POST (422 campos.recorrencia) e não tem o gerador
+ *  das recorrências criadas pelo app. Só na demo até o ERP ter. */
+export const NOVA_RECORRENCIA = DEMO;
 /** Liga o detalhe do lançamento (tocar no cartão) com Receber/Pagar, Alterar, Excluir, Retornar e Reativar.
  *  Baixa e estorno mexem em valor: regra mestre Tier 0. Só na demo até o ERP ter as rotas. */
 export const LANCAMENTO_ACOES = DEMO;
