@@ -677,8 +677,8 @@ export interface PainelFinanceiro {
  *  (parâmetros em financeiro-filtros.ts → paramsFiltros). Só leitura. */
 export const FILTRO_FINANCEIRO = true;
 /** Liga "+ Novo" no Financeiro (POST /api/app/financeiro/lancamentos, formato em lancamento-regras.ts). Mexe em valor:
- *  regra mestre Tier 0 (dupla prova e ok do [W]). Só na demo até o ERP ter a rota. */
-export const NOVO_LANCAMENTO = DEMO;
+ *  regra mestre Tier 0. Rota no ERP desde o #9526, aprovado pelo [W] em 2026-10-16. Recorrente segue em NOVA_RECORRENCIA. */
+export const NOVO_LANCAMENTO = true;
 /** Liga a aba Recorrências do Financeiro (contratos e contas fixas, com "Interromper") e os contratos vigentes na ficha
  *  da pessoa. Rotas no ERP desde o #9523 (`contato_id`, `vigentes`, `parte_id`). Não mexe em valor. */
 export const RECORRENCIAS = true;
@@ -686,8 +686,9 @@ export const RECORRENCIAS = true;
  *  das recorrências criadas pelo app. Só na demo até o ERP ter. */
 export const NOVA_RECORRENCIA = DEMO;
 /** Liga o detalhe do lançamento (tocar no cartão) com Receber/Pagar, Alterar, Excluir, Retornar e Reativar.
- *  Baixa e estorno mexem em valor: regra mestre Tier 0. Só na demo até o ERP ter as rotas. */
-export const LANCAMENTO_ACOES = DEMO;
+ *  Baixa e estorno mexem em valor: regra mestre Tier 0. Rotas no ERP desde o #9526, aprovado pelo [W] em 2026-10-16
+ *  (excluir = cancelar no ERP, com motivo; o lançamento volta com reativar). */
+export const LANCAMENTO_ACOES = true;
 /** Recorrência (contrato ou conta fixa). `proxima_geracao`: dia em que o ERP cria o próximo lançamento (null se o
  *  contrato terminou); `gerados`: quantos lançamentos ela já criou. */
 export interface Recorrencia {
