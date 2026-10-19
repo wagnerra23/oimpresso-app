@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId 'com.oimpresso.fisio'
-        minSdk 23
+        minSdk 24  // Proteção Automática da Play exige 24+
         targetSdk 36
         // versionCode = run_number do workflow (cada envio à Play precisa de um número maior).
         versionCode Integer.parseInt(System.getenv('ANDROID_VERSION_CODE') ?: '1')
