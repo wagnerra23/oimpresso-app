@@ -1,17 +1,25 @@
 // Recibo do lançamento liquidado: prévia na tela e exportação (PDF montado no app por ../recibo, sem servidor).
 // Recebido → a empresa assina e manda ao cliente. Pago → vai ao fornecedor para ele assinar.
 // Navegador: "Baixar PDF" salva o arquivo; "Compartilhar" usa o menu de compartilhar do aparelho quando existe.
-// No app instalado (Android/iOS) salvar e compartilhar arquivo pede os plugins Filesystem e Share do Capacitor,
-// que ainda não estão no projeto: até lá a tela avisa e oferece "Copiar texto".
+// No app instalado (Android/iOS) o PDF vai para o cache do app (Filesystem) e abre o menu do aparelho (Share):
+// daí a pessoa salva em Arquivos/Drive ou manda pelo WhatsApp. "Baixar PDF" e "Compartilhar" fazem o mesmo ali.
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { api } from '../api';
 import { nomeArquivoRecibo, pdfRecibo, reciboComoTexto, textoRecibo, type ReciboDados } from '../recibo';
 import { Cabecalho } from './NovaOs';
 import { reais } from './Pedidos';
 
 type Aviso = (texto: string, tom?: 'ok' | 'warn' | 'erro') => void;
-const NATIVO_SEM_PLUGIN = 'No app instalado, salvar e enviar o PDF chega com o plugin de compartilhar. Por enquanto, use Copiar texto.';
+
+/** Bytes → base64 em blocos (o PDF passa do limite de argumentos do String.fromCharCode). */
+function base64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
 
 export function Recibo({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => void; avisar?: Aviso }) {
   const [r, setR] = useState<ReciboDados | null>(null);
@@ -22,9 +30,20 @@ export function Recibo({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => v
 
   const arquivo = (x: ReciboDados) => new File([pdfRecibo(x) as BlobPart], nomeArquivoRecibo(x), { type: 'application/pdf' });
 
+  // App instalado: grava no cache e abre o menu do aparelho (salvar em Arquivos/Drive ou enviar).
+  const compartilharNativo = async (x: ReciboDados) => {
+    try {
+      const { uri } = await Filesystem.writeFile({ path: nomeArquivoRecibo(x), data: base64(pdfRecibo(x)), directory: Directory.Cache });
+      await Share.share({ title: `Recibo ${x.numero}`, files: [uri], dialogTitle: 'Salvar ou enviar o recibo' });
+    } catch (e) {
+      // Fechar o menu de compartilhar não é erro.
+      if (!/cancel/i.test(String((e as { message?: string } | null)?.message ?? ''))) avisar?.('Não foi possível gerar o PDF. Use Copiar texto.', 'erro');
+    }
+  };
+
   const baixar = () => {
     if (!r) return;
-    if (Capacitor.isNativePlatform()) { avisar?.(NATIVO_SEM_PLUGIN, 'warn'); return; }
+    if (Capacitor.isNativePlatform()) { void compartilharNativo(r); return; }
     const url = URL.createObjectURL(arquivo(r));
     const a = document.createElement('a');
     a.href = url; a.download = nomeArquivoRecibo(r);
@@ -35,12 +54,13 @@ export function Recibo({ id, aoVoltar, avisar }: { id: number; aoVoltar: () => v
 
   const compartilhar = async () => {
     if (!r) return;
+    if (Capacitor.isNativePlatform()) { await compartilharNativo(r); return; }
     const titulo = `Recibo ${r.numero}`;
     try {
       const f = arquivo(r);
       if (navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f], title: titulo, text: titulo });
       else if (navigator.share) await navigator.share({ title: titulo, text: reciboComoTexto(r) });
-      else { avisar?.(Capacitor.isNativePlatform() ? NATIVO_SEM_PLUGIN : 'Compartilhar não está disponível aqui. Use Baixar PDF ou Copiar texto.', 'warn'); return; }
+      else { avisar?.('Compartilhar não está disponível aqui. Use Baixar PDF ou Copiar texto.', 'warn'); return; }
     } catch (e) {
       // Fechar o menu de compartilhar não é erro.
       if ((e as { name?: string } | null)?.name !== 'AbortError') avisar?.('Não foi possível compartilhar. Use Baixar PDF ou Copiar texto.', 'erro');
