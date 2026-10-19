@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">oimpresso Fisio</string>
+    <string name="launchUrl">https://oimpresso.com/fisio/app</string>
+    <string name="assetStatements" translatable="false">
+        [{ \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+           \"target\": { \"namespace\": \"web\", \"site\": \"https://oimpresso.com\" } }]
+    </string>
+</resources>

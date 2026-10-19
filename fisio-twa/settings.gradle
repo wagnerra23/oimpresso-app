@@ -1,0 +1,18 @@
+// App do PACIENTE do módulo Fisio (ERP oimpresso) — Trusted Web Activity.
+// Abre o portal web https://oimpresso.com/fisio/... em tela cheia. Não é o app do oimpresso
+// (com.oimpresso.app, pasta android/): é um pacote separado, com.oimpresso.fisio.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'oimpresso-fisio'
+include ':app'

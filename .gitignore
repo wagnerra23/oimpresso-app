@@ -28,3 +28,7 @@ ios/DerivedData/
 
 # build do Vite (gerado por npm run build)
 /www/
+# app do paciente do Fisio (TWA)
+fisio-twa/app/build/
+fisio-twa/build/
+fisio-twa/.gradle/
