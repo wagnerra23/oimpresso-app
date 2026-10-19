@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Roxo 295 do DS do oimpresso (primary oklch(0.55 0.15 295)), o mesmo do ícone. -->
+    <color name="colorPrimary">#795BBF</color>
+    <color name="navigationColor">#FFFFFF</color>
+</resources>

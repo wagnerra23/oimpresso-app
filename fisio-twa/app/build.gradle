@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.oimpresso.fisio'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.oimpresso.fisio'
+        minSdk 24  // Proteção Automática da Play exige 24+
+        targetSdk 36
+        // versionCode = run_number do workflow (cada envio à Play precisa de um número maior).
+        versionCode Integer.parseInt(System.getenv('ANDROID_VERSION_CODE') ?: '1')
+        versionName '0.1.0'
+    }
+
+    signingConfigs {
+        release {
+            // Mesma UPLOAD KEY do app oimpresso (segredos ANDROID_KEYSTORE_*). A chave definitiva
+            // fica no Google (Play App Signing). Sem keystore no ambiente, o build release falha.
+            def ks = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}
