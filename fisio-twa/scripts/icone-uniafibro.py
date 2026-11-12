@@ -1,5 +1,5 @@
 """Ícone do app Uniafibro, redesenhado a partir do logo da associação:
-roda de 6 pessoas de mãos dadas, mapa de SC com "SC" e o laço roxo da fibromialgia,
+roda de 6 pessoas de mãos dadas com o laço roxo da fibromialgia no centro,
 roxo em degradê (lilás em cima à esquerda, roxo escuro embaixo à direita) sobre branco.
 
 Uso: python -I icone-uniafibro.py <saida_dir>
@@ -9,15 +9,13 @@ import math
 import os
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 S = 2048
 C = S / 2
 K = 5.0  # escala: 1 unidade do logo original (640 px) = K px aqui
 LILAS = (178, 140, 226)
 ROXO = (70, 22, 122)
-FONTES = ["C:/Windows/Fonts/georgia.ttf", "C:/Windows/Fonts/times.ttf",
-          "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"]
 
 
 def L(x, y):
@@ -88,33 +86,6 @@ def roda():
     return m
 
 
-# ---------- mapa de Santa Catarina (silhueta simplificada) ----------
-SC = [  # contorno aproximado: oeste à esquerda, litoral à direita, sul embaixo
-    (220, 176), (228, 168), (241, 165), (254, 166), (266, 162), (279, 158), (292, 159),
-    (303, 156), (315, 158), (328, 155), (342, 152), (356, 151), (370, 149), (383, 146),
-    (396, 143), (407, 146), (412, 154), (406, 162), (410, 171), (404, 180), (408, 190),
-    (402, 199), (405, 209), (398, 216), (399, 226), (391, 236), (385, 248), (377, 260),
-    (368, 271), (358, 283), (347, 293), (338, 300), (333, 289), (327, 275), (320, 261),
-    (312, 247), (304, 234), (294, 223), (282, 216), (268, 212), (254, 210), (240, 208),
-    (229, 202), (222, 190)]
-
-
-def mapa():
-    m = mascara()
-    ImageDraw.Draw(m).polygon([L(x, y) for x, y in SC], fill=255)
-    # "SC" vazado em branco
-    fonte = None
-    for f in FONTES:
-        if os.path.exists(f):
-            fonte = ImageFont.truetype(f, int(36 * K))
-            break
-    if fonte is None:
-        fonte = ImageFont.load_default()
-    txt = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(txt).text(L(342, 205), "SC", font=fonte, fill=255, anchor="mm")
-    return ImageChops.subtract(m, txt)
-
-
 # ---------- laço ----------
 def bezier(p0, p1, p2, p3, n=160):
     out = []
@@ -133,29 +104,26 @@ def traco(d, pts, w, cor):
 
 
 def laco(m):
-    """laço embaixo à esquerda do mapa, com contorno branco separando do mapa."""
+    """laço da fibromialgia no centro da roda."""
     d = ImageDraw.Draw(m)
-    cx, cy, s = 262, 258, 0.115
+    cx, cy, s = 320, 214, 0.2
     P = lambda x, y: L(cx + x * s, cy + y * s)
-    w = 9 * K
+    w = 17 * K
     s1 = bezier(P(-230, 400), P(-115, 225), P(35, 70), P(85, -35))
     s2 = bezier(P(85, -35), P(205, -280), P(110, -400), P(0, -400))
     s3 = bezier(P(0, -400), P(-110, -400), P(-205, -280), P(-85, -35))
     s4 = bezier(P(-85, -35), P(-35, 70), P(115, 225), P(230, 400))
-    borda = w + 7 * K
-    for seg in (s1, s2, s3, s4):
-        traco(d, seg, borda, 0)
     for seg in (s2, s3, s4):
         traco(d, seg, w, 255)
-    traco(d, s1[40:], w + 4 * K, 0)
+    traco(d, s1[40:], w + 8 * K, 0)
     traco(d, s1, w, 255)
     # pontas retas
     for x, y in (P(-230, 400), P(230, 400)):
-        d.rectangle([x - 7 * K, y - 1 * K, x + 7 * K, y + 7 * K], fill=0)
+        d.rectangle([x - 12 * K, y - 1 * K, x + 12 * K, y + 12 * K], fill=0)
 
 
 def marca():
-    m = ImageChops.lighter(roda(), mapa())
+    m = roda()
     laco(m)
     return m
 
