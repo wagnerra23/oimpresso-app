@@ -32,3 +32,4 @@ ios/DerivedData/
 fisio-twa/app/build/
 fisio-twa/build/
 fisio-twa/.gradle/
+__pycache__/
